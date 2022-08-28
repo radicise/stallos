@@ -1,0 +1,1 @@
+"newf" is the default GNU LD linker script edited to change the text segment to start at 0x40 (2 changed lines)
