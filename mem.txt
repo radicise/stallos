@@ -1,3 +1,4 @@
+# Real-mode OS memory variables
 0x0050:______
 b	0x0000	BIOS boot drive number
 b	0x0002	Console width, characters
