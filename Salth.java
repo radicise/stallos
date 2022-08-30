@@ -1,7 +1,9 @@
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.EmptyStackException;
 import java.util.Stack;
 public class Salth {
@@ -15,13 +17,27 @@ public class Salth {
 	static int blo;
 	static int brer;
 	static String pref;
+	static int errors;
+	static int warns;
+	static long compDate;
+	static String tim;
+	static long fcompDate;
+	static String ftim;
+	static String version = "0.1";// TODO Bump version number (do not remove this to-do marking)
 	static String cleanse(String s) {
 		return cleanse(Integer.decode(s));
 	}
 	static String cleanse(int i) {// TODO Warn if out of 16-bit integer limit or 8-bit integer limit and pad / truncate hex (as appropriate)
 		return "0x" + Integer.toHexString(i);
 	}
-	public synchronized static void main(String[] args) {// TODO Implement syntax for static linking from other source files, only import used functions
+	public synchronized static void main(String[] args) throws IOException {// TODO Implement syntax for static linking from other source files, only import used functions
+		compDate = System.currentTimeMillis();
+		tim = (new Date(compDate)).toString();
+		System.out.println("# --------------------------------");
+		System.out.println("# Salth-to-x86_asm compiler, version \"" + version + "\"");
+		System.out.println("# Compilation started at millisecond " + Long.toString(compDate) + " (" + tim + ")");
+		errors = 0;
+		warns = 0;
 		BufferedReader inr = new BufferedReader(new InputStreamReader(System.in));
 		String tin;
 		String[] tre;
@@ -41,32 +57,32 @@ public class Salth {
 		int reer;
 		boolean fuo = false;
 		boolean raw = false;
-		try {
-			pref = "";
-			if (args.length > 0) {
-				if (args.length > 1) {
-					pref = args[1] + "_";
-				}
-				if (args[0].contains("s")) {
-					System.out.println(".globl " + pref + "_start");
-					System.out.println(".text");
-					System.out.println(".code16");
-				}
-				System.out.println("_" + pref + "start:");
-				if (!(args[0].contains("u"))) {
-					System.out.println("movw %cs,%bx");
-					System.out.println("addw $" + pref + "RESrmstroff,%bx");
-					System.out.println("movw %bx,%es");
-				}
+		pref = "";
+		if (args.length > 0) {
+			if (args.length > 1) {
+				pref = args[1] + "_";
 			}
-			else {
-				System.out.println("_" + pref + "start:");
+			if (args[0].contains("s")) {
+				System.out.println(".globl _" + pref + "start");
+				System.out.println(".text");
+				System.out.println(".code16");
+			}
+			System.out.println("_" + pref + "start:");
+			if (!(args[0].contains("u"))) {
 				System.out.println("movw %cs,%bx");
 				System.out.println("addw $" + pref + "RESrmstroff,%bx");
 				System.out.println("movw %bx,%es");
 			}
-			while ((tin = inr.readLine()) != null) {
-				line++;
+		}
+		else {
+			System.out.println("_" + pref + "start:");
+			System.out.println("movw %cs,%bx");
+			System.out.println("addw $" + pref + "RESrmstroff,%bx");
+			System.out.println("movw %bx,%es");
+		}
+		while ((tin = inr.readLine()) != null) {
+			line++;
+			try {
 				tin = tin.trim();
 				tre = tin.split(" ");
 				if (raw) {
@@ -236,22 +252,31 @@ public class Salth {
 				}
 				sols(tre);
 			}
-			if ((!(blocks.empty())) || (!(blid.empty()))) {
-				throw new Exception("Unclosed coditional block(s)");
-			}
-			System.out.println(".space (16 - ((. - " + pref + "_start) % 16)) % 16");
-			System.out.println(".set " + pref + "RESrmstroff, (. - " + pref + "_start) / 16");
-			System.out.println(pref + "RESstrstart:");
-			for(Svar vs : vass) {
-				System.out.println(pref + "str_" + vs.name + ':');
-				System.out.println(".asciz \"" + vs.cont + "\"");
-				System.out.println(".set " + pref + "str_" + vs.name + "_len, ( . - str_" + vs.name + " - 1 )");
-				System.out.println(".set " + pref + "str_" + vs.name + "_addr, ( str_" + vs.name + " - " + pref + "RESstrstart )");
+			catch (Exception E) {
+				errors++;
+				System.out.println(".err # Salth source (line " + Integer.toString(line) + "): " + E.getMessage());
 			}
 		}
-		catch (Exception E) {
-			System.out.println("Line " + line + ": " + E);
+		if ((!(blocks.empty())) || (!(blid.empty()))) {
+			System.out.println(".err # Unclosed coditional block(s)");
+			errors++;
 		}
+		System.out.println(".space (16 - ((. - _" + pref + "start) % 16)) % 16");
+		System.out.println(".set " + pref + "RESrmstroff, (. - _" + pref + "start) / 16");
+		System.out.println(pref + "RESstrstart:");
+		for(Svar vs : vass) {
+			System.out.println(pref + "str_" + vs.name + ':');
+			System.out.println(".asciz \"" + vs.cont + "\"");
+			System.out.println(".set " + pref + "str_" + vs.name + "_len, ( . - " + pref + "str_" + vs.name + " - 1 )");
+			System.out.println(".set " + pref + "str_" + vs.name + "_addr, ( " + pref + "str_" + vs.name + " - " + pref + "RESstrstart )");
+		}
+		fcompDate = System.currentTimeMillis();
+		System.out.println("# End of Salth-to-x86_asm compilation started at millisecond " + Long.toString(compDate) + " (" + tim + ")");
+		ftim = (new Date(fcompDate)).toString();
+		System.out.println("# Finished at millisecond " + Long.toString(fcompDate) + " (" + ftim + ")");
+		long elapsed = fcompDate - compDate;
+		System.out.println("# " + Integer.toString(errors) + " error(s), " + Integer.toString(warns) + " warning(s), " + Integer.toString(line) + " source line(s), " + Long.toString(elapsed / 1000) + "." + Long.toString((elapsed % 1000) + 1000).substring(1) + "s");
+		System.out.println("# --------------------------------");
 	}
 	static void sols(String[] ss) throws Exception {
 		solv(Arrays.copyOfRange(ss, 2, ss.length));
@@ -372,7 +397,7 @@ public class Salth {
 					System.out.println("orw %bx,%ax");
 					break;
 				default:
-					throw new Exception("Invalid infix operator: \"" + ss[j] + "\"");
+					throw new Exception("Invalid infix operator: \"" + ss[j + 1] + "\"");
 			}
 			if (brc) {
 				j = dah - 2;
@@ -411,7 +436,7 @@ public class Salth {
 					throw new Exception("Unknown string field: \"" + ves[1] + "\"");
 				}
 				else {
-					throw new VariableUndefinedException(F.getMessage() + " (also does not resolve to a string constant");
+					throw new VariableUndefinedException(F.getMessage() + " (also does not resolve to a string field)");
 				}
 			}
 		}
