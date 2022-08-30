@@ -18,11 +18,10 @@ public class Salth {
 	static String cleanse(String s) {
 		return cleanse(Integer.decode(s));
 	}
-	static String cleanse(int i) {
-		// TODO warn if out of 16-bit integer limit or 8-bit integer limit and pad / truncate hex (as appropriate)
+	static String cleanse(int i) {// TODO Warn if out of 16-bit integer limit or 8-bit integer limit and pad / truncate hex (as appropriate)
 		return "0x" + Integer.toHexString(i);
 	}
-	public synchronized static void main(String[] args) {
+	public synchronized static void main(String[] args) {// TODO Implement syntax for static linking from other source files, only import used functions
 		BufferedReader inr = new BufferedReader(new InputStreamReader(System.in));
 		String tin;
 		String[] tre;
@@ -45,18 +44,30 @@ public class Salth {
 		try {
 			pref = "";
 			if (args.length > 0) {
-				if (args[0].contains("s")) {
-					System.out.println(".globl _start");
-					System.out.println(".text");
-					System.out.println(".code16");
-				}
 				if (args.length > 1) {
 					pref = args[1] + "_";
 				}
+				if (args[0].contains("s")) {
+					System.out.println(".globl " + pref + "_start");
+					System.out.println(".text");
+					System.out.println(".code16");
+				}
+				System.out.println("_" + pref + "start:");
+				if (!(args[0].contains("u"))) {
+					System.out.println("movw %cs,%bx");
+					System.out.println("addw $" + pref + "RESrmstroff,%bx");
+					System.out.println("movw %bx,%es");
+				}
 			}
-			System.out.println("_" + pref + "start:");
+			else {
+				System.out.println("_" + pref + "start:");
+				System.out.println("movw %cs,%bx");
+				System.out.println("addw $" + pref + "RESrmstroff,%bx");
+				System.out.println("movw %bx,%es");
+			}
 			while ((tin = inr.readLine()) != null) {
 				line++;
+				tin = tin.trim();
 				tre = tin.split(" ");
 				if (raw) {
 					if (tin.equals("endraw")) {
@@ -197,7 +208,7 @@ public class Salth {
 					continue;
 				}
 				if (tre[0].equals("decl")) {
-					vars.add((new Var()).name(tre[1]).pos(n = (Var.curp = Var.curp + 2)));
+					vars.add((new Var()).name(tre[1]).pos(n = (Var.curp = Var.curp + 2)));// TODO Optimize variable memory usage
 					vans.add(tre[1]);
 					solv(Arrays.copyOfRange(tre, 2, tre.length));
 					System.out.println("movw %ax,%ds:" + cleanse(n));
@@ -228,13 +239,14 @@ public class Salth {
 			if ((!(blocks.empty())) || (!(blid.empty()))) {
 				throw new Exception("Unclosed coditional block(s)");
 			}
-			System.out.println(".space (16 - ((.-_start) % 16)) % 16");
+			System.out.println(".space (16 - ((. - " + pref + "_start) % 16)) % 16");
+			System.out.println(".set " + pref + "RESrmstroff, (. - " + pref + "_start) / 16");
 			System.out.println(pref + "RESstrstart:");
 			for(Svar vs : vass) {
 				System.out.println(pref + "str_" + vs.name + ':');
 				System.out.println(".asciz \"" + vs.cont + "\"");
 				System.out.println(".set " + pref + "str_" + vs.name + "_len, ( . - str_" + vs.name + " - 1 )");
-				System.out.println(".set " + pref + "str_" + vs.name + "_addr, ( str_" + vs.name + " - RESstrstart )");
+				System.out.println(".set " + pref + "str_" + vs.name + "_addr, ( str_" + vs.name + " - " + pref + "RESstrstart )");
 			}
 		}
 		catch (Exception E) {
@@ -389,14 +401,14 @@ public class Salth {
 						throw new Exception("String field not present");
 					}
 					if (ves[1].equals("len")) {
-						System.out.println("movw $" + pref + "str_" + ves[0] + "_len");
+						System.out.println("movw $" + pref + "str_" + ves[0] + "_len,%" + reg);
 						return;
 					}
-					if (ves[1].equals("len")) {
-						System.out.println("movw $" + pref + "str_" + ves[0] + "_len");
+					if (ves[1].equals("addr")) {
+						System.out.println("movw $" + pref + "str_" + ves[0] + "_addr,%" + reg);
 						return;
 					}
-					throw new Exception("Unknown string field");
+					throw new Exception("Unknown string field: \"" + ves[1] + "\"");
 				}
 				else {
 					throw new VariableUndefinedException(F.getMessage() + " (also does not resolve to a string constant");
@@ -417,7 +429,7 @@ public class Salth {
 		}
 		int i = vans.indexOf(n);
 		if (i == (-1)) {
-			throw new Exception("Undefined variable \"" + n + "\"");
+			throw new VariableUndefinedException("Undefined variable \"" + n + "\"");
 		}
 		return vars.get(i).pos;
 	}

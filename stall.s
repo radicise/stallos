@@ -40,7 +40,7 @@ _start: # TODO migrate to protected mode
     movw $0x01,%dx
     call _cann
     incw %ax
-    add $0x0200,%bx
+    addw $0x0200,%bx
     loop kree
     # call _dishe
     # call test
@@ -280,7 +280,7 @@ _print:
     movw $0x50,%bx
     movw %bx,%ds
     popw %si
-    cmp $0x00,0x0c
+    cmpb $0x00,0x0c
     jz kreh
     movw %di,%ax
     movw %si,%bx
@@ -362,4 +362,10 @@ _read:
     loop rheat
     reand:
     ret
+.space 2048-(.-_start)
+    call _cann
+    iretw
+.space 2560-(.-_start)
+    call _cahh
+    iretw
 .space 1474560-(.-_start)
