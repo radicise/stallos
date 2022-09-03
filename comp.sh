@@ -1,39 +1,50 @@
 #!/bin/sh
 PROL="stall"
-as -o $PROL.o $PROL.s
-LEC=$?
-if [ $LEC -ne 0 ];then
-    printf "as failed with code $LEC\n"
-    exit $LEC
+cp stall.s stall-comp.s
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "cp failed with code ${LEC}\n"
+    exit ${LEC}
+fi
+printf "asm_copy:       succeeded\n"
+java -jar salth.jar n staltstd < ${PROL}.slth >> ${PROL}-comp.s
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "java failed with code ${LEC}\n"
+    exit ${LEC}
+fi
+printf "salth_compile:  succeeded\n"
+printf ".space 1474560-(.-_start)\n" >> ${PROL}-comp.s
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "printf failed with code ${LEC}\n"
+    exit ${LEC}
+fi
+printf "src_141MBpad:   succeeded\n"
+as -o ${PROL}.o ${PROL}-comp.s
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "as failed with code ${LEC}\n"
+    exit ${LEC}
 fi
 printf "assembly:       succeeded\n"
-ld -T "./newf" -o $PROL.elf $PROL.o
-LEC=$?
-if [ $LEC -ne 0 ];then
-    printf "ld failed with code $LEC\n"
-    exit $LEC
+ld -T "./newf" -o ${PROL}.elf ${PROL}.o
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "ld failed with code ${LEC}\n"
+    exit ${LEC}
 fi
 printf "linking:        succeeded\n"
-objcopy -O binary $PROL.elf $PROL.bin
-LEC=$?
-if [ $LEC -ne 0 ];then
-    printf "objcopy failed with code $LEC\n"
+objcopy -O binary ${PROL}.elf ${PROL}.bin
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "objcopy failed with code ${LEC}\n"
     exit 255
 fi
-printf "objcopy:        succeeded\n"
-if [ -e "./stal.flab" ];then
-    rm ./$PROL.flab
-    LEC=$?
-    if [ $LEC -ne 0 ];then
-        printf "rm failed with code $LEC\n"
-        exit 255
-    fi
-    printf "remove:         succeeded\n"
-fi
-qemu-system-i386 -drive file=$PROL.bin,index=0,if=floppy,format=raw
-LEC=$?
-if [ $LEC -ne 0 ];then
-    printf "remove failed with code $LEC\n"
+qemu-system-i386 -drive file=${PROL}.bin,index=0,if=floppy,format=raw
+LEC=${?}
+if [ ${LEC} -ne 0 ];then
+    printf "remove failed with code ${LEC}\n"
     exit 255
 fi
 printf "execution:      succeeded\n"

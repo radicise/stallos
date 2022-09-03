@@ -24,11 +24,22 @@ public class Salth {
 	static long fcompDate;
 	static String ftim;
 	static String version = "0.1";// TODO Bump version number (do not remove this to-do marking)
+	static int wsize;
+	static char wsuf;
+	static String wpref;
+	static int wtype;
+	static int line;
+	static void noImp() {
+		System.out.println(".err # ERROR: Salth source (line " + Integer.toString(line) + "): This functionality has not been implemented");
+	}
 	static String cleanse(String s) {
 		return cleanse(Integer.decode(s));
 	}
 	static String cleanse(int i) {// TODO Warn if out of 16-bit integer limit or 8-bit integer limit and pad / truncate hex (as appropriate)
-		return "0x" + Integer.toHexString(i);
+		if (i >= 0) {
+			return "0x" + Integer.toHexString(i);
+		}
+		return "-0x" + Integer.toHexString(-i);
 	}
 	public synchronized static void main(String[] args) throws IOException {// TODO Implement syntax for static linking from other source files, only import used functions
 		compDate = System.currentTimeMillis();
@@ -38,6 +49,7 @@ public class Salth {
 		System.out.println("# Compilation started at millisecond " + Long.toString(compDate) + " (" + tim + ")");
 		errors = 0;
 		warns = 0;
+		line = 0;
 		BufferedReader inr = new BufferedReader(new InputStreamReader(System.in));
 		String tin;
 		String[] tre;
@@ -53,37 +65,77 @@ public class Salth {
 		int n;
 		int p;
 		int c;
-		int line = 0;
 		int reer;
 		boolean fuo = false;
 		boolean raw = false;
 		pref = "";
+		wsize = 2;
+		wsuf = 'w';
+		wpref = "";
+		wtype = 1;
 		if (args.length > 0) {
 			if (args.length > 1) {
 				pref = args[1] + "_";
+				if (args.length > 2) {
+					noImp();
+					try {
+						reer = Integer.parseInt(args[2]);
+					}
+					catch (NumberFormatException E) {
+						System.out.println("# WARNING: Illegal word size setting \"" + args[2] + "\", defaulting to 16 bits");
+						reer = 16;
+					}
+					switch (reer) {
+						case (16):
+							break;
+						case (32):
+							wtype = 2;
+							wsize = 4;
+							wsuf = 'l';
+							wpref = "e";
+							break;
+						case (64):
+							wtype = 3;
+							wsize = 8;
+							wsuf = 'q';
+							wpref = "r";
+							break;
+						default:
+							System.out.println("# WARNING: Illegal word size setting \"" + args[2] + "\", defaulting to 16 bits");
+							warns++;
+					}
+				}
 			}
 			if (args[0].contains("s")) {
 				System.out.println(".globl _" + pref + "start");
 				System.out.println(".text");
-				System.out.println(".code16");
+				if (wtype == 1) {
+					System.out.println(".code16");
+				}
+				else if (wtype == 2) {
+					System.out.println(".code32");// Uhh
+				}
 			}
 			System.out.println("_" + pref + "start:");
 			if (!(args[0].contains("u"))) {
-				System.out.println("movw %cs,%bx");
-				System.out.println("addw $" + pref + "RESrmstroff,%bx");
-				System.out.println("movw %bx,%es");
+				System.out.println("mov" + wsuf + " %" + wpref + "cs,%" + wpref + "bx");
+				System.out.println("add" + wsuf + " $" + pref + "RESrmstroff,%" + wpref + "bx");
+				System.out.println("mov" + wsuf + " %" + wpref + "bx,%" + wpref + "es");
 			}
 		}
 		else {
 			System.out.println("_" + pref + "start:");
-			System.out.println("movw %cs,%bx");
-			System.out.println("addw $" + pref + "RESrmstroff,%bx");
-			System.out.println("movw %bx,%es");
+			System.out.println("mov" + wsuf + " %" + wpref + "cs,%" + wpref + "bx");
+			System.out.println("add" + wsuf + " $" + pref + "RESrmstroff,%" + wpref + "bx");
+			System.out.println("mov" + wsuf + " %" + wpref + "bx,%" + wpref + "es");
 		}
 		while ((tin = inr.readLine()) != null) {
 			line++;
 			try {
 				tin = tin.trim();
+				if (tin.equals("")) {
+					continue;
+				}
 				tre = tin.split(" ");
 				if (raw) {
 					if (tin.equals("endraw")) {
@@ -112,7 +164,7 @@ public class Salth {
 					}
 					n = Integer.decode(tre[2]);
 					if ((n > 15) || (n < 0)) {
-						throw new Exception ("Argument count (" + Integer.toString(n) + ") is not in the range [0, 16]");
+						throw new Exception ("Argument count (" + Integer.toString(n) + ") is not in the range [0, 15]");
 					}
 					System.out.println(pref + "func_" + tre[1] + "_" + Integer.toString(n) + ":");
 					fuo = true;
@@ -124,13 +176,14 @@ public class Salth {
 				}
 				if (tre[0].equals("if")) {
 					solv(Arrays.copyOfRange(tre, 1, tre.length));
-					System.out.println("cmpw $0x0000,%ax");
+					System.out.println("testw %ax,%ax");
 					blocks.push(blex);
 					brer++;
 					blex = brer;
 					System.out.println("jz " + pref + "block_" + Integer.toString(blex));
 					blid.push(blo);
 					blo = 1;
+					continue;
 				}
 				if (tre[0].equals("endif")) {
 					if (blo != 1) {
@@ -144,6 +197,7 @@ public class Salth {
 					catch (EmptyStackException E) {
 						throw new Exception("Use of \"endif\" outside of a conditional block");
 					}
+					continue;
 				}
 				if (tre[0].equals("while")) {
 					blocks.push(blex);
@@ -151,10 +205,11 @@ public class Salth {
 					blex = brer;
 					System.out.println(pref + "wstart_" + Integer.toString(blex) + ":");
 					solv(Arrays.copyOfRange(tre, 1, tre.length));
-					System.out.println("cmpw $0x0000,%ax");
+					System.out.println("testw %ax,%ax");
 					System.out.println("jz " + pref + "block_" + Integer.toString(blex));
 					blid.push(blo);
 					blo = 2;
+					continue;
 				}
 				if (tre[0].equals("wend")) {
 					if (blo != 2) {
@@ -169,6 +224,7 @@ public class Salth {
 					catch (EmptyStackException E) {
 						throw new Exception("Use of \"wend\" outside of a conditional block");
 					}
+					continue;
 				}
 				if (tre[0].equals("goto")) {
 					System.out.println("jmp " + pref + "label_" + tre[1]);
@@ -201,7 +257,7 @@ public class Salth {
 								}
 							}
 							solv(Arrays.copyOfRange(tre, p, n));
-							System.out.println("movw %ax,%ds:" + cleanse(c * 2));
+							System.out.println("movw %ax,%ds:" + cleanse((15 - c) * 2));
 							if (n == tre.length) {
 								break;
 							}
@@ -211,12 +267,12 @@ public class Salth {
 						}
 						c++;
 						for (reer = 0; reer < c; reer++) {
-							System.out.println("pushw %ds:" + cleanse(reer * 2));
+							System.out.println("pushw %ds:" + cleanse((15 - reer) * 2));
 						}
 						System.out.println("call " + pref + "func_" + tre[1] + "_" + Integer.toString(c));
 						reer--;
 						for (;reer >= 0; reer--) {
-							System.out.println("popw %ds:" + cleanse(reer * 2));
+							System.out.println("popw %ds:" + cleanse((15 - reer) * 2));
 						}
 						continue;
 					}
@@ -254,11 +310,11 @@ public class Salth {
 			}
 			catch (Exception E) {
 				errors++;
-				System.out.println(".err # Salth source (line " + Integer.toString(line) + "): " + E.getMessage());
+				System.out.println(".err # ERROR: Salth source (line " + Integer.toString(line) + "): " + E.getMessage());
 			}
 		}
 		if ((!(blocks.empty())) || (!(blid.empty()))) {
-			System.out.println(".err # Unclosed coditional block(s)");
+			System.out.println(".err # ERROR: Unclosed coditional block(s)");
 			errors++;
 		}
 		System.out.println(".space (16 - ((. - _" + pref + "start) % 16)) % 16");
@@ -332,7 +388,10 @@ public class Salth {
 			j--;
 			solv(Arrays.copyOfRange(ss, 1, j));
 		}
-		for (; j < (ss.length - 1); j += 2) { // TODO Implement order of operation
+		if ((ss.length % 2) == 0) {
+			throw new Exception("Invalid expression");
+		}
+		for (; j < (ss.length - 1); j += 2) {// TODO Implement order of operation
 			if (ss[j + 2].equals("(")) {
 				System.out.println("pushw %ax");
 				eg = j;
@@ -444,10 +503,10 @@ public class Salth {
 	static int locv(String n) throws Exception {
 		if (n.startsWith("arg")) {
 			int t = Integer.decode(n.substring(3));
-			if ((t < 0) || (t > 15)) {
+			if ((t < 0) || (t > 14)) {
 				throw new Exception("Illegal argument index");
 			}
-			return t * 2;
+			return (14 - t) * wsize;
 		}
 		if (n.equals("res")) {
 			return 30;

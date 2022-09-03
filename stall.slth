@@ -1,0 +1,20 @@
+// 
+func print 2
+startraw
+    movw %ds:0x1c,%bx
+    movw %ds:0x1a,%cx
+    movw %0x02,%dx
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    lcall *%ss:(%di)
+    movw %dx,%ds:0x1e
+    popw %ax
+    popw %ax
+endraw
+    return res
+endfunc
+func readchar 1
+call read arg0 , 1
+return res
+endfunc

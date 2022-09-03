@@ -364,8 +364,9 @@ _read:
     ret
 .space 2048-(.-_start)
     call _cann
-    iretw
+    lretw
 .space 2560-(.-_start)
+    call test
     call _cahh
-    iretw
-.space 1474560-(.-_start)
+    lretw
+.space 3072-(.-_start)
