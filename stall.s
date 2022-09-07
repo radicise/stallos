@@ -191,9 +191,10 @@ _seac:
     movw $isec,%ax
     movw %ax,%es
     movw $iadd,%bx
-    movw $1,%cx
+    movw $0x01,%cx
+    xorw %ax,%ax
     steel:
-    movw $3,%dx
+    movw $0x03,%dx
     call _cann
     cmpb $0x0a,%es:(%bx)
     jz holk
@@ -207,6 +208,16 @@ _seac:
     movb $0x0a,%es:(%bx)
     movw $2,%dx
     call _cann
+    pushw $0x0880
+    pushw $0x0000
+    movw %sp,%di
+    pushw %ds
+    movw $0x0080,%ax
+    movw %ax,%ds
+    lcall *%ss:(%di)
+    popw %ds
+    popw %ax
+    popw %ax
     jmp shesh
 .space 1024-(.-_start)
 _print:
@@ -350,23 +361,32 @@ _print:
 .space 1536-(.-_start)
 _read:
     # doc:
-    # %es:%bx - Destination location
-    # %cx - Length in bytes
+    # %ax - Read ASCII or 16-bit code (ax=0x00000: ASCII, ax!=0x0000: 16-bit code)
+    # %es:(%bx) - Destination location start
+    # %cx - Length in units
     # Cannot cross segment boundary of %es
     jcxz reand
+    test %ax,%ax
+    jz rheat
+    coalm:
+    movb $0x00,%ah
+    int $0x16
+    movw %ax,%es:(%bx)
+    addw $2,%bx
+    loopw coalm
+    jmp reand
     rheat:
     movb $0x00,%ah
     int $0x16
     movb %al,%es:(%bx)
-    inc %bx
-    loop rheat
+    incw %bx
+    loopw rheat
     reand:
     ret
 .space 2048-(.-_start)
     call _cann
     lretw
 .space 2560-(.-_start)
-    call test
     call _cahh
     lretw
 .space 3072-(.-_start)

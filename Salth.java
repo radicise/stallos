@@ -257,7 +257,7 @@ public class Salth {
 								}
 							}
 							solv(Arrays.copyOfRange(tre, p, n));
-							System.out.println("movw %ax,%ds:" + cleanse((15 - c) * 2));
+							System.out.println("movw %ax,%ds:" + cleanse((14 - c) * 2));
 							if (n == tre.length) {
 								break;
 							}
@@ -266,13 +266,13 @@ public class Salth {
 							c++;
 						}
 						c++;
-						for (reer = 0; reer < c; reer++) {
-							System.out.println("pushw %ds:" + cleanse((15 - reer) * 2));
+						for (reer = 0; reer < c; reer++) {// TODO Maybe make it so that uses of earlier variables doesn't use the new ones
+							System.out.println("pushw %ds:" + cleanse((14 - reer) * 2));
 						}
 						System.out.println("call " + pref + "func_" + tre[1] + "_" + Integer.toString(c));
 						reer--;
 						for (;reer >= 0; reer--) {
-							System.out.println("popw %ds:" + cleanse((15 - reer) * 2));
+							System.out.println("popw %ds:" + cleanse((14 - reer) * 2));
 						}
 						continue;
 					}
