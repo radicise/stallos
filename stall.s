@@ -3,7 +3,6 @@
   File created on 2022-08-22 by root
 */
 .globl _start
-.globl iadd
 .text
 .code16
 _start: # TODO migrate to protected mode
