@@ -1,7 +1,8 @@
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
+declstr helwor "Hello, World!"
 // while 1
 //     call readcode
-//     call printdec res
+//     call printbase res , 10
 // wend
 startraw
 lret
@@ -103,12 +104,16 @@ startraw
 endraw
     return res
 endfunc
-func printdec 1
+func printbase 2
 startraw
     xorw %dx,%dx
     movw %ds:0x1c,%ax
-    movw $0x0a,%di
+    movw %ds:0x1a,%di
     divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_nolett
+    addb $0x27,%dl
+    std_printdec_nolett:
     addb $0x30,%dl
     xorb %bh,%bh
     movb %dl,%bl
@@ -153,7 +158,7 @@ startraw
     incw %cx
     std_printdec_poploop:
     popw %ax
-    loopw std_printdec_poploop
+    loop std_printdec_poploop
     movw %dx,%ds:0x1e
 endraw
     return res
