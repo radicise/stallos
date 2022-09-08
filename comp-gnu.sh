@@ -7,7 +7,7 @@ if [ ${LEC} -ne 0 ];then
     exit ${LEC}
 fi
 printf "asm_copy:       succeeded\n"
-java -jar salth.jar n staltstd < ${PROL}.slth >> ${PROL}-comp.s
+java Salth n staltstd < ${PROL}.slth >> ${PROL}-comp.s
 LEC=${?}
 if [ ${LEC} -ne 0 ];then
     printf "java failed with code ${LEC}\n"
