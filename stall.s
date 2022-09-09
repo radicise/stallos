@@ -114,7 +114,7 @@ _dishe:
     movb %ds:(%di),%al
     movb %al,%es:(%bx)
     decw %bx
-    loopw bee
+    loop bee
     popw %di
     popw %ds
     popw %cx
@@ -133,7 +133,8 @@ _dishe:
     nop
     nop
     jmp trep
-.space 256-(.-_start)
+.set dist_twty, . - _start
+.space 256 - dist_twty
 _diwr:
     # TODO implement as an interrupt
     # doc:
@@ -167,20 +168,23 @@ _diwr:
     # movb %,%dh
     # call _dishe
     ret
-.space 510-(.-_start)
+.set dist_ttqp, . - _start
+.space 510 - dist_ttqp
 .byte 0x55
 .byte 0xaa
 _seac:
     jmp shesh
     inpc:
     .byte 0
-    .set isec, ((inpc - _start) / 16) + 0x7c0
-    .set iadd, (inpc - _start) % 16
+    .set iinter, inpc - _start
+    .set isec, (iinter / 0x10) + 0x07c0
+    .set iadd, iinter % 0x10
     prompt:
     .ascii ":# "
     .set plen, (.-prompt)
-    .set psec, ((prompt - _start) / 16) + 0x7c0
-    .set padd, (prompt - _start) % 16
+    .set pinter, prompt - _start
+    .set psec, (pinter / 0x10) + 0x07c0
+    .set padd, pinter % 0x10
     shesh:
     movw $psec,%ax
     movw %ax,%es
@@ -191,14 +195,31 @@ _seac:
     movw $isec,%ax
     movw %ax,%es
     movw $iadd,%bx
-    movw $1,%cx
+    movw $0x01,%cx
+    xorb %al,%al
+    xorw %di,%di
+    .set shell_seg, (shell_offset / 16) + 0x7c0
+    .set commstart_seg, (shell_offset / 16) + 0x7c0 + staltstd_RESrmstroff
+    movw $commstart_seg,%si
     steel:
-    movw $3,%dx
+    movw $0x03,%dx
     call _cann
     cmpb $0x0a,%es:(%bx)
     jz holk
     cmpb $0x0d,%es:(%bx)
     jz holk
+    cmpw $0xff,%di
+    jz healk
+    cmpb $0x20,%es:(%bx)
+    jl healk
+    cmpb $0x7f,%es:(%bx)
+    jz healk
+    movb %es:(%bx),%ah
+    pushw %es
+    movw %si,%es
+    movb %ah,%es:(%di)
+    incw %di
+    popw %es
     healk:
     movw $2,%dx
     call _cann
@@ -207,8 +228,23 @@ _seac:
     movb $0x0a,%es:(%bx)
     movw $2,%dx
     call _cann
+    movw %si,%es
+    movw $0x00,%es:(%di)
+    movw %di,%bx
+    pushw $shell_seg
+    pushw $0x0000
+    movw %sp,%di
+    pushw %ds
+    movw $0x0080,%ax
+    movw %ax,%ds
+    movw %bx,%ds:0x1c
+    lcall *%ss:(%di)
+    popw %ds
+    popw %ax
+    popw %ax
     jmp shesh
-.space 1024-(.-_start)
+.set dist_tqpwr, . - _start
+.space 1024 - dist_tqpwr
 _print:
     # doc:
     # %es:%bx - Location of text
@@ -295,7 +331,7 @@ _print:
     jmp steev
     steev:
     incw %bx
-    loopw prii
+    loop prii
     shrw $1,%di
     movw $0x50,%ax
     movw %ax,%ds
@@ -330,7 +366,9 @@ _print:
     movw %bx,%si
     movw %cx,%ax
     cld
-    rep es movsw
+    es
+    rep
+    movsw
     movw %ax,%di
     shlw $1,%di
     shrw $1,%bx
@@ -347,26 +385,40 @@ _print:
     popw %es
     popw %cx
     ret
-.space 1536-(.-_start)
+.set dist_tqtey, . - _start
+.space 1536 - dist_tqtey
 _read:
     # doc:
-    # %es:%bx - Destination location
-    # %cx - Length in bytes
+    # %al - Read ASCII or 16-bit code (al=0x00: ASCII, ax!=0x00: 16-bit code)
+    # %es:(%bx) - Destination location start
+    # %cx - Length in units
     # Cannot cross segment boundary of %es
     jcxz reand
+    testb %al,%al
+    jz rheat
+    coalm:
+    xorb %ah,%ah
+    int $0x16
+    movw %ax,%es:(%bx)
+    addw $2,%bx
+    loop coalm
+    jmp reand
     rheat:
     movb $0x00,%ah
     int $0x16
     movb %al,%es:(%bx)
-    inc %bx
+    incw %bx
     loop rheat
     reand:
     ret
-.space 2048-(.-_start)
+.set dist_twpri, . - _start
+.space 2048 - dist_twpri
     call _cann
     lretw
-.space 2560-(.-_start)
-    call test
+.set dist_twtyp, . - _start
+.space 2560 - dist_twtyp
     call _cahh
     lretw
-.space 3072-(.-_start)
+.set shell_offset, 3072
+.set dist_tepuw, . - _start
+.space shell_offset - dist_tepuw

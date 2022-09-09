@@ -82,7 +82,7 @@ public class Salth {
 						reer = Integer.parseInt(args[2]);
 					}
 					catch (NumberFormatException E) {
-						System.out.println("# WARNING: Illegal word size setting \"" + args[2] + "\", defaulting to 16 bits");
+						System.out.println("# WARNING: Invalid word size setting \"" + args[2] + "\", defaulting to 16 bits");
 						reer = 16;
 					}
 					switch (reer) {
@@ -257,7 +257,7 @@ public class Salth {
 								}
 							}
 							solv(Arrays.copyOfRange(tre, p, n));
-							System.out.println("movw %ax,%ds:" + cleanse((15 - c) * 2));
+							System.out.println("movw %ax,%ds:" + cleanse((14 - c) * 2));
 							if (n == tre.length) {
 								break;
 							}
@@ -266,13 +266,13 @@ public class Salth {
 							c++;
 						}
 						c++;
-						for (reer = 0; reer < c; reer++) {
-							System.out.println("pushw %ds:" + cleanse((15 - reer) * 2));
+						for (reer = 0; reer < c; reer++) {// TODO Maybe make it so that uses of earlier variables doesn't use the new ones
+							System.out.println("pushw %ds:" + cleanse((14 - reer) * 2));
 						}
 						System.out.println("call " + pref + "func_" + tre[1] + "_" + Integer.toString(c));
 						reer--;
 						for (;reer >= 0; reer--) {
-							System.out.println("popw %ds:" + cleanse((15 - reer) * 2));
+							System.out.println("popw %ds:" + cleanse((14 - reer) * 2));
 						}
 						continue;
 					}
@@ -317,8 +317,10 @@ public class Salth {
 			System.out.println(".err # ERROR: Unclosed coditional block(s)");
 			errors++;
 		}
-		System.out.println(".space (16 - ((. - _" + pref + "start) % 16)) % 16");
-		System.out.println(".set " + pref + "RESrmstroff, (. - _" + pref + "start) / 16");
+		System.out.println(".set " + pref + "REStspcs, . - _" + pref + "start");
+		System.out.println(".space (16 - (" + pref + "REStspcs % 16)) % 16");
+		System.out.println(".set " + pref + "REStsoff, . - _" + pref + "start");
+		System.out.println(".set " + pref + "RESrmstroff, " + pref + "REStsoff / 16");
 		System.out.println(pref + "RESstrstart:");
 		for(Svar vs : vass) {
 			System.out.println(pref + "str_" + vs.name + ':');

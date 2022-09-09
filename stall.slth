@@ -1,9 +1,69 @@
-// 
-func print 2
+// Do NOT declare any strings before this one
+// Reserve space for the command line, which is null-terminated
+// Do not use the length property of this string for finding the length of the comand line, use the variable named `commandlength'
+declstr commandline "                                                                                                                                                                                                                                                                "
+decl commandlength arg0
+// Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
+call printstr commandline_addr , commandlength
+call printline
+startraw
+lret
+endraw
+// Standard library functions
+func read 3
 startraw
     movw %ds:0x1c,%bx
     movw %ds:0x1a,%cx
-    movw %0x02,%dx
+    movw $0x03,%dx
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    pushw %es
+    movw %ds,%ax
+    movw %ax,%es
+    movw %ds:0x18,%ax
+    lcall *%ss:(%di)
+    movw %dx,%ds:0x1e
+    popw %es
+    popw %ax
+    popw %ax
+endraw
+    return res
+endfunc
+func printline 0
+startraw
+    pushw %ds:0x18
+    movw $0x0a,%ds:0x18
+endraw
+    call printmem 0x18 , 1
+startraw
+    popw %ds:0x18
+endraw
+endfunc
+func printmem 2
+startraw
+    movw %ds:0x1c,%bx
+    movw %ds:0x1a,%cx
+    movw $0x02,%dx
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    pushw %es
+    movw %ds,%ax
+    movw %ax,%es
+    lcall *%ss:(%di)
+    movw %dx,%ds:0x1e
+    popw %es
+    popw %ax
+    popw %ax
+endraw
+    return res
+endfunc
+func printstr 2
+startraw
+    movw %ds:0x1c,%bx
+    movw %ds:0x1a,%cx
+    movw $0x02,%dx
     pushw $0x07c0
     pushw $0x0800
     movw %sp,%di
@@ -14,7 +74,115 @@ startraw
 endraw
     return res
 endfunc
-func readchar 1
-call read arg0 , 1
-return res
+func readcode 0
+startraw
+    pushw %ds:0x16
+endraw
+    call read 0x16 , 1 , 1
+startraw
+    movw %ds:0x16,%ax
+    movw %ax,%ds:0x1e
+    popw %ds:0x16
+endraw
+    return res
 endfunc
+func readchar 0
+startraw
+    pushw %ds:0x16
+endraw
+    call read 0x16 , 1 , 0
+startraw
+    movw %ds:0x16,%ax
+    xorb %ah,%ah
+    movw %ax,%ds:0x1e
+    popw %ds:0x16
+endraw
+    return res
+endfunc
+func bootedDiskette144_read 3
+startraw
+    movw %ds:0x1c,%ax
+    pushw %es
+    movw %ds:0x1a,%es
+    movw %ds:0x18,%bx
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    movw $0x01,%dx
+    lcall *%ss:(%di)
+    movw %dx,%ds:0x1e
+    popw %ax
+    popw %ax
+    popw %es
+endraw
+    return res
+endfunc
+func printbase 2
+startraw
+    xorw %dx,%dx
+    movw %ds:0x1c,%ax
+    movw %ds:0x1a,%di
+    divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_nolett
+    addb $0x27,%dl
+    std_printdec_nolett:
+    addb $0x30,%dl
+    xorb %bh,%bh
+    movb %dl,%bl
+    movw $0x02,%cx
+    testw %ax,%ax
+    jz std_printdec_end
+    std_printdec_loop:
+    pushw %bx
+    xorw %dx,%dx
+    divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_joe
+    addb $0x27,%dl
+    std_printdec_joe:
+    addb $0x30,%dl
+    movb %dl,%bh
+    incw %cx
+    testw %ax,%ax
+    jz std_printdec_end
+    xorw %dx,%dx
+    divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_geh
+    addb $0x27,%dl
+    std_printdec_geh:
+    addb $0x30,%dl
+    movb %dl,%bl
+    incw %cx
+    testw %ax,%ax
+    jz std_printdec_end
+    jmp std_printdec_loop
+    std_printdec_end:
+    pushw %bx
+    movw %cx,%bx
+    andw $0x01,%bx
+    addw %sp,%bx
+    pushw %es
+    movw %ss,%ax
+    movw %ax,%es
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    movw $0x02,%dx
+    decw %cx
+    lcall *%ss:(%di)
+    popw %ax
+    popw %ax
+    popw %es
+    shrw $0x01,%cx
+    incw %cx
+    std_printdec_poploop:
+    popw %ax
+    loop std_printdec_poploop
+    movw %dx,%ds:0x1e
+endraw
+    return res
+endfunc
+startraw
+endraw
