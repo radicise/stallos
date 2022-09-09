@@ -185,6 +185,7 @@ _seac:
     .set pinter, prompt - _start
     .set psec, (pinter / 0x10) + 0x07c0
     .set padd, pinter % 0x10
+    .byte 65
     shesh:
     movw $psec,%ax
     movw %ax,%es
@@ -196,7 +197,11 @@ _seac:
     movw %ax,%es
     movw $iadd,%bx
     movw $0x01,%cx
-    xorw %ax,%ax
+    xorb %al,%al
+    xorw %di,%di
+    .set shell_seg, (shell_offset / 16) + 0x7c0
+    .set commstart_seg, (shell_offset / 16) + 0x7c0 + staltstd_RESrmstroff
+    movw $commstart_seg,%si
     steel:
     movw $0x03,%dx
     call _cann
@@ -204,6 +209,18 @@ _seac:
     jz holk
     cmpb $0x0d,%es:(%bx)
     jz holk
+    cmpw $0xff,%di
+    jz healk
+    cmpb $0x20,%es:(%bx)
+    jl healk
+    cmpb $0x7f,%es:(%bx)
+    jz healk
+    movb %es:(%bx),%ah
+    pushw %es
+    movw %si,%es
+    movb %ah,%es:(%di)
+    incw %di
+    popw %es
     healk:
     movw $2,%dx
     call _cann
@@ -212,12 +229,16 @@ _seac:
     movb $0x0a,%es:(%bx)
     movw $2,%dx
     call _cann
-    pushw $0x0880
+    movw %si,%es
+    movw $0x00,%es:(%di)
+    movw %di,%bx
+    pushw $shell_seg
     pushw $0x0000
     movw %sp,%di
-    pushw %ds
+    pushw %ds 
     movw $0x0080,%ax
     movw %ax,%ds
+    movw %bx,%ds:0x1c
     lcall *%ss:(%di)
     popw %ds
     popw %ax
@@ -369,15 +390,15 @@ _print:
 .space 1536 - dist_tqtey
 _read:
     # doc:
-    # %ax - Read ASCII or 16-bit code (ax=0x00000: ASCII, ax!=0x0000: 16-bit code)
+    # %al - Read ASCII or 16-bit code (al=0x00: ASCII, ax!=0x00: 16-bit code)
     # %es:(%bx) - Destination location start
     # %cx - Length in units
     # Cannot cross segment boundary of %es
     jcxz reand
-    test %ax,%ax
+    testb %al,%al
     jz rheat
     coalm:
-    movb $0x00,%ah
+    xorb %ah,%ah
     int $0x16
     movw %ax,%es:(%bx)
     addw $2,%bx
@@ -399,5 +420,6 @@ _read:
 .space 2560 - dist_twtyp
     call _cahh
     lretw
+.set shell_offset, 3072
 .set dist_tepuw, . - _start
-.space 3072 - dist_tepuw
+.space shell_offset - dist_tepuw

@@ -14,7 +14,7 @@ if [ ${LEC} -ne 0 ];then
     exit ${LEC}
 fi
 printf "salth_compile:  succeeded\n"
-printf ".space 1474560-(.-_start)\n" >> ${PROL}-comp.s
+printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n.set dist_end141, . - _start\n.space 1474560 - dist_end141\n" >> ${PROL}-comp.s
 LEC=${?}
 if [ ${LEC} -ne 0 ];then
     printf "printf failed with code ${LEC}\n"

@@ -1,9 +1,11 @@
+// Do NOT declare any strings before this one
+// Reserve space for the command line, which is null-terminated
+// Do not use the length property of this string for finding the length of the comand line, use the variable named `commandlength'
+declstr commandline "                                                                                                                                                                                                                                                                "
+decl commandlength arg0
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
-declstr helwor "Hello, World!"
-// while 1
-//     call readcode
-//     call printbase res , 10
-// wend
+call printstr commandline_addr , commandlength
+call printline
 startraw
 lret
 endraw
@@ -27,6 +29,16 @@ startraw
     popw %ax
 endraw
     return res
+endfunc
+func printline 0
+startraw
+    pushw %ds:0x18
+    movw $0x0a,%ds:0x18
+endraw
+    call printmem 0x18 , 1
+startraw
+    popw %ds:0x18
+endraw
 endfunc
 func printmem 2
 startraw
@@ -81,6 +93,7 @@ endraw
     call read 0x16 , 1 , 0
 startraw
     movw %ds:0x16,%ax
+    xorb %ah,%ah
     movw %ax,%ds:0x1e
     popw %ds:0x16
 endraw
@@ -124,6 +137,10 @@ startraw
     pushw %bx
     xorw %dx,%dx
     divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_joe
+    addb $0x27,%dl
+    std_printdec_joe:
     addb $0x30,%dl
     movb %dl,%bh
     incw %cx
@@ -131,6 +148,10 @@ startraw
     jz std_printdec_end
     xorw %dx,%dx
     divw %di
+    cmpw $0x0a,%dx
+    jc std_printdec_geh
+    addb $0x27,%dl
+    std_printdec_geh:
     addb $0x30,%dl
     movb %dl,%bl
     incw %cx
@@ -163,3 +184,5 @@ startraw
 endraw
     return res
 endfunc
+startraw
+endraw
