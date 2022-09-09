@@ -185,7 +185,6 @@ _seac:
     .set pinter, prompt - _start
     .set psec, (pinter / 0x10) + 0x07c0
     .set padd, pinter % 0x10
-    .byte 65
     shesh:
     movw $psec,%ax
     movw %ax,%es
@@ -235,7 +234,7 @@ _seac:
     pushw $shell_seg
     pushw $0x0000
     movw %sp,%di
-    pushw %ds 
+    pushw %ds
     movw $0x0080,%ax
     movw %ax,%ds
     movw %bx,%ds:0x1c
