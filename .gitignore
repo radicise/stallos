@@ -1,2 +1,4 @@
 stall-comp.s
-stall-inter.bin
+*.bin
+*.class
+*.o

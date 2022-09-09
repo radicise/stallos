@@ -10,5 +10,4 @@ dd if=stall.o of=stall-inter.bin bs=${FILEOFF} skip=1
 FILEOFF=$(otool -l stall.o | grep " size" | grep -oE '[^ ]+$')
 FILEOFF=$(printf "%d" ${FILEOFF})
 dd if=stall-inter.bin of=stall.bin bs=${FILEOFF} count=1
-printf "A raw floppy image was generated:\n"
-ls -l stall.bin
+qemu-system-i386 -drive file=stall.bin,index=0,if=floppy,format=raw
