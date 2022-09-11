@@ -2,6 +2,7 @@
 .text
 .code32
 _start:
+# TODO make interrupt handlers and set the IDT so that interrupts can be re-enabled, then re-enable interrupts
 # sti
 # inb $0x70,%al
 # andb $0x7f,%al
