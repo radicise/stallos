@@ -3,12 +3,55 @@
 // Do not use the length property of this string for finding the length of the comand line, use the variable named `commandlength'
 declstr commandline "                                                                                                                                                                                                                                                                "
 decl commandlength arg0
+declstr fail "failed to complete requested operation\n"
+declstr unknown "unknown operation\n"
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
-call printstr commandline_addr , commandlength
-call printline
+decl theen 0
+call handle
+theen = res
+if theen
+    call bootkernel32
+    call printstr fail_addr , fail_len
+endif
+if theen ^ 1
+    call printstr unknown_addr , unknown_len
+endif
 startraw
 lret
 endraw
+func handle 0
+startraw
+    cmpw $0x656b,%es:0x00
+    jnz noboo
+    cmpw $0x6e72,%es:0x02
+    jnz noboo
+    cmpw $0x6c65,%es:0x04
+    jnz noboo
+    cmpw $0x3233,%es:0x06
+    jnz noboo
+    cmpb $0x00,%es:0x08
+    jnz noboo
+    movw $0x01,%ds:0x1e
+    jmp afe
+    noboo:
+    movw $0x00,%ds:0x1e
+    afe:
+endraw
+    return res
+endfunc
+func bootkernel32 0
+startraw
+    movw $0x04,%dx
+    pushw $0x07c0
+    pushw $0x0800
+    movw %sp,%di
+    lcall *%ss:(%di)
+    popw %ax
+    popw %ax
+    movw %dx,%ds:0x1e
+endraw
+    return res
+endfunc
 // Standard library functions
 func read 3
 startraw

@@ -6,7 +6,7 @@
 .text
 .code16
 _start: # TODO migrate to protected mode
-    movw $0x07c0,%ax
+    movw $0x07c0,%ax # TODO what if the BIOS launches this from the HMA and the CS runs out soon?
     movw %ax,%ss
     movw $510,%bp
     movw $510,%sp
@@ -46,7 +46,7 @@ _start: # TODO migrate to protected mode
     # call test
     movw $0x100,%ax
     movw %ax,%ss
-    movw $0x6bff,%ax
+    movw $0x6c00,%ax
     movw %ax,%bp
     movw %ax,%sp
     movw $0x50,%ax
@@ -59,6 +59,8 @@ _cahh: # TODO read and write files using numbers (terminal in / out will also ha
     jz lam
     cmpw $0x03,%dx
     jz lak
+    cmpw $0x04,%dx
+    jz lao
     ret
     lad:
     call _diwr
@@ -69,6 +71,9 @@ _cahh: # TODO read and write files using numbers (terminal in / out will also ha
     lak:
     call _read
     ret
+    lao:
+    call _boot_kernel32
+    ret
 _cann:
     # doc:
     # Saves %ax, %bx, %cx, %si, %di, %ds, and %es in the stack before calling the service specified in %ds, popping the saved registers back afterwards
@@ -77,6 +82,7 @@ _cann:
     # %dx=0x0001 - bootedDiskette144_service
     # %dx=0x0002 - print_service
     # %dx=0x0003 - read_service
+    # %dx=0x0004 - bootKernel32_service
     pushw %ax
     pushw %bx
     pushw %cx
@@ -121,6 +127,7 @@ _dishe:
     popw %bx
     popw %es
     popw %ax
+    jmp test
     ret
     test:
     movw $0xb800,%bx
@@ -163,7 +170,7 @@ _diwr:
     clc
     # call _dishe
     int $0x13
-    jc test # TODO proper error handling
+    jc _dishe # TODO proper error handling
     # jmp gtre
     # movb %,%dh
     # call _dishe
@@ -253,7 +260,7 @@ _print:
     jcxz preq
     movw %cx,%ax
     addw %bx,%ax
-    jc test # TODO proper error handling
+    jc _dishe # TODO proper error handling
     movw $0x50,%ax
     movw %ax,%ds
     movw 0x06,%di
@@ -419,6 +426,86 @@ _read:
 .space 2560 - dist_twtyp
     call _cahh
     lretw
-.set shell_offset, 3072
 .set dist_tepuw, . - _start
-.space shell_offset - dist_tepuw
+.space 3072 - dist_tepuw
+_boot_kernel32:
+    jmp a20_enable
+    disint:
+    inb $0x70,%al
+    orb $0x80,%al
+    outb %al,$0x70
+    inb $0x71
+    cli
+    jmp afdis
+    a20_enable:
+    movw $0x2403,%ax
+    clc
+    int $0x15
+    jc a20_failure
+    testb %ah,%ah
+    jnz a20_failure
+    movw $0x2402,%ax
+    clc
+    int $0x15
+    jc a20_failure
+    testb %ah,%ah
+    jnz a20_failure
+    cmpb $0x01,%al
+    jz a20_isset
+    movw $0x2401,%ax # TODO maybe wait for a20 for a bit? does the bios only return after it has been set fully?
+    clc
+    int $0x15
+    jc a20_failure
+    testb %ah,%ah
+    jnz a20_failure
+    a20_isset:
+    jmp disint
+    afdis:
+    pushw $0x00cf
+    pushw $0x9200
+    pushw $0x0000
+    pushw $0xffff
+    pushw $0x00cf
+    pushw $0x9a00
+    pushw $0x0000
+    pushw $0xffff
+    pushw $0x0000
+    pushw $0x0000
+    pushw $0x0000
+    pushw $0x0000
+    movw $0x0000,%ax
+    movw %ax,%ds
+    xorl %eax,%eax
+    movw %ss,%ax
+    shll $4,%eax
+    xorl %ebx,%ebx
+    movw %sp,%bx
+    addl %ebx,%eax
+    pushl %eax
+    pushw $23
+    subl $6,%eax
+    movl %eax,%ebx
+    pushl $0x9400
+    pushw $8
+    subl $0x06,%eax
+    movw $0x01,%cx
+    movw %cx,%es
+    movl %ebx,%edx
+    movl %eax,%ebx
+    lgdtl %ds:(%edx)
+    movl %cr0,%edx
+    orl $0x01,%edx
+    movl %edx,%cr0
+    .byte 0x66
+    .byte 0xea
+    .byte 0x00
+    .byte 0x94
+    .byte 0x00
+    .byte 0x00
+    .byte 0x08
+    .byte 0x00
+    a20_failure:
+    ret
+.set shell_offset, 4096
+.set dist_tshell, . - _start
+.space shell_offset - dist_tshell
