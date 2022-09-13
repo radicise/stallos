@@ -481,6 +481,10 @@ _boot_kernel32:
     xorl %ebx,%ebx
     movw %sp,%bx
     addl %ebx,%eax
+    movl %eax,%edi
+    movw %di,%ds:0x0510
+    shrl $16,%edi
+    movw %di,%ds:0x0512
     pushl %eax
     pushw $23
     subl $6,%eax
@@ -496,14 +500,7 @@ _boot_kernel32:
     movl %cr0,%edx
     orl $0x01,%edx
     movl %edx,%cr0
-    .byte 0x66
-    .byte 0xea
-    .byte 0x00
-    .byte 0x94
-    .byte 0x00
-    .byte 0x00
-    .byte 0x08
-    .byte 0x00
+    ljmp $0x08,$0x9400
     a20_failure:
     ret
 .set shell_offset, 4096

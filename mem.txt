@@ -1,9 +1,9 @@
-# Real-mode OS memory variables
-0x0050:______
-b	0x0000	BIOS boot drive number
-b	0x0002	Console width, characters
-b	0x0004	Console height, characters
-w	0x0006	Current console output position (0 at top-left, increases by 1 each character to the right and wraps to the left side of the next line) (limitation: limits console from having more than or equal to 2^15 character spaces because it is shifted left during prints)
-b	0x0008	Current console formatting
-w	0x000a	Section of console (limitation: must start at the beginning of the section)
-b	0x000c	Implicit carriage return in console when line feed (0=no,1=yes)
+# Physical addresses of OS memory variables
+b	0x0500	BIOS boot drive number
+b	0x0502	Console width, characters
+b	0x0504	Console height, characters
+w	0x0506	Current console output position (0 at top-left, increases by 1 each character to the right and wraps to the left side of the next line) (limitation: limits console from having more than or equal to 2^15 character spaces because it is shifted left during prints)
+b	0x0508	Current console formatting
+w	0x050a	Section of console (limitation: must start at the beginning of the section)
+b	0x050c	Implicit carriage return in console when line feed (0=no,1=yes)
+l	0x0510	Physical address of start of GDT

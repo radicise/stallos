@@ -13,7 +13,6 @@ movw %ax,%ds
 # outb %al,$0x70
 # inb $0x71,%al
 
-
 xorw %cx,%cx
 xorl %ebx,%ebx
 lop:
@@ -37,7 +36,7 @@ giveMem:
 # Returns 0 on error
 # TODO save registers which need saving
 # TODO check if %esp is large enough
-movl %ss:8(%ebp),%ecx
+movl %ss:8(%ebp),%edi
 movl %ss:12(%ebp),%eax
 movl %ss:16(%ebp),%edx
 movl $0x1fffff,%ebx
@@ -48,39 +47,39 @@ andb $0x07,%al
 movl %ecx,%esi
 movb %al,%cl
 movb $0x01,%al
-shll %cl,%al
-movl %esi,%ecx
+shlb %cl,%al
 xorl %esi,%esi
-movb %al,%dil
-movw %edx,%eax
+movb %al,%cl
+movl %edx,%eax
 shll $3,%eax
-addw $0x200000,%eax
+addl $0x200000,%eax
 jmp fmem_entr2
 fmem_loop:
 xorl %esi,%esi
 fmem_loop2:
-cmpw %eax,%ebx
+cmpl %eax,%ebx
 jnc fmem_zer
-movb $0x01,%dil
+movb $0x01,%cl
 fmem_entr2:
 incl %ebx
 cmpb $0xff,%ds:(%ebx)
 jz fmem_loop
 fmem_testb:
-test %dil,%ds:(%ebx)
-jnz fmem_loop
+test %cl,%ds:(%ebx)
+jnz fmem_j3
 incl %esi
-cmpl %esi,%ecx
+cmpl %esi,%edi
 jz fmem_end
-shlb %dil
-testb %dil,%dil
+fmem_j3:
+shlb %cl
+testb %cl,%cl
 jz fmem_loop2
 fmem_end:
-subw $0x200000,%ebx
+subl $0x200000,%ebx
 shll $3,%ebx
 fmem_eah:
-shrb $1,%dil
-testb %dil,%dil
+shrb $1,%cl
+testb %cl,%cl
 jz fmem_rend
 incl %ebx
 jmp fmem_eah
@@ -90,10 +89,10 @@ jnc fmem_zer
 movl %ebx,%edx
 movl %ebx,%eax
 shrl $3,%ebx
-addl %0x200000,%ebx
+addl $0x200000,%ebx
 orl $0x07,%ecx
 movl $0x01,%edx
-shll %cl,%dl
+shlb %cl,%dl
 decl %ebx
 fmem_reah:
 incl %ebx
@@ -102,7 +101,7 @@ jecxz fmem_reas
 orb %dl,%ds:(%ebx)
 decl %ecx
 rolb %dl
-cmpw $0x01,%dl
+cmpb $0x01,%dl
 jz fmem_reah
 jmp fmem_reed
 fmem_reas:
@@ -119,20 +118,37 @@ executeELF:
 # arg0 - Physical / absolute address of ELF in memory
 # arg1 - Length of ELF file in memory, in bytes
 # TODO check if %esp gives enough space
-# TODO push / otherwise save registers, make this call SystemV-conformant
+# TODO push / otherwise save registers, make this call SystemVABI-compatible
 # TODO return appropriate values for loading failures and make sure that they are distinguishable from program exit codes and run-time failures by the user space caller
 # TODO make sure that no memory is read outside of the passed length
 movl %ss:8(%ebp),%ebx
 cmpl $0x464c457f,%ds:(%ebx)
-jnz elfLoad_failure
+jnz elfLoad_failure # invalid magic
 cmpb $0x01,%ds:4(%ebx)
-jnz elfLoad_filure
+jnz elfLoad_failure # wrong platform size
 cmpb $0x01,%ds:5(%ebx)
-jnz elfLoad_failure
+jnz elfLoad_failure # wrong endian-ness
+# TODO test header version
+cmpb $0x00,%ds:7(%ebx)
+jnz elfLoad_failure # wrong ABI
 cmpw $0x02,%ds:16(%ebx)
 jnz elfLoad_failure
+movw %ds:18(%ebx),%ax
+testw %ax,%ax
+jz elf_goodArch
+cmpw $3,%ax
+jz elf_goodArch
+jmp elfLoad_failure # incompatible architecture
+elf_goodArch:
+movl %ds:28(%ebx),%edi
+cmpw $0x20,%ds:42(%ebx)
+xorl %ecx,%ecx
+movw %ds:44(%ebx),%cx
+xchgl %ebx,%edi
 
-# TODO test header version
+
+jnz elfLoad_failure # unsupported program header size
+# TODO check ELF version
 
 
 
