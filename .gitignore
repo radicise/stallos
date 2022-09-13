@@ -2,3 +2,5 @@ stall-comp.s
 *.bin
 *.class
 *.o
+log_qemu.txt
+kernel-comp.s
