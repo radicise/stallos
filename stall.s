@@ -35,7 +35,7 @@ _start: # TODO migrate to protected mode
     movw %ax,%es
     movw $0x0200,%bx
     movw $1,%ax
-    movw $15,%cx
+    movw $17,%cx
     kree:
     movw $0x01,%dx
     call _cann

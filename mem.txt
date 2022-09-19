@@ -6,4 +6,5 @@ w	0x0506	Current console output position (0 at top-left, increases by 1 each cha
 b	0x0508	Current console formatting
 w	0x050a	Section of console (limitation: must start at the beginning of the section)
 b	0x050c	Implicit carriage return in console when line feed (0=no,1=yes)
-l	0x0510	Physical address of start of GDT
+l	0x0510	Start of GDT
+w	0x0514	Bug check code
