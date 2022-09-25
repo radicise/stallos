@@ -1,7 +1,6 @@
-int _start(int argv, char* argc[]) {
+int _start(int argc, char* argv[]) {
+    reeds:
+    goto reeds;
     int i = 6;
-    while (1) {
-        i++;
-    }
-    return i;
+    
 }

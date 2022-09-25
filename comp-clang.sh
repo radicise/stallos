@@ -19,7 +19,7 @@ FILEOFF=$(otool -l kernel.o | grep " size" | grep -oE '[^ ]+$')
 FILEOFF=$(printf "%d" ${FILEOFF})
 dd if=stall-inter.bin of=kernel.bin bs=${FILEOFF} count=1
 cat kernel.bin >> stall.bin
-dd if=/dev/zero of=stall.bin bs=16 count=1 seek=447
+dd if=/dev/zero of=stall.bin bs=16 count=1 seek=511
 clang -c -fno-asynchronous-unwind-tables -target i386-pc-linux-elf -Wall -o kern-ul.elf kern.c
 ld.lld kern-ul.elf -o kern.elf
 cat kern.elf >> stall.bin
