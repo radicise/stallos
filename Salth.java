@@ -23,7 +23,7 @@ public class Salth {
 	static String tim;
 	static long fcompDate;
 	static String ftim;
-	static String version = "0.1";// TODO Bump version number (do not remove this to-do marking)
+	static String version = "0.2";// TODO Bump version number (do not remove this to-do marking)
 	static int wsize;
 	static char wsuf;
 	static String wpref;
