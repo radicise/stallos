@@ -6,6 +6,22 @@ movw $0x10,%ax
 movw %ax,%ss
 movl $0x1fffff0,%esp
 movw %ax,%ds
+movl $0x00200000,%edi
+movl $0x00040000,%ecx
+clearMemMap:
+movb $0x00,%ds:(%edi)
+incl %edi
+loop clearMemMap
+manualResMem:
+movl $0x200000,%edi
+movl $0x48,%ecx
+reserveImportantMem:
+movb $0xff,%ds:(%edi)
+incl %edi
+loop reserveImportantMem
+
+
+# TODO relocate the GDT so that it doesn't spill onto the boot code so that the machine can be booted into the pre-kernel environment without disk reads at any time
 # TODO remap PIC so that hardware interrupts do not overlap with CPU exception interrupts, make interrupt handlers, and set the IDT so that interrupts can be re-enabled and go to the handlers, then re-enable both NMI and interrupts dependent on IF
 # sti
 # inb $0x70,%al
@@ -180,6 +196,7 @@ executeELFKernelSpace:
 # TODO push / otherwise save registers, make this call SystemVABI-compatible
 # TODO return appropriate values for loading failures and make sure that they are distinguishable from program exit codes and run-time failures by the user space caller
 # TODO make sure that no memory is read outside of the passed length
+# TODO comment out visual testing patterns / variable displays
 movl %ss:8(%ebp),%ebx
 movl %ss:12(%ebp),%edx
 # TODO make sure that everything fits within file size
@@ -231,9 +248,7 @@ jecxz elf_almEnd
 movl %ds:(%ebx),%eax
 cmpl $0x01,%eax
 jz theLoad
-cmpl $0x6474e551,%eax
-jz theLoad
-jmp theNS # not a loadable segment
+jmp theNS # TODO what to do with 0x6474e551 ?
 theLoad:
 movl %edx,%esi
 xorl %ecx,%ecx
@@ -395,9 +410,9 @@ pushw %ax
 lgdtl %ss:(%esp)
 # jmp n
 movl %ds:8(%ebx),%edi
-shl $3,%edi
+shll $3,%edi
 addl $0x18,%edi
-movw %di,%ds:2(%ebx)
+movw %di,%ds:8(%ebx)
 pushl $0x00
 pushw $0x00
 bp_ent:
@@ -409,8 +424,10 @@ movl %esp,%ebp
 subl $0x08,%ebp
 subl $0x1000,%esp
 movl %ds:12(%ebx),%eax
-addl $0x03,%eax
+# movb %al,%ds:0xb8000
+# jmp n
 shll $3,%eax
+addl $0x18,%eax
 # call disax
 # jmp n
 movw %ax,%ds
@@ -457,10 +474,17 @@ movw %ax,%es
 # call disax
 # jmp n
 
-ljmp *%ds:2(%ebx)
-jmp n
-ljmp $0x00,$0x00
-# TODO check ELF version
+movw $0x10,%ax
+movw %ax,%ss
+movl $0xb8040,%esp
+pushl $0x0707
+
+####
+lcall *%es:4(%ebx)
+# jmp n
+# TODO inform user that kernel has finished executing (in practice, this may not always be how the kernel makes the system exit, but returning from the far jump is always a possibility( NOTE this is a 8-byte absolute far jump with previous %cs included, so it technically does not comform to System V ABI calling conventions for i386 ))
+jmp n # TODO actually halt system
+# TODO check ELF version and ELF header version
 # TODO avoid kernel stack overflow
 elfLoad_failure:
 movl $0x41,%eax

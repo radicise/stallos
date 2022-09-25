@@ -8,3 +8,4 @@ w	0x050a	Section of console (limitation: must start at the beginning of the sect
 b	0x050c	Implicit carriage return in console when line feed (0=no,1=yes)
 l	0x0510	Start of GDT
 w	0x0514	Bug check code
+GDT	0x0800	Start of GDT

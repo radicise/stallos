@@ -461,6 +461,9 @@ _boot_kernel32:
     a20_isset:
     jmp disint
     afdis:
+    movw $0x00,%ax
+    movw %ax,%ss
+    movw $0x830,%sp
     pushw $0x00cf
     pushw $0x9200
     pushw $0x0000
