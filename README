@@ -1,2 +1,3 @@
-Use `kernel32' to boot the 32-bit kernel
-"newf" is the default GNU LD linker script edited to change the text segment to start at 0x40 (2 changed lines)
+Use the `kernel32' operation in the pre-kernel environemnt to boot the 32-bit kernel
+The 32-bit kernel consists of `kern.c', starting execution from `_start' after the compiled ELF is loaded in kernel space
+`newf' is the default GNU LD linker script edited to change the text segment to start at 0x40 (2 changed lines)
