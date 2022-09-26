@@ -1,11 +1,13 @@
-# Physical addresses of OS memory variables
+# Physical addresses of memory variables
+Type	Addr.	Description
 b	0x0500	BIOS boot drive number
 b	0x0502	Console width, characters
 b	0x0504	Console height, characters
 w	0x0506	Current console output position (0 at top-left, increases by 1 each character to the right and wraps to the left side of the next line) (limitation: limits console from having more than or equal to 2^15 character spaces because it is shifted left during prints)
 b	0x0508	Current console formatting
-w	0x050a	Section of console (limitation: must start at the beginning of the section)
+w	0x050a	Physical address of beginning of main console divided by 16 (Euclidean division) (limitation: Address mod 16 must equal 0, limitation: address must not be greater than 1048560 because of overflow)
 b	0x050c	Implicit carriage return in console when line feed (0=no,1=yes)
-l	0x0510	Start of GDT
+l	0x0510	Physical address of start of GDT
 w	0x0514	Bug check code
+l	0x0518	Physical address of beginning of main console # TODO implement
 GDT	0x0800	Start of GDT

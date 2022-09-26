@@ -191,7 +191,7 @@ executeELFKernelSpace:
 # executeELFKernelSpace
 # arg0 - Physical / absolute address of ELF in memory
 # arg1 - Length of ELF file in memory, in bytes
-# only 1 executable loaded in this manner can be run at a time
+# only 1 executable loaded in this manner can be run at a time. the integrity of the 16 bytes starting at the address given is invalidated.
 # TODO check if %esp gives enough space
 # TODO push / otherwise save registers, make this call SystemVABI-compatible
 # TODO return appropriate values for loading failures and make sure that they are distinguishable from program exit codes and run-time failures by the user space caller
@@ -474,15 +474,15 @@ movw %ax,%es
 # call disax
 # jmp n
 
-movw $0x10,%ax
-movw %ax,%ss
-movl $0xb8040,%esp
-pushl $0x0707
+# movw $0x10,%ax
+# movw %ax,%ss
+# movl $0xb8040,%esp
+# pushl $0x0707
 
 ####
 lcall *%es:4(%ebx)
 # jmp n
-# TODO inform user that kernel has finished executing (in practice, this may not always be how the kernel makes the system exit, but returning from the far jump is always a possibility( NOTE this is a 8-byte absolute far jump with previous %cs included, so it technically does not comform to System V ABI calling conventions for i386 ))
+# TODO inform user that kernel has finished executing and of its exit code ( value in %eax ) ( in practice, this may not always be how the kernel makes the system exit, but returning from the far jump is always a possibility ( NOTE this is an 8-byte absolute far jump with previous %cs included, so it technically does not comform to System V ABI calling conventions for i386 ) )
 jmp n # TODO actually halt system
 # TODO check ELF version and ELF header version
 # TODO avoid kernel stack overflow
