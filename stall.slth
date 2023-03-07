@@ -5,13 +5,25 @@ declstr commandline "                                                           
 decl commandlength arg0
 declstr fail "failed to complete requested operation\n"
 declstr unknown "unknown operation\n"
+declstr disabled "The requested feature has been disabled\n"
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
 decl theen 0
 call handle
 theen = res
+//call printstr commandline_addr , commandlength
 if theen
-    call bootkernel32
-    call printstr fail_addr , fail_len
+//    call bootkernel32
+//    call printstr fail_addr , fail_len
+    if theen ^ 2
+        call printstr disabled_addr , disabled_len
+	theen = 0
+    endif
+    if theen
+    startraw
+        call sys16
+    endraw
+    endif
+    theen = 1
 endif
 if theen ^ 1
     call printstr unknown_addr , unknown_len
@@ -34,6 +46,15 @@ startraw
     movw $0x01,%ds:0x1e
     jmp afe
     noboo:
+    cmpw $0x7973,%es:0x00
+    jnz nei
+    cmpw $0x3173,%es:0x02
+    jnz nei
+    cmpw $0x0036,%es:0x04
+    jnz nei
+    movw $0x02,%ds:0x1e
+    jmp afe
+    nei:
     movw $0x00,%ds:0x1e
     afe:
 endraw

@@ -1,0 +1,7 @@
+#utilise "mem.s" docscan
+#utilise <pc/io.s> docscan
+#utilise "shell.s" docscan
+struct ArgsStruct {
+	int argc,
+	addr*addr*u8 argv;
+}
