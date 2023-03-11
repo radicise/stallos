@@ -20,7 +20,13 @@ if theen
     endif
     if theen
     startraw
-        call sys16
+    	pushw %ds
+	pushw %es
+	movw $0x07c0,%ax
+	movw %ax,%ds
+    	lcallw $0x07c0,$sys16
+	popw %es
+	popw %ds
     endraw
     endif
     theen = 1

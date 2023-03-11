@@ -51,7 +51,7 @@ _start: # TODO migrate to protected mode
     movw %ax,%sp
     movw $0x50,%ax
     movw %ax,%ds
-    jmp _seac # TODO Use a far jump with %cs=0x07c0 so that it is sure that code segment space does not run out
+    ljmpw $0x07c0,$0x0200
 _cahh: # TODO read and write files using numbers (terminal in / out will also have [a] number[s])
     cmpw $0x01,%dx # TODO migrate to interrupts
     jz lad

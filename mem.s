@@ -13,7 +13,7 @@ alloc:/*dhulbDoc-v202:function;a16 alloc(u16) call16;*/
 	xorw %cx,%cx
 	movb %cl,%al
 	incw %cx
-	movw $0xfe00,%bx
+	xorb %bx,%bx
 	alloc_loop:
 	incw %ax
 	testb (%bx),%cl
@@ -22,7 +22,7 @@ alloc:/*dhulbDoc-v202:function;a16 alloc(u16) call16;*/
 	alloc_nex:
 	cmpw %ax,%dx
 	jz alloc_solv
-	testw %bx,%bx
+	testw $0x1ff,%bx
 	jz alloc_fail
 	shlb %cl
 	jcxz alloc_inc
@@ -41,7 +41,7 @@ alloc:/*dhulbDoc-v202:function;a16 alloc(u16) call16;*/
 	shrb %cl,$1
 	jcxz alloc_uinc
 	jmp alloc_solv
-	allov_uinc:
+	alloc_uinc:
 	movb $0x80,%cl
 	decw %dx
 	jmp alloc_solv
