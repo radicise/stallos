@@ -1,7 +1,24 @@
-#utilise "mem.s" docscan
-#utilise <pc/io.s> docscan
-#utilise "shell.s" docscan
-struct ArgsStruct {
-	int argc,
-	addr*addr*u8 argv;
+/%
+	smem:
+	.skip 512
+%/
+imply u8 smem;
+#define SHELLMEM_SIZE 512
+#import "stlfs16.dhulb"
+int shell() {
+	:shell__loop;
+	print(username);
+	print(":# ");
+	readLine($$STDIN_FILENO$$, $$STDOUT_FILENO$$, smem$, $$SHELLMEM_SIZE$$);
+	if (strcmp("exit", smem$) == 0) {
+		return 0;
+	}
+	goto shell__loop;
+	return 0;
 }
+/%
+root:
+.byte 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00
+%/
+/*imply SLTFS16Part root;*/
+

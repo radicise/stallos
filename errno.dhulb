@@ -1,0 +1,2 @@
+#define ENOTDIR 2
+#define ENOENT 3

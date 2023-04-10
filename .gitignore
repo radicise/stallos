@@ -1,6 +1,8 @@
-stall-comp.s
+/stall-comp.s
 *.bin
 *.class
 *.o
-log_qemu.txt
-kernel-comp.s
+/log_qemu.txt
+/kernel-comp.s
+*.elf
+/newf

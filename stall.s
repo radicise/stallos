@@ -22,7 +22,7 @@ _start: # TODO migrate to protected mode
     movb $0x01,0x0c
     movw $0xb800,0x0a # TODO support Hercules-MDA graphics area
     movb $0x01,%ah
-    movw $0x1706,%cx
+    movw $0x2706,%cx
     int $0x10
     movb $0x07,0x08
     movw $0x07c0,%ax

@@ -1,0 +1,58 @@
+#if OPERAND_BITS != 16
+	#error "Unsupported operand size"
+#endif
+#if CALL_BITS != 16
+	#error "Unsupported call size"
+#endif 
+#utilise <pc/io.s> docscan
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+int bread(int fd) {
+	if (fd != $$STDIN_FILENO$$) {
+		return (0 - 1);
+	}
+	return in();
+}
+int bwrite(int fd, u8 val) {
+	if (fd != $$STDOUT_FILENO$$) {
+		return (0 - 1);
+	}
+	return fbprint(val$, 1);
+}
+int write(int fd, addr a, uint len) {
+	if (fd != $$STDOUT_FILENO$$) {
+		return (0 - 1);
+	}
+	if (len == 0) {
+		return 0;
+	}
+	return fbprint(a, len);
+}
+int read(int fd, addr a, uint len) {
+	if (fd != $$STDIN_FILENO$$) {
+		return (0 - 1);
+	}
+	fd = a + len;
+	:read__loop;
+	if (fd == a) {
+		return len;
+	}
+	in() -> (a as *u8);
+	a = a + 1;
+	goto read__loop;
+}
+uint rand_last;
+int rand(uint max) {
+	:rand__loop;
+	rand_last = rand_last + 21845 + 21846;
+	if (rand_last <= max) {
+		return rand_last;
+	}
+	goto rand__loop;
+}
+#define SEEK_SET 1
+#define SEEK_CUR 2
+#define SEEK_END 3
+int lseek(int fd, u32 off, int mode) {
+	return (0 - 1);
+}

@@ -1,18 +1,31 @@
-#utilise <pc/io.s> docscan
+#import <sys.dhulb>
+#import <ioutil.dhulb>
+*u8 username;
+#import "shell.dhulb"
 u8 sys16() {
 	/&
+		cld
+		pushw %bx
 		xorw %ax,%ax
 		movw %ax,%es
 		movw %es:0x0506,%ax
+		movw %ax,%bx
 		divb %es:0x0502
 		movb %al,cursor_pos_y
 		movb %ah,cursor_pos_x
+		movw $0xb800,%ax
+		movw %ax,%es
+		shlw $1,%bx
+		xorb $0x77,%es:1(%bx)
 		/*
 		#not using the previous formatting
 		#TODO make and set the dimentions in io.s
 		*/
 	&/
-	print("The 16-bit system has not yet been implemented\n", 0);
+	username = "admin";
+	print("Stall v0.0.0.1\n");
+	shell();
+	/*the exit value of the shell is allowed to remain in %ax*/
 	/&
 		/*
 		#not restoring the color formatting to 0x0000:0x0508
@@ -27,7 +40,14 @@ u8 sys16() {
 		xorb %dh,%dh
 		addw %dx,%ax
 		movw %ax,%es:0x0506
+		movw $0xb800,%dx
+		movw %dx,%es
+		movw %ax,%bx
+		shlw $1,%bx
+		xorb $0x77,%es:1(%bx)
 		movw %cx,%ax
+		movw %bp,%sp
+		popw %bx
 		movw %bp,%sp
 		popw %bp
 		lretw

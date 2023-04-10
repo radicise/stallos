@@ -4,7 +4,7 @@
 declstr commandline "                                                                                                                                                                                                                                                                "
 decl commandlength arg0
 declstr fail "failed to complete requested operation\n"
-declstr unknown "unknown operation\n"
+declstr unknown "Unknown operation, valid commands are: kernel32, sys16\n"
 declstr disabled "The requested feature has been disabled\n"
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
 decl theen 0
@@ -24,7 +24,20 @@ if theen
 	pushw %es
 	movw $0x07c0,%ax
 	movw %ax,%ds
-    	lcallw $0x07c0,$sys16
+	pushw %bp
+	movw %sp,%bx
+	movw %ss,%dx
+	movw %ax,%ss
+	movw $0xfff0,%sp
+	pushw %dx
+	pushw %bx
+	subw $0x0c,%sp
+	lcallw $0x07c0,$sys16
+	addw $0x0c,%sp
+	popw %bx
+	popw %ss
+	movw %bx,%sp
+	popw %bp
 	popw %es
 	popw %ds
     endraw
