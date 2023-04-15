@@ -1,0 +1,2 @@
+off_t	s32
+time_t	s64

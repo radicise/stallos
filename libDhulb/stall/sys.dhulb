@@ -56,3 +56,4 @@ int rand(uint max) {
 int lseek(int fd, u32 off, int mode) {
 	return (0 - 1);
 }
+#define NULL 0

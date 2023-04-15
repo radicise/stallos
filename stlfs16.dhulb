@@ -84,14 +84,15 @@ struct STLFS16Part {
 struct STLFS16Path {
 	STLFS16Part part,
 	Dirsect node;
-}/*One more Dirsect after maxNodeDepth Dirsect, for null-termination using bNum = 0
-imply int split(*u8, u8);/*replaces given character with a null and moves each part to the left when the character is at the beginning and when multiple of the character are next to each other and returns the amount of items*/
-int getPath(*u8 form, *STLFS16Path res, *Dirblock place) {
-	if (form@ == (0x2f as u8)) {
-		0 -> res.node.bNum;
-	}
-	return getRelPath(form, res, place);
-}
+}/*One more Dirsect after maxNodeDepth Dirsect, for null-termination using bNum = 0*/
+
+/*
+imply s16 split(a16*u8, u8);/*replaces given character with a null and moves each part to the left when the character is at the beginning and when multiple of the character are next to each other and returns the amount of items*/
+imply s16 getPath(a16*u8, a16*STLFS16Path, a16*Dirblock);
+/&
+getPath:
+jmp getPathAny
+&/
 int getRelPath(*u8 form, *STLFS16Path res, *Dirblock place) {
 	int g = split(form, 0x2f as u8);
 	*Dirsect nval = res.node;
@@ -192,6 +193,12 @@ int getRelPath(*u8 form, *STLFS16Path res, *Dirblock place) {
 	nval = nval + 48;
 	goto getRelPath__loop;
 }
+int getPathAny(*u8 form, *STLFS16Path res, *Dirblock place) {
+	if (form@ == (0x2f as u8)) {
+		0 -> res.node.bNum;
+	}
+	return getRelPath(form, res, place);
+}
 int getChild(*Dirblock dir, *u8 name, *Dirsect res, uint blockSize, uint offset, int fd) {/*Contents at dir are invalidated*/
 	uint g = dir.numChildren@;
 	uint j = 0;
@@ -213,3 +220,4 @@ int getChild(*Dirblock dir, *u8 name, *Dirsect res, uint blockSize, uint offset,
 	}
 	goto getChild__loop;
 }
+*/
