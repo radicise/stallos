@@ -4,7 +4,6 @@ cp stall.s stall-comp.s
 java Salth n staltstd < stall.slth >> stall-comp.s
 printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n" >> stall-comp.s
 cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNT >> stall-comp.s
-printf ".set dist_end6144, . - _start\n.space 6144 - dist_end6144\n" >> stall-comp.s
 cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s >> stall-comp.s
 as -m16 -o stall.o stall-comp.s
 strip stall.o
@@ -26,5 +25,7 @@ dd if=stall-inter.bin of=stall.bin bs=${FILEOFF} count=1
 #clang -c -fno-asynchronous-unwind-tables -target i386-pc-linux-elf -Wall -o kern-ul.elf kern.c
 #ld.lld kern-ul.elf -o kern.elf
 #cat kern.elf >> stall.bin
+dd if=/dev/zero of=stall.bin bs=512 count=1 seek=1439
+cat fs.bin >> stall.bin
 dd if=/dev/zero of=stall.bin bs=512 count=1 seek=2879
 qemu-system-i386 -D log_qemu.txt -drive file=stall.bin,format=raw,index=0,media=disk

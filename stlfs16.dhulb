@@ -88,6 +88,7 @@ struct STLFS16Path {
 
 /*
 imply s16 split(a16*u8, u8);/*replaces given character with a null and moves each part to the left when the character is at the beginning and when multiple of the character are next to each other and returns the amount of items*/
+/*
 imply s16 getPath(a16*u8, a16*STLFS16Path, a16*Dirblock);
 /&
 getPath:
@@ -199,7 +200,7 @@ int getPathAny(*u8 form, *STLFS16Path res, *Dirblock place) {
 	}
 	return getRelPath(form, res, place);
 }
-int getChild(*Dirblock dir, *u8 name, *Dirsect res, uint blockSize, uint offset, int fd) {/*Contents at dir are invalidated*/
+int getChild(*Dirblock dir, *u8 name, *Dirsect res, uint blockSize, uint offset, int fd) {/*Contents at dir are invalidated*//*
 	uint g = dir.numChildren@;
 	uint j = 0;
 	*Dirsect t = dir.entries;
