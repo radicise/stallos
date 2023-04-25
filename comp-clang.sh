@@ -4,7 +4,7 @@ cp stall.s stall-comp.s
 java Salth n staltstd < stall.slth >> stall-comp.s
 printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n" >> stall-comp.s
 cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNT >> stall-comp.s
-cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s >> stall-comp.s
+cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s >> stall-comp.s
 as -m16 -o stall.o stall-comp.s
 strip stall.o
 FILEOFF=$(otool -l stall.o | grep "fileoff" | grep -oE '[^ ]+$')

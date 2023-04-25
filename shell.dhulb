@@ -5,10 +5,14 @@
 imply u8 smem;
 #define SHELLMEM_SIZE 512
 #import "stlfs16.dhulb"
-int shell() {
+#define PATH_MAX 512
+#utilise "shell.s" docscan
+int shelld(*u8 curdir) {
 	:shell__loop;
 	print(username);
-	print(":# ");
+	print(":");
+	print(curdir);
+	print("# ");
 	readLine($$STDIN_FILENO$$, $$STDOUT_FILENO$$, smem$, $$SHELLMEM_SIZE$$);
 	if (strcmp("exit", smem$) == 0) {
 		return 0;
