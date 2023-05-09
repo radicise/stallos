@@ -3,6 +3,7 @@
 #define PATH_MAX 512
 #utilise "shell.s" docscan
 int shelld(*u8 curdir, *u8 smem) {
+	int lastRetVal = 0;
 	:shell__loop;
 	print(username);
 	print(":");
@@ -11,13 +12,13 @@ int shelld(*u8 curdir, *u8 smem) {
 	readLine($$STDIN_FILENO$$, $$STDOUT_FILENO$$, smem, $$SHELLMEM_SIZE$$);
 	println(smem);
 	if (strcmp("exit", smem) == 0) {
-		return 0;
+		return lastRetVal;
 	}
-	if (bcmp("exit ", smem, 4) == 0) {
+	if (bcmp("exit ", smem, 5) == 0) {
 		smem = smem + 5;
 		:shelld__exitnum_loop1;
 		if (smem@ == 0x00) {
-			return 0;
+			return lastRetVal;
 		}
 		if (smem@ == 0x20) {
 			smem = smem + 1;
@@ -26,13 +27,13 @@ int shelld(*u8 curdir, *u8 smem) {
 		u8 neg = 0;
 		if (smem@ == 0x2d) {
 			smem = smem + 1;
-			if (smem@ == 0x00) {
+			if ((smem@ < 0x30) | (smem@ > 0x39)) {
 				return 0;
 			}
 			neg = 1;
 		}
-		if ((smem@ < 0x30) | (smem@ > 0x39)) {
-			return 0;
+		else ((smem@ < 0x30) | (smem@ > 0x39)) {
+			return lastRetVal;
 		}
 		int rv = 0;
 		:shelld__exitnum_loop2;
@@ -47,7 +48,6 @@ int shelld(*u8 curdir, *u8 smem) {
 		goto shelld__exitnum_loop2;
 	}
 	goto shell__loop;
-	return 0;
 }
 /%
 root:
