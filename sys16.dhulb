@@ -11,15 +11,20 @@ u8 sys16() {
 		movw %es:0x0506,%ax
 		movw %ax,%bx
 		divb %es:0x0502
-		movb %al,cursor_pos_y
-		movb %ah,cursor_pos_x
-		movw $0xb800,%ax
+		movb %al,5+console#y
+		movb %ah,4+console#x
+		movb %es:0x0502,%al
+		movb %es:0x0504,%ah
+		movw %ax,2+console#width, height
+		movb %es:0x0508,%al
+		movb %al,6+console#format
+		movw %es:0x050a,%ax
+		movw %ax,console#seg
 		movw %ax,%es
 		shlw $1,%bx
 		xorb $0x77,%es:1(%bx)
 		/*
 		#not using the previous formatting
-		#TODO make and set the dimentions in io.s
 		*/
 	&/
 	username = "admin";
@@ -29,18 +34,17 @@ u8 sys16() {
 	/&
 		/*
 		#not restoring the color formatting to 0x0000:0x0508
-		#TODO make and restore the dimensions from io.s
 		*/
 		movw %ax,%cx
 		xorw %dx,%dx
 		movw %dx,%es
-		movb cursor_pos_y,%al
+		movb 5+console,%al
 		mulb %es:0x0502
-		movb cursor_pos_x,%dl
+		movb 4+console,%dl
 		xorb %dh,%dh
 		addw %dx,%ax
 		movw %ax,%es:0x0506
-		movw $0xb800,%dx
+		movw %es:0x050a,%dx
 		movw %dx,%es
 		movw %ax,%bx
 		shlw $1,%bx

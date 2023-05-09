@@ -87,6 +87,10 @@ struct STLFS16Path {
 	Dirsect node;
 }/*One more Dirsect after maxNodeDepth Dirsect, for null-termination using bNum = 0*/
 
+
+
+
+
 /*
 imply s16 split(a16*u8, u8);/*replaces given character with a null and moves each part to the left when the character is at the beginning and when multiple of the character are next to each other and returns the amount of items*/
 /*

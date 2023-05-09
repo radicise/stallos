@@ -1,21 +1,50 @@
-/%
-	smem:
-	.skip 512
-%/
-imply u8 smem;
 #define SHELLMEM_SIZE 512
 #import "stlfs16.dhulb"
 #define PATH_MAX 512
 #utilise "shell.s" docscan
-int shelld(*u8 curdir) {
+int shelld(*u8 curdir, *u8 smem) {
 	:shell__loop;
 	print(username);
 	print(":");
 	print(curdir);
 	print("# ");
-	readLine($$STDIN_FILENO$$, $$STDOUT_FILENO$$, smem$, $$SHELLMEM_SIZE$$);
-	if (strcmp("exit", smem$) == 0) {
+	readLine($$STDIN_FILENO$$, $$STDOUT_FILENO$$, smem, $$SHELLMEM_SIZE$$);
+	println(smem);
+	if (strcmp("exit", smem) == 0) {
 		return 0;
+	}
+	if (bcmp("exit ", smem, 4) == 0) {
+		smem = smem + 5;
+		:shelld__exitnum_loop1;
+		if (smem@ == 0x00) {
+			return 0;
+		}
+		if (smem@ == 0x20) {
+			smem = smem + 1;
+			goto shelld__exitnum_loop1;
+		}
+		u8 neg = 0;
+		if (smem@ == 0x2d) {
+			smem = smem + 1;
+			if (smem@ == 0x00) {
+				return 0;
+			}
+			neg = 1;
+		}
+		if ((smem@ < 0x30) | (smem@ > 0x39)) {
+			return 0;
+		}
+		int rv = 0;
+		:shelld__exitnum_loop2;
+		rv = rv * 10 + (smem@ - 0x30);
+		smem = smem + 1;
+		if ((smem@ < 0x30) | (smem@ > 0x39)) {
+			if (neg) {
+				return 0 - rv;
+			}
+			return rv;
+		}
+		goto shelld__exitnum_loop2;
 	}
 	goto shell__loop;
 	return 0;

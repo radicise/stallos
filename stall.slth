@@ -6,6 +6,7 @@ decl commandlength arg0
 declstr fail "failed to complete requested operation\n"
 declstr unknown "Unknown operation, valid commands are: kernel32, sys16\n"
 declstr disabled "The requested feature has been disabled\n"
+declstr sys16exit "returned: 0x"
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
 decl theen 0
 call handle
@@ -32,7 +33,7 @@ if theen
 	pushw %dx
 	pushw %bx
 	subw $0x0c,%sp
-	lcallw $0x07c0,$sys16
+	lcallw $0x07c0,$sys16#TODO mark the topmost stackframe in the conventional way
 	addw $0x0c,%sp
 	popw %bx
 	popw %ss
@@ -40,7 +41,55 @@ if theen
 	popw %bp
 	popw %es
 	popw %ds
+	pushw %ax
     endraw
+    call printstr sys16exit_addr , sys16exit_len
+    startraw
+    	popw %ax
+	pushw %ds:0x18
+	pushw %ds:0x16
+	movw %ax,%cx
+	andb $0x0f,%al
+	addb $0x30,%al
+	cmpb $0x39,%al
+	jbe noa0
+	addb $0x07,%al
+	noa0:
+	movb %al,%ds:0x19
+	shrw $4,%cx
+	movb %cl,%al
+	andb $0x0f,%al
+        addb $0x30,%al
+        cmpb $0x39,%al
+        jbe noa1
+        addb $0x07,%al
+        noa1:
+        movb %al,%ds:0x18
+        shrw $4,%cx
+        movb %cl,%al
+	andb $0x0f,%al
+        addb $0x30,%al
+        cmpb $0x39,%al
+        jbe noa2
+        addb $0x07,%al
+        noa2:
+        movb %al,%ds:0x17
+        shrw $4,%cx
+        movb %cl,%al
+	andb $0x0f,%al
+        addb $0x30,%al
+        cmpb $0x39,%al
+        jbe noa3
+        addb $0x07,%al
+        noa3:
+        movb %al,%ds:0x16
+    endraw
+    call printmem 0x16 , 4
+    startraw
+	popw %ds:0x16
+	popw %ds:0x18
+    endraw
+    call printline
     endif
     theen = 1
 endif
