@@ -28,7 +28,7 @@ u8 sys16() {
 		*/
 	&/
 	username = "admin";
-	print("Stall v0.0.0.1\n");
+	print("Stall v0.0.1.0\n");
 	shell();
 	/*the exit value of the shell is allowed to remain in %ax*/
 	/&

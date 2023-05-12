@@ -28,4 +28,4 @@ dd if=stall-inter.bin of=stall.bin bs=${FILEOFF} count=1
 dd if=/dev/zero of=stall.bin bs=512 count=1 seek=1439
 cat fs.bin >> stall.bin
 dd if=/dev/zero of=stall.bin bs=512 count=1 seek=2879
-qemu-system-i386 -D log_qemu.txt -drive file=stall.bin,format=raw,index=0,media=disk
+qemu-system-i386 -D log_qemu.txt -drive file=stall.bin,format=raw,index=0,if=floppy

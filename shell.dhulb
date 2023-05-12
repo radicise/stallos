@@ -2,6 +2,39 @@
 #import "stlfs16.dhulb"
 #define PATH_MAX 512
 #utilise "shell.s" docscan
+#import <io/bufferIO.dhulb>
+int hexdump(*InputStream in) {
+	u8 g;
+	int r;
+	u32 t;
+	u8 c;
+	0x20 as u8 -> t$ as *u8[2];
+	0 as u8 -> t$ as *u8[3];
+	:hexdump__loop;
+	r = in.read@(g$, 1, in);
+	if (r <= 0) {
+		println("");
+		return r;
+	}
+	c = g & 0x0f;
+	if (c > 9) {
+		c = c + 0x37;
+	}
+	else {
+		c = c + 0x30;
+	}
+	c -> t$ as *u8[1];
+	c = g >> 4;
+	if (c > 9) {
+		c = c + 0x37;
+	}
+	else {
+		c = c + 0x30;
+	}
+	c -> t$;
+	print(t$);
+	goto hexdump__loop;
+}
 int shelld(*u8 curdir, *u8 smem) {
 	int lastRetVal = 0;
 	:shell__loop;
@@ -46,6 +79,12 @@ int shelld(*u8 curdir, *u8 smem) {
 			return rv;
 		}
 		goto shelld__exitnum_loop2;
+	}
+	if ((strcmp("test", smem) == 0) | (bcmp("test ", smem, 5) == 0)) {
+		BufferInputStream bis;
+		bufIn_init(smem, $$SHELLMEM_SIZE$$, bis$);
+		hexdump(bis$);
+		bis$.close@(bis$);
 	}
 	goto shell__loop;
 }

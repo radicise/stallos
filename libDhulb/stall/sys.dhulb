@@ -7,6 +7,7 @@
 #import <pc/io.dhulb>
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
+#import "errno.dhulb"
 VGAMode3Out console;
 int bread(int fd) {
 	if (fd != $$STDIN_FILENO$$) {
@@ -42,6 +43,9 @@ int read(int fd, addr a, uint len) {
 	a = a + 1;
 	goto read__loop;
 }
+int close(int fd) {
+	return 0 - $$EIO$$;
+}
 uint rand_last;
 int rand(uint max) {
 	:rand__loop;
@@ -56,5 +60,21 @@ int rand(uint max) {
 #define SEEK_END 3
 int lseek(int fd, u32 off, int mode) {
 	return (0 - 1);
+}
+#import <io/streams.dhulb>
+struct FileOutputStream extends OutputStream {
+	int fd;
+}
+int fdOut_write(addr src, uint len, *FileOutputStream it) {
+	return write(it.fd@, src, len);
+}
+int fdOut_close(*FileOutputStream it) {
+	return close(it.fd@);
+}
+int fdOut_init(int fd, *FileOutputStream it) {
+	fd -> it.fd;
+	fdOut_write -> it.write;
+	fdOut_close -> it.close;
+	return 0;
 }
 #define NULL 0
