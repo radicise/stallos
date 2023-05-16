@@ -81,10 +81,12 @@ int shelld(*u8 curdir, *u8 smem) {
 		goto shelld__exitnum_loop2;
 	}
 	if ((strcmp("test", smem) == 0) | (bcmp("test ", smem, 5) == 0)) {
+		
 		BufferInputStream bis;
 		bufIn_init(smem, $$SHELLMEM_SIZE$$, bis$);
 		hexdump(bis$);
 		bis$.close@(bis$);
+		
 	}
 	goto shell__loop;
 }
