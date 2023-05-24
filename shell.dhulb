@@ -3,6 +3,7 @@
 #define PATH_MAX 512
 #utilise "shell.s" docscan
 #import <io/bufferIO.dhulb>
+#import <stall/stack.dhulb>
 int hexdump(*InputStream in) {
 	u8 g;
 	int r;
@@ -33,6 +34,7 @@ int hexdump(*InputStream in) {
 	}
 	c -> t$;
 	print(t$);
+	/*print_uint(g to uint);*/
 	goto hexdump__loop;
 }
 int shelld(*u8 curdir, *u8 smem) {
@@ -80,13 +82,22 @@ int shelld(*u8 curdir, *u8 smem) {
 		}
 		goto shelld__exitnum_loop2;
 	}
-	if ((strcmp("test", smem) == 0) | (bcmp("test ", smem, 5) == 0)) {
-		
+	if ((strcmp("test", smem) == 0) | (bcmp("test ", smem, 5) == 0)) {	
+		/*
 		BufferInputStream bis;
-		bufIn_init(smem, $$SHELLMEM_SIZE$$, bis$);
+		bufIn_init(sp() - 200, 512, bis$);
 		hexdump(bis$);
 		bis$.close@(bis$);
-		
+		*/
+		StackTracer st;
+		0 -> st$.count;
+		trace(st$);
+	}
+	else ((strcmp("sh", smem) == 0) | (bcmp("sh ", smem, 3) == 0)) {
+		lastRetVal = shell();
+		print("returned: ");
+		print_uint(lastRetVal to uint);
+		print("\n");
 	}
 	goto shell__loop;
 }

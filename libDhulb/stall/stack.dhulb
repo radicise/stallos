@@ -1,0 +1,13 @@
+struct StackTracer {
+        uint count;
+}
+#utilise "stack.s"
+u16 stack_printer(a16 retAddr, a16 stackBase, *StackTracer tracer) {
+        tracer.count@ -> tracer.count;
+        print("Called from: ");
+        print_uint(retAddr as u16);
+        print(", stack frame ");
+        print_uint(stackBase as u16);
+        print("\n");
+        return 0;
+}

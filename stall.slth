@@ -33,7 +33,8 @@ if theen
 	pushw %dx
 	pushw %bx
 	subw $0x0c,%sp
-	lcallw $0x07c0,$sys16#TODO mark the topmost stackframe in the conventional way
+	movw $0x00,%bp
+	lcallw $0x07c0,$sys16
 	addw $0x0c,%sp
 	popw %bx
 	popw %ss

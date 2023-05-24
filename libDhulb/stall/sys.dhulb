@@ -8,6 +8,7 @@
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #import "errno.dhulb"
+#utilise "sys.s" docscan
 VGAMode3Out console;
 int bread(int fd) {
 	if (fd != $$STDIN_FILENO$$) {
