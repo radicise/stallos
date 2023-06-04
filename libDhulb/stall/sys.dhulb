@@ -5,8 +5,7 @@
 	#error "Unsupported call size"
 #endif 
 #import <pc/io.dhulb>
-#define STDIN_FILENO 0
-#define STDOUT_FILENO 1
+#import <dos/api_bindings.dhulb>
 #import "errno.dhulb"
 #utilise "sys.s" docscan
 VGAMode3Out console;
@@ -14,13 +13,14 @@ int bread(int fd) {
 	if (fd != $$STDIN_FILENO$$) {
 		return (0 - 1);
 	}
-	return in();
+	return dos_console_input();
 }
 int bwrite(int fd, u8 val) {
 	if (fd != $$STDOUT_FILENO$$) {
 		return (0 - 1);
 	}
-	return fbprint(val$, 1, console$);
+	dos_console_output(val);
+	return 1;
 }
 int write(int fd, addr a, uint len) {
 	if (fd != $$STDOUT_FILENO$$) {
@@ -29,7 +29,14 @@ int write(int fd, addr a, uint len) {
 	if (len == 0) {
 		return 0;
 	}
-	return fbprint(a, len, console$);
+	fd = a + len;
+	:write__loop;
+	if (fd == a) {
+		return len;
+	}
+	dos_console_output((a as *u8)@);
+	a = a + 1;
+	goto write__loop;
 }
 int read(int fd, addr a, uint len) {
 	if (fd != $$STDIN_FILENO$$) {
@@ -40,7 +47,7 @@ int read(int fd, addr a, uint len) {
 	if (fd == a) {
 		return len;
 	}
-	in() -> (a as *u8);
+	dos_console_input() -> (a as *u8);
 	a = a + 1;
 	goto read__loop;
 }
@@ -56,9 +63,6 @@ int rand(uint max) {
 	}
 	goto rand__loop;
 }
-#define SEEK_SET 1
-#define SEEK_CUR 2
-#define SEEK_END 3
 int lseek(int fd, u32 off, int mode) {
 	return (0 - 1);
 }

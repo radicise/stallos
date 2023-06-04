@@ -1,9 +1,17 @@
+#import "defs.dhulb"
 #import <ioutil.dhulb>
 #import <sys.dhulb>
 *u8 username;
 #import "shell.dhulb"
+#import "kernel/handler21h.dhulb"
 u8 sys16() {
 	/&
+		xorw %ax,%ax
+		movw %ax,%es
+		movw $int20h,%es:0x0080
+		movw $0x07c0,%es:0x0082
+		movw $int21h,%es:0x0084
+		movw $0x07c0,%es:0x0086
 		cld
 		pushw %bx
 		xorw %ax,%ax
@@ -27,6 +35,22 @@ u8 sys16() {
 		#not using the previous formatting
 		*/
 	&/
+	int21ahHandle = handle21h00h;
+	handle21h01h -> int21ahHandle$[1];
+	handle21h02h -> int21ahHandle$[2];
+	handle21h03h -> int21ahHandle$[3];
+	handle21h04h -> int21ahHandle$[4];
+	handle21h05h -> int21ahHandle$[5];
+	handle21h06h -> int21ahHandle$[6];
+	handle21h07h -> int21ahHandle$[7];
+	handle21h08h -> int21ahHandle$[8];
+	handle21h09h -> int21ahHandle$[9];
+	handle21h0ah -> int21ahHandle$[10];
+	handle21h0bh -> int21ahHandle$[11];
+	handle21h0ch -> int21ahHandle$[12];
+	handle21h0dh -> int21ahHandle$[13];
+	handle21h0eh -> int21ahHandle$[14];
+	handle21h0fh -> int21ahHandle$[15];
 	username = "admin";
 	print("Stall v0.0.1.0\n");
 	shell();
@@ -57,3 +81,4 @@ u8 sys16() {
 		lretw
 	&/
 }
+

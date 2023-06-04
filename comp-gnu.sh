@@ -5,7 +5,7 @@ java Salth n staltstd < stall.slth >> stall-comp.s
 printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n" >> stall-comp.s
 #printf ".set sys_off, .\n" >> stall-comp.s
 cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNT >> stall-comp.s
-cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s >> stall-comp.s
+cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s ${DHULB_PATH}/src/DLib/stall/stack.s ${DHULB_PATH}/src/DLib/stall/sys.s ${DHULB_PATH}/src/DLib/dos/api_bindings.s kernel/int.s >> stall-comp.s
 as -o stall.o stall-comp.s
 ld -T ./newf -o stall.elf stall.o
 strip stall.elf

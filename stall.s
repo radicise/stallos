@@ -6,7 +6,8 @@
 .text
 .code16
 _start: # TODO migrate to protected mode
-    movw $0x07c0,%ax # TODO what if the BIOS launches this from the HMA and the CS runs out soon?
+    ljmpw $0x07c0,$0x0003
+    movw $0x07c0,%ax
     movw %ax,%ss
     movw $510,%bp
     movw $510,%sp

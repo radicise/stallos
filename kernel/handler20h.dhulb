@@ -1,4 +1,0 @@
-#utilise "int.s" noscan
-u8 handler20h(u16 ax, u16 bx, u16 cx, u16 dx) {
-	return 0;
-}
