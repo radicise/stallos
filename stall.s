@@ -6,7 +6,7 @@
 .text
 .code16
 _start: # TODO migrate to protected mode
-    ljmpw $0x07c0,$0x0003
+    ljmpw $0x07c0,$0x0005
     movw $0x07c0,%ax
     movw %ax,%ss
     movw $510,%bp
