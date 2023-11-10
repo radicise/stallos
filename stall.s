@@ -5,7 +5,7 @@
 .globl _start
 .text
 .code16
-_start: # TODO migrate to protected mode
+_start:
     ljmpw $0x07c0,$0x0005
     movw $0x07c0,%ax
     movw %ax,%ss
@@ -14,8 +14,7 @@ _start: # TODO migrate to protected mode
     movw $0x50,%ax
     movw %ax,%ds
     movb %dl,0
-    movb $0x00,%ah
-    movb $0x03,%al
+    movw $0x03,%ax
     int $0x10
     movb $80,0x02
     movb $25,0x04
@@ -36,7 +35,7 @@ _start: # TODO migrate to protected mode
     movw %ax,%es
     movw $0x0200,%bx
     movw $1,%ax
-    movw $48,%cx
+    movw $0x70,%cx
     kree:
     movw $0x01,%dx
     call _cann
@@ -435,6 +434,16 @@ _boot_kernel32:
     inb $0x70,%al
     orb $0x80,%al
     outb %al,$0x70
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
     inb $0x71
     cli
     jmp afdis
@@ -493,7 +502,7 @@ _boot_kernel32:
     pushw $23
     subl $6,%eax
     movl %eax,%ebx
-    pushl $0x9400
+    pushl $0xdc00
     pushw $8
     subl $0x06,%eax
     movw $0x01,%cx
@@ -504,7 +513,15 @@ _boot_kernel32:
     movl %cr0,%edx
     orl $0x01,%edx
     movl %edx,%cr0
-    ljmp $0x08,$0x9400
+    xorl %edx,%edx
+    incw %dx
+    shll $0x10,%edx
+    movl %edx,%esp
+    movl $0x10,%ebx
+    movw %bx,%ss
+    movw %bx,%ds
+    xorl %ebp,%ebp
+    ljmp $0x08,$0xdc00
     a20_failure:
     ret
 .set shell_offset, 4096

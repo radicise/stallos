@@ -9,6 +9,7 @@
 #import <sys.dhulb>
 #import <ioutil.dhulb>
 #import <stall/stack.dhulb>
+#import "editor.dhulb"
 int hexdump(*InputStream in) {
 	u8 g;
 	int r;
@@ -125,6 +126,9 @@ int shelld(*u8 curdir, *u8 smem, *MapEntry uninit_map) {
 	ObjStr traceobj;
 	ObjStr_init("trace", traceobj$);
 	programs$.add@(traceobj$, shell_trace, programs$);
+	ObjStr editorobj;
+	ObjStr_init("editor", editorobj$);
+	programs$.add@(editorobj$, editor, programs$);
 	int lastRetVal = 0;
 	u8 ran;
 	:shell__loop;

@@ -1,0 +1,74 @@
+/%. = 0xdc00
+%/
+/&_start:
+.globl _start
+&/
+imply s32 runSystem();
+imply s32 executeSystem();
+imply s32 show();
+int entry() {
+	runSystem();
+	u8 t = 252;
+	int i;
+	:entry_loop1;
+	((0xb8000 + (t to u32)) as *u16)@ -> ((0xb8000 + (((t + 2) as u8) to u32)) as *u16);
+	t = t - 2;
+	i = 0;
+	:entry_loop2;
+	if (i < 32768) {
+		i = i + 1;
+		goto entry_loop2;
+	}
+	goto entry_loop1;
+}
+/&show:
+&/
+int shw() {
+	0x0707 as u16 -> (0xb8000 as *u16);
+	return 0;
+}
+#import "elfExec.dhulb"
+imply s32 setup();
+/&irupt_null:
+.globl irupt_null
+iret
+set_idt:
+.globl set_idt
+movl 4(%esp),%edx
+movl %edx,0x000073fc
+movl 8(%esp),%edx
+movw %dx,0x000073fa
+lidt 0x000007fa
+ret
+int_enable:
+.globl int_enable
+inb $0x70,%al
+andb $0x7f,%al
+outb %al,$0x70
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+inb $0x71
+sti
+ret
+runSystem:
+&/
+int runSys() {
+	setup();
+	/*
+	(setup() + 0x30) as u8 -> (0xb8000 as *u8);
+	:runSys_loop1;
+	goto runSys_loop1;
+	*/
+	/*((0xb8002 as *u8)@ as int + 1) -> (0xb8002 as *u8);*/
+	int i = executeSystem();
+	(i + 0x30) as u8 -> (0xb8000 as *u8);
+	return i;
+}

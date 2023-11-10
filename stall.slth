@@ -13,10 +13,9 @@ call handle
 theen = res
 //call printstr commandline_addr , commandlength
 if theen
-//    call bootkernel32
-//    call printstr fail_addr , fail_len
     if theen ^ 2
-        call printstr disabled_addr , disabled_len
+        call bootkernel32
+        call printstr fail_addr , fail_len
 	theen = 0
     endif
     if theen

@@ -9,21 +9,25 @@ cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s ${DH
 as -o stall.o stall-comp.s
 ld -T ./newf -o stall.elf stall.o
 strip stall.elf
-objcopy stall.elf /dev/null --dump-section .text=stall.bin
+objcopy --dump-section .text=stall.bin stall.elf /dev/null
+dhulbpp - - < sys32.dhulb > kern32-comp.dhulb
+dhulbc 32 -tNGT < kern32-comp.dhulb > kernel-comp.s
 #cp kernel.s kernel-comp.s
-#as -m32 -o kernel.o kernel-comp.s
-#strip kernel.o
-#FILEOFF=$(otool -l kernel.o | grep "fileoff" | grep -oE '[^ ]+$')
-#dd if=kernel.o of=stall-inter.bin bs=${FILEOFF} skip=1
-#FILEOFF=$(otool -l kernel.o | grep " size" | grep -oE '[^ ]+$')
-#FILEOFF=$(printf "%d" ${FILEOFF})
-#dd if=stall-inter.bin of=kernel.bin bs=${FILEOFF} count=1
-#cat kernel.bin >> stall.bin
-#dd if=/dev/zero of=stall.bin bs=16 count=1 seek=511
+i686-linux-gnu-as -march=i386 -o kernel.o kernel-comp.s
+i686-linux-gnu-as -march=i386 -o irupts.o sys32/irupts.s
+gcc -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o sysc.elf sys32/sys.c
+i686-linux-gnu-ld --no-dynamic-linker -T ./newf386 -o kernel.elf kernel.o sysc.elf irupts.o
+cp kernel.elf kernel-copy.elf
+i686-linux-gnu-strip kernel-copy.elf
+i686-linux-gnu-objcopy --dump-section .text=kernel.bin kernel.elf /dev/null
+dd if=kernel.bin of=stall.bin bs=512 skip=110 seek=48
+gcc -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o prgm-ul.elf os/shell.c
+i686-linux-gnu-ld --no-dynamic-linker -o prgm.elf prgm-ul.elf
+dd if=prgm.elf of=stall.bin bs=512 seek=66
 #clang -c -fno-asynchronous-unwind-tables -target i386-pc-linux-elf -Wall -o kern-ul.elf kern.c
 #ld.lld kern-ul.elf -o kern.elf
 #cat kern.elf >> stall.bin
-dd if=/dev/zero of=stall.bin bs=512 count=1 seek=1439
-cat fs.bin >> stall.bin
+#dd if=/dev/zero of=stall.bin bs=512 count=1 seek=1439
+#cat fs.bin >> stall.bin
 dd if=/dev/zero of=stall.bin bs=512 count=1 seek=2879
 qemu-system-i386 -D log_qemu.txt -drive file=stall.bin,format=raw,index=0,if=floppy

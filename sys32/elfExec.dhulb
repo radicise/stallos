@@ -1,0 +1,275 @@
+typealias Elf32_Addr u32;
+typealias Elf32_Half u16;
+typealias Elf32_Off u32;
+typealias Elf32_Sword s32;
+typealias Elf32_Word u32;
+structure Elf32_Ehdr {
+	u8 e_ident,
+	u8 e_ident_1,
+	u8 e_ident_2,
+	u8 e_ident_3,
+	u8 e_ident_4,
+	u8 e_ident_5,
+	u8 e_ident_6,
+	u8 e_ident_7,
+	u8 e_ident_8,
+	u8 e_ident_9,
+	u8 e_ident_10,
+	u8 e_ident_11,
+	u8 e_ident_12,
+	u8 e_ident_13,
+	u8 e_ident_14,
+	u8 e_ident_15,
+	Elf32_Half e_type,
+	Elf32_Half e_machine,
+	Elf32_Word e_version,
+	Elf32_Addr e_entry,
+	Elf32_Off e_phoff,
+	Elf32_Off e_shoff,
+	Elf32_Word e_flags,
+	Elf32_Half e_ehsize,
+	Elf32_Half e_phentsize,
+	Elf32_Half e_phnum,
+	Elf32_Half e_shentsize,
+	Elf32_Half e_shnum,
+	Elf32_Half e_shstrndx;
+}
+structure Elf32_Phdr {
+	Elf32_Word p_type,
+	Elf32_Off p_offset,
+	Elf32_Addr p_vaddr,
+	Elf32_Addr p_paddr,
+	Elf32_Word p_filesz,
+	Elf32_Word p_memsz,
+	Elf32_Word p_flags,
+	Elf32_Word p_align;
+}
+int rut() {
+	:rut_loop1;
+	goto rut_loop1;
+}
+int cpy(addr dest, addr from, uint count) {
+	:cpy_loop1;
+	if (count == 0) {
+		return 0;
+	}
+	(from to *u8)@ -> (dest to *u8);	
+	from = from + 1;
+	dest = dest + 1;
+	count = count - 1;
+	goto cpy_loop1;
+}
+int fill(addr dest, u8 val, uint count) {
+	:fill_loop1;
+	if (count == 0) {
+		return 0;
+	}
+	val -> (dest to *u8);
+	dest = dest + 1;
+	count = count - 1;
+	goto fill_loop1;
+}
+int loadSeg(*Elf32_Phdr seg, addr fileBase, addr base, *addr stack) {
+	Elf32_Word t = seg.p_type@;
+	if ((t == 0) | (t == 4) | (t == 6)) {
+		return 0;
+	}
+	if (t == 2) {
+		return 19;/* Dynamic linking is not supported */
+	}
+	if (t == 3) {
+		return 20;/* Program interpretation is not supported */
+	}
+	if (t == 5) {
+		return 21;/* Unsupported segment type */
+	}
+	if ((t > 0x70000000) & (t <= 0x7fffffff)) {
+		return 22;/* Unrecognised processor-specific segment type */
+		/* TODO Check for these in the SystemV ABI for i386 */
+	}
+	if (t > 6) {
+		return 23;/* Unrecognised segment type */
+	}
+	if (((seg.p_align@) != 0) & ((seg.p_align@) != 1)) {
+		return 24;/* Alignment requirement is not supported */
+		/* TODO Support */
+	}
+	if ((seg.p_filesz@) > (seg.p_memsz@)) {
+		return 25;/* Memory image is of smaller size than file image */
+	}
+	cpy((base + (seg.p_vaddr@)) to addr, (fileBase + (seg.p_offset@)) to addr, seg.p_filesz@ to uint);
+	if ((seg.p_memsz@) > (seg.p_filesz@)) {
+		fill((base + (seg.p_vaddr@) + (seg.p_filesz@)) to addr, 0x00 as u8, ((seg.p_memsz@) - (seg.p_filesz@)) to uint);
+	}
+	addr s = base + (seg.p_vaddr@) + (seg.p_memsz@);
+	if (s > (stack@)) {
+		s -> stack;
+	}
+	return 0;
+}
+int loadELF(*Elf32_Ehdr prgm, addr base, *addr s) {
+	if (prgm.e_ident@ != 0x7F) {
+		return 1;/* Invalid magic */
+	}
+	if (prgm.e_ident_1@ != 0x45) {
+		return 1;
+	}
+	if (prgm.e_ident_2@ != 0x4C) {
+		return 1;
+	}
+	if (prgm.e_ident_3@ != 0x46) {
+		return 1;
+	}
+	u8 c = prgm.e_ident_4@;
+	if (c == 0) {
+		return 2;/* Invalid ELF class */
+	}
+	if (c == 2) {
+		return 3;/* ELF class not supported */
+	}
+	if (c > 2) {
+		return 4;/* ELF class not recognised */
+	}
+	c = prgm.e_ident_5@;
+	if (c == 0) {
+		return 5;/* Invalid data encoding */
+	}
+	if (c == 2) {
+		return 6;/* Data encoding not supported */
+	}
+	if (c > 2) {
+		return 7;/* Unrecognised data encoding */
+	}
+	c = prgm.e_ident_6@;
+	if (c != (prgm.e_version@)) {
+		return 8;/* Inconsistent ELF version identifier */
+	}
+	if (c == 0) {
+		return 9;/* Invalid ELF version */
+	}
+	if (c > 1) {
+		return 10;/* Unrecognised ELF version identifier */
+	}
+	int t = prgm.e_type@ to int;
+	if (t == 0) {
+		return 11;/* No ELF file type */
+	}
+	if (t == 1) {
+		return 12;/* ELF relocatable file */
+	}
+	if (t == 3) {
+		return 13;/* ELF shared object file */
+	}
+	if (t == 4) {
+		return 14;/* ELF core file */
+	}
+	if (t >= 0xff00) {
+		return 15;/* Unrecognised processor-specific ELF file type */
+		/* TODO find processor-specific types for SystemV i386 */
+	}
+	if (t != 2) {
+		return 16;/* Unrecognised ELF file type */
+	}
+	t = prgm.e_machine@;
+	if ((t <= 8) & (t != 0) & (t != 3) & (t != 6)) {
+		return 17;/* Unsupported architecture */
+	}
+	if ((t > 8) | (t == 6)) {
+		return 18;/* Unrecognised architecture */
+	}
+	addr*Elf32_Phdr seg = prgm + 52;
+	uint ps = prgm.e_phentsize@;
+	uint pnum = prgm.e_phnum@;
+	:loadELF_loop1;
+	if (pnum == 0) {
+		return 0;
+	}
+	loadSeg(seg, prgm, base, s);
+	seg = seg + ps;
+	pnum = pnum - 1;
+	goto loadELF_loop1;
+}
+int makeMemseg(a32 base, u8 priv) {
+	uint segB = (0x07fa as addr*u16)@;
+	if (segB >= 375) {
+		return 26;/* Too many segments */
+	}
+	if (priv >= 4) {
+		return 27;/* Invalid permission level */
+	}
+	((segB + 16) to u16) -> (0x07fa as addr*u16);
+	a32*u16 sd = (((0x07fc as a32*u32)@) + segB + 1) as a32*u16;
+	(0xffff as u16) -> (sd[0]);
+	(base as u16) -> (sd[1]);
+	(((((priv as u32) << 5) | 0x9a00) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[2]);
+	((0x00cf | (((base >> 16) & 0xff00) as u32)) as u16) -> (sd[3]);
+	(0xffff as u16) -> (sd[4]);
+	(base as u16) -> (sd[5]);
+	(((((priv as u32) << 5) | 0x9200) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[6]);
+	((0x00cf | (((base >> 16) & 0xff00) as u32)) as u16) -> (sd[7]);
+	/&xorl %eax,%eax
+movw $0x07fa,%ax
+lgdtl (%eax)
+&/
+	return 0;
+}
+int execELF(addr base, uint entry, *s32 code, addr stackAddr) {
+	int i = makeMemseg(base, 0x00);/* TODO Change privilege level */
+	if (i != 0) {
+		return i;
+	}
+	entry as u32;
+	/&pushl %eax
+xorl %eax,%eax
+movw 0x07fa,%ax
+subw $0x0f,%ax
+pushw %ax
+pushw %ax
+&/
+stackAddr;
+/&movl %esp,%ebx
+incl %ebx
+incl %ebx
+movl %eax,%ecx
+movw %cs,%dx
+movw %dx,%es
+popw %ax
+addw $0x08,%ax
+movw %ax,%ds
+movw %ax,%ss
+movl %ecx,%esp
+pushl %ebx
+pushl %ebp
+pushl $0x00
+lcalll *%cs:(%ebx)
+popl %ebx
+popl %ebp
+popl %esp
+movw %cs,%bx
+movw %bx,%ds
+movw %bx,%ss
+popw %bx
+popl %ebx
+pushl %eax
+&/
+	code;
+	/&popl %ebx
+movl %ebx,(%eax)
+&/
+	(((0x07fa as addr*u16)@ as u32 - 16) as u16) -> (0x07fa as addr*u16);
+	return 0;
+}
+int runELF(addr elf, addr memArea, *s32 code) {
+	addr s = memArea;
+	int i = loadELF(elf as *Elf32_Ehdr, memArea, s$);
+	if (i != 0) {
+		return i;
+	}
+	s = s + 0x00200000;
+	s = s - (s % 4);
+	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, code, s);
+	if (i != 0) {
+		return i;
+	}
+	return 0;
+}

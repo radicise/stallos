@@ -6,4 +6,5 @@
 /kernel-comp.s
 *.elf
 /newf
+/newf386
 /src/Dlib/stall/*
