@@ -1,3 +1,4 @@
+imply s32 sanc();
 typealias Elf32_Addr u32;
 typealias Elf32_Half u16;
 typealias Elf32_Off u32;
@@ -53,7 +54,7 @@ int cpy(addr dest, addr from, uint count) {
 	if (count == 0) {
 		return 0;
 	}
-	(from to *u8)@ -> (dest to *u8);	
+	(from to *u8)@ -> (dest to *u8);
 	from = from + 1;
 	dest = dest + 1;
 	count = count - 1;
@@ -88,14 +89,13 @@ int loadSeg(*Elf32_Phdr seg, addr fileBase, addr base, *addr stack) {
 		/* TODO Check for these in the SystemV ABI for i386 */
 	}
 	if (t > 6) {
-		return 23;/* Unrecognised segment type */
+		if (t != (0x6474e551 as u32)) {/* Disregard of PT_GNU_STACK because all segments are executable *//* TODO Pay attention to the p_flags value of PT_GNU_STACK when p_flags becomes used, in order to set executability of the stack accordingly */
+			return 23;/* Unrecognised segment type */
+		}
 	}
-	if (((seg.p_align@) != 0) & ((seg.p_align@) != 1)) {
-		return 24;/* Alignment requirement is not supported */
-		/* TODO Support */
-	}
+	/* TODO Use p_flags */
 	if ((seg.p_filesz@) > (seg.p_memsz@)) {
-		return 25;/* Memory image is of smaller size than file image */
+		return 24;/* Memory image is of smaller size than file image */
 	}
 	cpy((base + (seg.p_vaddr@)) to addr, (fileBase + (seg.p_offset@)) to addr, seg.p_filesz@ to uint);
 	if ((seg.p_memsz@) > (seg.p_filesz@)) {
@@ -180,22 +180,27 @@ int loadELF(*Elf32_Ehdr prgm, addr base, *addr s) {
 	addr*Elf32_Phdr seg = prgm + 52;
 	uint ps = prgm.e_phentsize@;
 	uint pnum = prgm.e_phnum@;
+	int res = 0;
 	:loadELF_loop1;
 	if (pnum == 0) {
 		return 0;
 	}
-	loadSeg(seg, prgm, base, s);
+	res = loadSeg(seg, prgm, base, s);
+	if (res != 0) {
+		return res;
+	}
 	seg = seg + ps;
 	pnum = pnum - 1;
 	goto loadELF_loop1;
 }
-int makeMemseg(a32 base, u8 priv) {
+int makeMemseg(a32 base, u8 priv) {/* ERRORS CANNOT BE ISSUED AFTER INCREMENTATION OF THE LGDT STRUCTURE LENGTH PROPERTY */
 	uint segB = (0x07fa as addr*u16)@;
+	bugCheck();
 	if (segB >= 375) {
-		return 26;/* Too many segments */
+		return 25;/* Too many segments */
 	}
 	if (priv >= 4) {
-		return 27;/* Invalid permission level */
+		return 26;/* Invalid permission level */
 	}
 	((segB + 16) to u16) -> (0x07fa as addr*u16);
 	a32*u16 sd = (((0x07fc as a32*u32)@) + segB + 1) as a32*u16;
@@ -209,15 +214,20 @@ int makeMemseg(a32 base, u8 priv) {
 	((0x00cf | (((base >> 16) & 0xff00) as u32)) as u16) -> (sd[7]);
 	/&xorl %eax,%eax
 movw $0x07fa,%ax
-lgdtl (%eax)
+lgdt (%eax)
 &/
 	return 0;
 }
 int execELF(addr base, uint entry, *s32 code, addr stackAddr) {
-	int i = makeMemseg(base, 0x00);/* TODO Change privilege level */
+	int i = makeMemseg(base, 0x00);/* TODO Change privilege level *//* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
 	if (i != 0) {
 		return i;
 	}
+	/*
+	((entry + base) as *u8)@ -> (0xb8000 as *u8);
+	:ege;
+	goto ege;
+	*/
 	entry as u32;
 	/&pushl %eax
 xorl %eax,%eax
@@ -240,9 +250,8 @@ movw %ax,%ss
 movl %ecx,%esp
 pushl %ebx
 pushl %ebp
-pushl $0x00
-lcalll *%cs:(%ebx)
-popl %ebx
+xorl %ebp,%ebp
+lcall *%cs:(%ebx)
 popl %ebp
 popl %esp
 movw %cs,%bx
@@ -259,6 +268,12 @@ movl %ebx,(%eax)
 	(((0x07fa as addr*u16)@ as u32 - 16) as u16) -> (0x07fa as addr*u16);
 	return 0;
 }
+/&sanc:
+.globl sanc
+movw $0x10,%ax
+movw %ax,%es
+call bugCheck
+&/
 int runELF(addr elf, addr memArea, *s32 code) {
 	addr s = memArea;
 	int i = loadELF(elf as *Elf32_Ehdr, memArea, s$);

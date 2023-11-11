@@ -473,7 +473,7 @@ _boot_kernel32:
     afdis:
     movw $0x00,%ax
     movw %ax,%ss
-    movw $0x830,%sp
+    movw $0x818,%sp
     pushw $0x00cf
     pushw $0x9200
     pushw $0x0000

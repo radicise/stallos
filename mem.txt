@@ -16,6 +16,7 @@ b	0x050c	Implicit carriage return in console when line feed (0=no,1=yes)
 
 l	0x0510	Physical address of start of GDT
 w	0x0514	Bug check code
+
 l	0x0518	Physical address of beginning of main console # TODO implement
 LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT

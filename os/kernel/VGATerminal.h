@@ -83,6 +83,10 @@ void VGATerminalWriteCodePoint(struct VGATerminal* term, unsigned int cp) {
 	}
 	term->screen[term->pos].text = (unsigned char) cp;
 	term->screen[term->pos].format = term->format;
+	term->pos++;
+	if (term->pos >= term->total) {
+		VGATerminalAdjustVis(term);
+	}
 	return;
 }
 unsigned int getCodePoint(unsigned char* data, unsigned int* len) {/* Returns the next UTF-8-encoded Unicode code point and lowers the value at `len' accordingly; if there is not sufficient length for decoding, 0 is returned and the value at `len' remains unchanged; if there is a decoding error, 0 is returned and the value at `len' is adjusted according to the amount of data consumed; 0 cannot be returned with the value at `len' unchanged if the value of `len' at entry is at least 8 *//* TODO Implement correct UTF-8 support */

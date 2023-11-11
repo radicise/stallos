@@ -1,5 +1,4 @@
 extern void bugCheck(void);
-#include "../os/kernel/VGATerminal.h"
 extern void irupt_null(void);
 extern void set_idt(void*, int);
 extern void int_enable(void);

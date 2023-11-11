@@ -42,6 +42,7 @@ lidt 0x000007fa
 ret
 int_enable:
 .globl int_enable
+/*
 inb $0x70,%al
 andb $0x7f,%al
 outb %al,$0x70
@@ -57,6 +58,7 @@ nop
 nop
 inb $0x71
 sti
+*/
 ret
 runSystem:
 &/

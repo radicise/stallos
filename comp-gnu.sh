@@ -15,14 +15,14 @@ dhulbc 32 -tNGT < kern32-comp.dhulb > kernel-comp.s
 #cp kernel.s kernel-comp.s
 i686-linux-gnu-as -march=i386 -o kernel.o kernel-comp.s
 i686-linux-gnu-as -march=i386 -o irupts.o sys32/irupts.s
-gcc -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o sysc.elf sys32/sys.c
+gcc -std=c99 -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o sysc.elf sys32/sys.c
 i686-linux-gnu-ld --no-dynamic-linker -T ./newf386 -o kernel.elf kernel.o sysc.elf irupts.o
 cp kernel.elf kernel-copy.elf
 i686-linux-gnu-strip kernel-copy.elf
 i686-linux-gnu-objcopy --dump-section .text=kernel.bin kernel.elf /dev/null
 dd if=kernel.bin of=stall.bin bs=512 skip=110 seek=48
-gcc -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o prgm-ul.elf os/shell.c
-i686-linux-gnu-ld --no-dynamic-linker -o prgm.elf prgm-ul.elf
+gcc -std=c99 -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o prgm-ul.elf os/shell.c
+i686-linux-gnu-ld --no-dynamic-linker -T ./newf386 -o prgm.elf prgm-ul.elf
 dd if=prgm.elf of=stall.bin bs=512 seek=66
 #clang -c -fno-asynchronous-unwind-tables -target i386-pc-linux-elf -Wall -o kern-ul.elf kern.c
 #ld.lld kern-ul.elf -o kern.elf
