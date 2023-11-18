@@ -16,22 +16,9 @@ struct VGATerminal {
 	unsigned char onlcr;
 	unsigned char cursor;
 };
+extern struct VGATerminal mainTerm;
 void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigned int height, void* screen) {
 	term->extra[0] = 0;
-	term->extra[1] = 0;
-	term->extra[2] = 0;
-	term->extra[3] = 0;
-	term->extra[4] = 0;
-	term->extra[5] = 0;
-	term->extra[6] = 0;
-	term->extra[7] = 0;
-	term->extra[8] = 0;
-	term->extra[9] = 0;
-	term->extra[10] = 0;
-	term->extra[11] = 0;
-	term->extra[12] = 0;
-	term->extra[13] = 0;
-	term->extra[14] = 0;
 	term->format = 0x07;
 	term->pos = 0;
 	term->width = width;
@@ -166,4 +153,15 @@ unsigned int VGATerminalWrite(struct VGATerminal* term, unsigned char* data, uns
 	}
 	return res;
 }
+#include "types.h"
+#include "errno.h"
+ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
+	if (kfd != 1) {
+		errno = EBADF;
+		return -1;
+	}
+	return VGATerminalWrite(&mainTerm, (unsigned char*) data, len);
+}
+#include "FileDriver.h"
+struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write};
 #endif

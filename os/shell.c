@@ -1,7 +1,7 @@
-#define RELOC 0x00002000
-void bugCheck() {
+#define RELOC 0x00020000
+void bugCheck() {//Fatal kernel errors
 	while (1) {
-		(*((unsigned int*) (0xb8000 - RELOC)))++;
+		(*((unsigned char*) (0xb8000 - RELOC)))++;
 	}
 }
 #include "kernel/VGATerminal.h"
@@ -19,10 +19,9 @@ int kernelMsg(char* msg) {
 	}
 	return 0;
 }
+#include "kernel/syscalls.h"
 void _start() {
-	while (1) {
-	}
-	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) 0x000b8000);
+	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC));
 	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
 		((struct VGACell*) i)->format = mainTerm.format;
 		((struct VGACell*) i)->text = 0x20;
@@ -31,7 +30,7 @@ void _start() {
 	((struct VGACell*) (0x000b8000 - RELOC))->format ^= 0x77;
 	mainTerm.onlcr = 1;
 	mainTerm.cursor = 1;
-	/* Elf-of-style */
+	/* End-of-style */
 	while (1) {
 	}
 }

@@ -38,7 +38,7 @@ movl 4(%esp),%edx
 movl %edx,0x000073fc
 movl 8(%esp),%edx
 movw %dx,0x000073fa
-lidt 0x000007fa
+lidt 0x0000073fa
 ret
 int_enable:
 .globl int_enable

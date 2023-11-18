@@ -209,12 +209,16 @@ int makeMemseg(a32 base, u8 priv) {	uint segB = (0x07fa as addr*u16)@;
 	a32*u16 sd = (((0x07fc as a32*u32)@) + segB + 1) as a32*u16;
 	(0xffff as u16) -> (sd[0]);
 	(base as u16) -> (sd[1]);
-	(((((priv as u32) << 5) | 0x9a00) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[2]);
+	(((((priv as u32) << 13) | 0x9a00) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[2]);
 	((0x00cf | (((base >> 16) & 0xff00) as u32)) as u16) -> (sd[3]);
 	(0xffff as u16) -> (sd[4]);
 	(base as u16) -> (sd[5]);
-	(((((priv as u32) << 5) | 0x9200) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[6]);
+	(((((priv as u32) << 13) | 0x9200) | (((base >> 16) & 0x00ff) as u32)) as u16) -> (sd[6]);
 	((0x00cf | (((base >> 16) & 0xff00) as u32)) as u16) -> (sd[7]);
+	
+	
+
+
 	/&xorl %eax,%eax
 movw $0x07fa,%ax
 lgdt (%eax)
@@ -226,20 +230,30 @@ int execELF(addr base, uint entry, *s32 code, addr stackAddr) {
 		return i;
 	}
 		entry as u32;
-	/&pushl %eax
+	/&/*pushl %eax
+*/
+
+movl %eax,%ebx
+
 xorl %eax,%eax
 movw 0x07fa,%ax
 subw $0x0f,%ax
 pushw %ax
+
+pushl %ebx
+
 pushw %ax
 &/
+
+
+
 stackAddr;
 /&movl %esp,%ebx
 incl %ebx
 incl %ebx
 movl %eax,%ecx
-movw %cs,%dx
-movw %dx,%es
+movw %ds,%ax
+movw %ax,%es
 popw %ax
 addw $0x08,%ax
 movw %ax,%ds
@@ -248,7 +262,15 @@ movl %ecx,%esp
 pushl %ebx
 pushl %ebp
 xorl %ebp,%ebp
-lcall *%cs:(%ebx)
+/*
+movw $0x18,%ax
+movw %ax,%es
+movw %es:(%ebx),%ax
+movl %es:2(%ebx),%ebx
+qwsa:
+jmp qwsa
+*/
+lcall *%es:(%ebx)
 popl %ebp
 popl %esp
 movw %cs,%bx
@@ -277,7 +299,7 @@ int runELF(addr elf, addr memArea, *s32 code) {
 	if (i != 0) {
 		return i;
 	}
-	s = s + 0x00200000;
+	s = s + 0x00200000 - memArea;
 	s = s - (s % 4);
 	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, code, s);
 	if (i != 0) {
@@ -296,7 +318,7 @@ movl 4(%esp),%edx
 movl %edx,0x000073fc
 movl 8(%esp),%edx
 movw %dx,0x000073fa
-lidt 0x000007fa
+lidt 0x0000073fa
 ret
 int_enable:
 .globl int_enable
