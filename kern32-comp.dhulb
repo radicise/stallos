@@ -80,10 +80,6 @@ structure Elf32_Phdr {
 	Elf32_Word p_flags,
 	Elf32_Word p_align;
 }
-int rut() {
-	:rut_loop1;
-	goto rut_loop1;
-}
 int cpy(addr dest, addr from, uint count) {
 	:cpy_loop1;
 	if (count == 0) {
@@ -105,8 +101,7 @@ int fill(addr dest, u8 val, uint count) {
 	count = count - 1;
 	goto fill_loop1;
 }
-int loadSeg(*Elf32_Phdr seg, addr fileBase, addr base, *addr stack) {
-	Elf32_Word t = seg.p_type@;
+int loadSeg(*Elf32_Phdr seg, addr fileBase, addr base, *addr stack) {	Elf32_Word t = seg.p_type@;
 	if ((t == 0) | (t == 4) | (t == 6)) {
 		return 0;
 	}
@@ -276,8 +271,8 @@ popl %esp
 movw %cs,%bx
 movw %bx,%ds
 movw %bx,%ss
-popw %bx
 popl %ebx
+popw %bx
 pushl %eax
 &/
 	code;
@@ -287,11 +282,35 @@ movl %ebx,(%eax)
 	(((0x07fa as addr*u16)@ as u32 - 16) as u16) -> (0x07fa as addr*u16);
 	return 0;
 }
-/&sanc:
-.globl sanc
-movw $0x10,%ax
-movw %ax,%es
-call bugCheck
+/&farRunELF:
+.globl farRunELF#%eax: elf, %edx: memArea, %ecx: code; %ebx, %esi, %edi: Scratch; Return: %eax
+movw %ss,%bx
+rorl $16,%ebx
+movw %ds,%bx
+movl %ebx,%esi
+movl %esp,%edi
+movw $0x10,%bx
+movw %bx,%ds
+movw %bx,%ss
+movl $0x00010000,%esp
+pushl %edi
+pushl %esi
+pushl %ebp
+xorl %ebp,%ebp
+pushl %ecx
+pushl %edx
+pushl %eax
+call runELF
+popl %ebx
+popl %ebx
+popl %ebx
+popl %ebp
+popl %ebx
+popl %esp
+movw %bx,%ds
+roll $16,%ebx
+movw %bx,%ss
+lret
 &/
 int runELF(addr elf, addr memArea, *s32 code) {
 	addr s = memArea;
