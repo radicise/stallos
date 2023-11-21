@@ -24,10 +24,11 @@ dd if=kernel.bin of=stall.bin bs=512 skip=110 seek=48
 gcc -std=c99 -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o prgm-ul.elf os/system.c
 i686-linux-gnu-as -march=i386 -o prgm-asm.elf os/system.s
 i686-linux-gnu-ld --no-dynamic-linker -T ./newf386 -o prgm.elf prgm-ul.elf prgm-asm.elf
+dd if=prgm.elf of=stall.bin bs=512 seek=66
 gcc -std=c99 -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c -o shell-ul.elf os/shell.c
 i686-linux-gnu-as -march=i386 -o shell-asm.elf os/shell.s
 i686-linux-gnu-ld --no-dynamic-linker -T ./newf386 -o shell.elf shell-ul.elf shell-asm.elf
-dd if=prgm.elf of=stall.bin bs=512 seek=66
+dd if=shell.elf of=stall.bin bs=512 seek=194
 #clang -c -fno-asynchronous-unwind-tables -target i386-pc-linux-elf -Wall -o kern-ul.elf kern.c
 #ld.lld kern-ul.elf -o kern.elf
 #cat kern.elf >> stall.bin

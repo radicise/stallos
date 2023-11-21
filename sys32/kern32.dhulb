@@ -7,6 +7,11 @@ imply s32 runSystem();
 imply s32 executeSystem();
 imply s32 show();
 int entry() {
+	/*
+	:entry_aaa;
+	((0xb8000 as *u16)@ as u32 + 1) as u16 -> (0xb8000 as *u16);
+	goto entry_aaa;
+	*/
 	runSystem();
 	u8 t = 252;
 	int i;

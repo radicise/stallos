@@ -22,6 +22,6 @@ LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT
 LIDTd32	0x73fa	LIDT descriptor data
 l	0x0007f7f4	Value of %esp during kernel entry
-l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0010
-l	0x0007f7fc	Value 0x00000010
+l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
+l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes

@@ -7,7 +7,6 @@ call systemEntry
 lret
 irupt_80h:# NOTE: This is under the assumption that %edx can never be used to return anything, which is contrary to the `syscall' Linux man-pages page; TODO resolve this conflict
 .globl irupt_80h
-#TODO Zero %ebp
 pushl %eax
 pushl %ebx
 pushl %edx
@@ -24,15 +23,19 @@ popl %ecx
 movl %ecx,%cs:-20(%ebx)
 popl %ecx
 movl %ecx,%cs:-24(%ebx)
+movl %cs:-12(%ebx),%ecx
 subl $0x18,%ebx
 movl %ebx,%esp
 movw %cs,%ax
+addw $0x08,%ax
 movw %ax,%ds
 movw %ax,%ss
 popl %eax
 popl %ebx
+movl (%esp),%edx
 pushl %ebp
 pushl %eax
+pushl $0x00
 pushl %ebp
 xorl %ebp,%ebp
 pushl %edi
@@ -41,13 +44,14 @@ pushl %edx
 pushl %ecx
 pushl %ebx
 call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
-addl $0x1c,%esp
+addl $0x20,%esp
 popl %ebp
 popl %edx
 popl %ecx
 popw %ds
 popw %ss
 movl %cs:(%esp),%esp
+addl $0x0c,%esp
 iret
 writePhysical:
 .globl writePhysical

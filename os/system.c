@@ -19,7 +19,7 @@ int kernelMsg(char* msg) {
 	}
 	return 0;
 }
-extern int runELF(void*, void*, int);
+extern int runELF(void*, void*, int*);
 #include "kernel/syscalls.h"
 extern void irupt_80h(void);
 void systemEntry(void) {
@@ -36,6 +36,9 @@ void systemEntry(void) {
 	(*((unsigned short*) (0x7fc02 - RELOC))) = 0x0018;
 	(*((unsigned short*) (0x7fc06 - RELOC))) = (((int) irupt_80h) >> 16);
 	/* End-of-style */
+	int retVal = 0;
+	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);
+	(*((unsigned char*) (0xb8000 - RELOC))) = errVal + 0x30;
 	while (1) {
 	}
 }

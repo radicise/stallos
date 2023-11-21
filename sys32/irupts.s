@@ -9,6 +9,9 @@ irupt_discall__loop1:
 movb %al,0x000b8000
 incb %al
 jmp irupt_discall__loop1
+irupt_hang:
+.globl irupt_hang
+jmp irupt_hang
 bugCheck:
 .globl bugCheck
 movw $0x4720,%ax

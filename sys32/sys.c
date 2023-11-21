@@ -5,6 +5,7 @@ extern void int_enable(void);
 extern void irupt_discall(void);
 extern int runELF(void* elf, void* loadTo, int* code);
 extern void farRunELF(void);
+extern void irupt_hang(void);
 /* TODO Interrupt handler to fail the running program after divide-by zero exceptions &c */
 void set_irupt(void* base, unsigned int index, void(*func)(void), unsigned char trap, unsigned short seg) {
 	unsigned char* pos = ((char*) base) + (index * 8);
@@ -27,6 +28,7 @@ int setup() {/* setup() IS NOT ABLE TO ISSUE ANY ERRORS */
 	for (int i = 0; i < 256; i++) {
 		set_irupt((void*) 0x7f800, i, bugCheck, 0x00, 0x08);
 	}
+	//set_irupt((void*) 0x7f800, 13, irupt_hang, 0x00, 0x08);
 	set_idt((void*) 0x00007f800, 2047);
 	int_enable();
 	return 0;
@@ -39,7 +41,7 @@ int executeSystem() {
 	}
 	*/
 	(*((void**) 0x7f7f8)) = farRunELF;
-	(*((int*) 0x7f7fc)) = 0x00000010;
+	(*((int*) 0x7f7fc)) = 0x00000008;
 	int i = runELF((void*) 0x00010000, (void*) 0x00040000, &retVal);
 	return i;
 }

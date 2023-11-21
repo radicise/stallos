@@ -35,13 +35,15 @@ _start:
     movw %ax,%es
     movw $0x0200,%bx
     movw $1,%ax
-    movw $0x70,%cx
     kree:
     movw $0x01,%dx
     call _cann
     incw %ax
-    addw $0x0200,%bx
-    loop kree
+    movw %es,%si
+    addw $0x0020,%si
+    movw %si,%es
+    cmpw $0x300,%ax
+    jnz kree
     # call _dishe
     # call test
     movw $0x100,%ax
@@ -53,7 +55,7 @@ _start:
     movw %ax,%ds
     ljmpw $0x07c0,$0x0200
 _cahh: # TODO read and write files using numbers (terminal in / out will also have [a] number[s])
-    cmpw $0x01,%dx # TODO migrate to interrupts
+    cmpw $0x01,%dx
     jz lad
     cmpw $0x02,%dx
     jz lam
