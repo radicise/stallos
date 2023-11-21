@@ -62,7 +62,7 @@ ssize_t write(int fd, const void* buf, size_t count) {
 	return driver->write(kfd, buf, count);
 }
 //TODO Implement all applicable syscalls
-unsigned int system_call(unsigned int arg1, unsigned int arg2, unsigned int arg3, unsigned int arg4, unsigned int arg5, unsigned int arg6, unsigned int arg7, unsigned int nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
+unsigned int system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
 	pid = (pid_t) 1;//TODO Allow multiple processes
 	switch (nr) {
 		case (4):
