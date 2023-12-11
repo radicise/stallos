@@ -1,5 +1,7 @@
 #ifndef __KERNEL__VGATERMINAL_H__
 #define __KERNEL__VGATERMINAL_H__ 1
+#define FAILMASK_VGATERMINAL 0x00030000
+#include "types.h"
 struct VGACell {
 	unsigned char text;
 	unsigned char format;
@@ -15,9 +17,10 @@ struct VGATerminal {
 	/* Terminal settings */
 	unsigned char onlcr;
 	unsigned char cursor;
+	ssize_t (*read)(int, void*, size_t);
 };
 extern struct VGATerminal mainTerm;
-void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigned int height, void* screen) {
+void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigned int height, void* screen, ssize_t (*read)(int, void*, size_t)) {
 	term->extra[0] = 0;
 	term->format = 0x07;
 	term->pos = 0;
@@ -26,6 +29,7 @@ void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigne
 	term->screen = screen;
 	term->onlcr = 0;
 	term->cursor = 0;
+	term->read = read;
 	return;
 }
 void VGATerminalAdjustVis(struct VGATerminal* term) {
@@ -143,7 +147,7 @@ unsigned int writeDataVGATerminal(struct VGATerminal* term, unsigned char* data,
 		data += (j - len);
 	}
 }
-unsigned int VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned int len) {/* For UTF-8 */
+ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned int len) {/* For UTF-8 */
 	if (term->cursor) {
 		(term->screen[term->pos].format) ^= 0x77;
 	}
@@ -157,11 +161,16 @@ unsigned int VGATerminalWrite(struct VGATerminal* term, unsigned char* data, uns
 #include "errno.h"
 ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
 	if (kfd != 1) {
-		errno = EBADF;
-		return -1;
+		bugCheckNum(FAILMASK_VGATERMINAL | EBADF);
 	}
 	return VGATerminalWrite(&mainTerm, (unsigned char*) data, len);
 }
+ssize_t VGATerminal_read(int kfd, void* data, size_t siz) {
+	if (kfd != 0) {
+		bugCheckNum(FAILMASK_VGATERMINAL | EBADF);
+	}
+	return mainTerm.read(kfd, data, siz);
+}
 #include "FileDriver.h"
-struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write};
+struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write, VGATerminal_read};
 #endif

@@ -285,12 +285,12 @@ movl %es:2(%ebx),%ebx
 qwsa:
 jmp qwsa
 */
-lcall *%es:(%ebx)
+lcall *%es:(%ebx) # TODO Not allow previous %ebp and %esp to possibly be known by the userspace program
 popl %ebp
-popl %esp
 movw %cs,%bx
 movw %bx,%ds
 movw %bx,%ss
+popl %esp
 popl %ebx
 popw %bx
 pushl %eax

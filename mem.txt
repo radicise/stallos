@@ -20,8 +20,9 @@ w	0x0514	Bug check code
 l	0x0518	Physical address of beginning of main console # TODO implement
 LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT
-LIDTd32	0x73fa	LIDT descriptor data
+LIDTd32	0x000073fa	LIDT descriptor data
 l	0x0007f7f4	Value of %esp during kernel entry
 l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
 l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes
+STAKTOP	0x00800000	Top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack

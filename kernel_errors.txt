@@ -1,0 +1,4 @@
+Error code format: "INFO: 0x<A><B>", where A and B are 4-character hexadecimal strings (uppercase letters are used, not lowercase letters)
+A = "0001":
+	B =
+	"0070" to "007F": "Error processing IRQ <B - 0x0070>"

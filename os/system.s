@@ -7,6 +7,9 @@ call systemEntry
 lret
 irupt_80h:# NOTE: This is under the assumption that %edx can never be used to return anything, which is contrary to the `syscall' Linux man-pages page; TODO resolve this conflict
 .globl irupt_80h
+pushw %es
+pushw %fs
+pushw %gs
 pushl %eax
 pushl %ebx
 pushl %edx
@@ -25,11 +28,11 @@ popl %ecx
 movl %ecx,%cs:-24(%ebx)
 movl %cs:-12(%ebx),%ecx
 subl $0x18,%ebx
-movl %ebx,%esp
 movw %cs,%ax
 addw $0x08,%ax
 movw %ax,%ds
 movw %ax,%ss
+movl %ebx,%esp
 popl %eax
 popl %ebx
 movl (%esp),%edx
@@ -43,6 +46,7 @@ pushl %esi
 pushl %edx
 pushl %ecx
 pushl %ebx
+cld
 call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
 addl $0x20,%esp
 popl %ebp
@@ -52,8 +56,11 @@ popw %ds
 popw %ss
 movl %cs:(%esp),%esp
 addl $0x0c,%esp
-iret
-writePhysical:
+popw %gs
+popw %fs
+popw %es
+iretl
+writePhysical:# void writePhysical(u32 byteAddr, u32 byte)
 .globl writePhysical
 movw $0x10,%ax
 movw %ax,%es
@@ -61,7 +68,7 @@ movl 4(%esp),%eax
 movb 8(%esp),%cl
 movb %cl,%es:(%eax)
 ret
-readPhysical:
+readPhysical:# u32 readPhysical(u32 byteAddr)
 .globl readPhysical
 movw $0x10,%ax
 movw %ax,%es
@@ -70,7 +77,7 @@ movb %es:(%eax),%cl
 xorl %eax,%eax
 movb %cl,%al
 ret
-runELF:#int runELF(void* elfPhys, void* memAreaPhys, int* retVal)
+runELF:# int runELF(void* elfPhys, void* memAreaPhys, int* retVal)
 .globl runELF
 pushl %ebp
 movl %esp,%ebp
@@ -85,4 +92,129 @@ popl %edi
 popl %esi
 popl %ebx
 popl %ebp
+ret
+bus_out_u32:
+.globl bus_out_u32
+bus_out_long:
+.globl bus_out_long
+movw 4(%esp),%dx
+movl 8(%esp),%eax
+outl %eax,%dx
+ret
+bus_out_u16:
+.globl bus_out_u16
+movw 4(%esp),%dx
+movw 8(%esp),%ax
+outw %ax,%dx
+ret
+bus_out_u8:
+.globl bus_out_u8
+movw 4(%esp),%dx
+movb 8(%esp),%al
+outb %al,%dx
+ret
+bus_in_u32:
+.globl bus_in_u32
+bus_in_long:
+.globl bus_in_long
+movw 4(%esp),%dx
+inl %dx,%eax
+ret
+bus_in_u16:
+.globl bus_in_u16
+movw 4(%esp),%dx
+inw %dx,%ax
+ret
+bus_in_u8:
+.globl bus_in_u8
+movw 4(%esp),%dx
+inb %dx,%al
+ret
+bus_wait:
+.globl bus_wait
+nop
+nop
+nop
+nop
+nop
+ret
+int_enable:
+.globl int_enable
+inb $0x70,%al
+andb $0x7f,%al
+outb %al,$0x70
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+inb $0x71
+sti
+ret
+Mutex_acquire:# void Mutex_acquire(Mutex* mutex)
+.globl Mutex_acquire
+movl 4(%esp),%edx
+xorb %al,%al
+incb %al
+Mutex_acquire__loop1:
+lock xchgb %al,(%edx)
+testb %al,%al
+jz Mutex_acquire__end
+nop
+jmp Mutex_acquire__loop1
+Mutex_acquire__end:
+ret
+Mutex_release:# void Mutex_release(Mutex* mutex)
+.globl Mutex_release
+movl 4(%esp),%edx
+xorb %al,%al
+lock xchgb %al,(%edx)
+ret
+Mutex_tryAcquire:# int Mutex_tryAcquire(Mutex* mutex)
+.globl Mutex_tryAcquire
+movl 4(%esp),%edx
+xorb %al,%al
+incb %al
+lock xchgb %al,(%edx)
+xorb $0x01,%al
+ret
+Mutex_initUnlocked:# void Mutex_initUnlocked(Mutex* mutex)
+.globl Mutex_initUnlocked
+movl 4(%esp),%edx
+xorb %al,%al
+lock xchgb %al,(%edx)
+ret
+Mutex_wait:
+.globl Mutex_wait
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
 ret
