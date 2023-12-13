@@ -7,6 +7,7 @@
  */
 #include "errno.h"
 #include "types.h"
+#include "capabilities.h"
 pid_t pid;
 int getDesc(int fd) {
 	if ((fd < 0) || (fd > 2)) {
@@ -45,6 +46,9 @@ unsigned int getMemOffset(pid_t pid) {
  * 1 - Main terminal output
  *
  */
+int validateCap(int cap) {
+	return 1;// TODO Implement
+}
 ssize_t write(int fd, const void* buf, size_t count) {
 	if (fd < 0) {
 		errno = EBADF;
@@ -77,14 +81,33 @@ ssize_t read(int fd, void* buf, size_t count) {
 	}
 	return driver->read(kfd, buf, count);
 }
-//TODO Implement all applicable syscalls
-unsigned int system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
-	pid = (pid_t) 1;//TODO Allow multiple processes
-	switch (nr) {
+time_t time(time_t* resAddr) {
+	time_t n = timeFetch();
+	if (resAddr != NULL) {
+		(*resAddr) = n;
+	}
+	return n;
+}
+int stime(const time_t* valAddr) {
+	if (!(validateCap(CAP_SYS_TIME))) {
+		errno = EPERM;
+		return -1;
+	}
+	timeStore(*valAddr);
+	return 0;
+}
+// TODO Implement all applicable syscalls
+unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
+	pid = (pid_t) 1;// TODO Allow multiple processes
+	switch (nr) {// TODO Authenticate memory access
 		case (3):
-			return read((int) arg1, (void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
+			return (unsigned long) read((int) arg1, (void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
 		case (4):
-			return write((int) arg1, (const void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
+			return (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
+		case (13):
+			return (unsigned long) time((time_t*) (arg1 + getMemOffset(pid)));
+		case (25):
+			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset(pid)));
 		default:
 			bugCheck();// Unrecognised / unimplemented system call
 			return 0;

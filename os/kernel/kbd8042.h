@@ -61,7 +61,7 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 		bus_wait();
 	}
 	u8 setup = bus_in_u8(0x0060);
-	setup &= 0x3e;
+	setup &= 0x3f;// TODO Prevent keyboard interrupt from executing before controller initialisation is complete
 	bus_wait();
 	while (bus_in_u8(0x0064) & 0x02) {
 		bus_wait();
@@ -221,6 +221,7 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 	if (res != 0xfa) {
 		bugCheckNum(0x0800 | res | FAILMASK_KBD8042);
 	}
+	/*
 	setup |= 0x01;
 	while (bus_in_u8(0x0064) & 0x02) {// TODO Remove if unnecessary
 		bus_wait();
@@ -235,6 +236,7 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 	while (bus_in_u8(0x0064) & 0x02) {// Waiting for sureness of the IRQ having been enabled
 		bus_wait();
 	}
+	*/
 	return;
 }
 void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
@@ -271,10 +273,12 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// `bufLock' must have been a
 	}
 }
 void kbd8042_onIRQ(struct Keyboard8042* kbd) {
+	//bugCheck();
 	int service = Mutex_tryAcquire(&(kbd->bufLock));
 	if (!service) {
 		return;//TODO URGENT Set timer to service the IRQ when it can
 	}
+	//bugCheck();
 	kbd8042_serviceIRQ(kbd);
 	Mutex_release(&(kbd->bufLock));
 	return;
@@ -287,6 +291,9 @@ ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
 		if (kbd->avail == 0) {
 			Mutex_release(&(kbd->bufLock));
 			Mutex_wait();
+			//for (int i = 0; i < 100000; i++) {
+			//	Mutex_wait();
+			//}
 			Mutex_acquire(&(kbd->bufLock));
 			continue;
 		}

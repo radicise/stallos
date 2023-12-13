@@ -115,11 +115,19 @@ extern void bus_wait(void);
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
 struct Keyboard8042 kbdMain;
-void irupt_handler_70h(void) {// IRQ 0
+time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
+extern void timeIncrement();// Atomic, increment system time by 1 second
+extern time_t timeFetch();// Atomic, get system time (time in seconds)
+extern void timeStore(time_t);// Atomic, set system time (time in seconds)
+void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
+	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
+		timeIncrement();
+	}
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
+	//bugCheck();
 	kbd8042_onIRQ(&kbdMain);
 	return;
 }
@@ -244,6 +252,10 @@ void systemEntry(void) {
 	substitute_irupt_address_vector(0x7d, (void*) irupt_7dh, 0x18);
 	substitute_irupt_address_vector(0x7e, (void*) irupt_7eh, 0x18);
 	substitute_irupt_address_vector(0x7f, (void*) irupt_7fh, 0x18);
+	bus_out_u8(0x0043, 0x34);
+	bus_out_u8(0x0040, 0x9c);// 11932 lobyte
+	bus_out_u8(0x0040, 0x2e);// 11932 hibyte
+	bus_wait();
 	//bugCheck();
 	initKeyboard8042(kbdBuf, KBDBUF_SIZE, 0, &kbdMain);
 	//bugCheck();

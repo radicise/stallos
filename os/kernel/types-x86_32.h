@@ -3,12 +3,13 @@
 /*
  *
  * Definitions for POSIX.1 types as in 32-bit i386 Linux
- * Source: '/arch/x86/include/uapi/asm/posix_types_32.h'
+ * Source: Linux '/arch/x86/include/uapi/asm/posix_types_32.h'
  *
  */
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef int pid_t;
+typedef long time_t;
 /*
  *
  * Definitions for fundamental integer types

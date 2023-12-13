@@ -47,7 +47,15 @@ pushl %edx
 pushl %ecx
 pushl %ebx
 cld
+movl %ebp,errno
 call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
+movl errno,%ebp
+testl %ebp,%ebp
+jz irupt_80h__noError
+movl %ebp,%eax
+notl %eax
+incl %eax
+irupt_80h__noError:
 addl $0x20,%esp
 popl %ebp
 popl %edx
@@ -217,4 +225,17 @@ nop
 nop
 nop
 nop
+ret
+timeIncrement:
+.globl timeIncrement
+lock incl currentTime
+ret
+timeFetch:
+.globl timeFetch
+movl currentTime,%eax# TODO Ensure atomic memory reads
+ret
+timeStore:
+.globl timeStore
+movl 4(%esp),%eax
+movl %eax,currentTime# TODO Ensure atomic memory writes
 ret
