@@ -2,11 +2,15 @@
 #define __EXT4_H__ 1
 #include "FileDriver.h"
 #include "types.h"
+#ifdef FSNAME
+#error "NOT IMPLEMENTED"
+#endif
 // many defs, hard to read stuff if they are in this file
-#include "defhelp/e4sbdef.h"
+#include "e4sbdef.h"
 // actual code, yippee!
 struct FileSystem {
     struct FileDriver* fdrive;
+    
     int kfd;
 };
 const int TOTAL_SB_DATA_SIZE = 0x400;
@@ -20,5 +24,5 @@ void* sbf_access(struct Ext4SuperBlock* sb, int field) {
 };
 
 // un-pollute the macros
-#include "defhelp/e4sbundef.h"
+#include "e4sbundef.h"
 #endif
