@@ -11,7 +11,7 @@ struct FileSystem {
 };
 const int TOTAL_SB_DATA_SIZE = 0x400;
 struct Ext4SuperBlock {
-    char data[TOTAL_SB_DATA_SIZE];
+    unsigned char data[TOTAL_SB_DATA_SIZE];
 };
 
 // access the mess that is the super block's data
