@@ -11,6 +11,9 @@ typedef int pid_t;
 
 /*maximum open filehandles*/
 const u16 SYS_MAX_FDS = 0xffff;
+const double FDT_ACQ_NITER_THRESH = 0.2; // threshold under which kfd_acquire shouldn't iter because it is unlikely to be fast enough
+const double FDT_ACQ_MITER_THRESH = 1.0; // threshold over which kfd_acquire MUST iter because holes are too prevalent in the table
+const u16 FDT_ACQ_SMALL_LKFD = 200; // threshold under which kfd_acquire shouldn't iter because there aren't enough entries to care
 
 // is the file descriptor valid? e.g. no other process has deleted the file it refers to
 #define FDE_VALID  0b1
@@ -27,6 +30,7 @@ typedef struct {
     u64    disk_loc;  // location of the file's data on disk
     pid_t  procid;    // process id that owns this handle
     u8     flags;     // status and permission flags
+    u64    position;  // corresponds to what `ftell()` returns
 } FDENTRY;
 
 /*
