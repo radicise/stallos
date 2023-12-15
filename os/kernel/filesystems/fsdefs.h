@@ -1,8 +1,23 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
-/**
- * types that make my life easier, designed to be used in combination with fsuntypes.h because no thoughts of compatability went into this - Tristan
- */
+
+#include "types.h"
+
+extern void* allocate(size_t);
+extern u64 compute_checksum(size_t*);
+extern u8 validate_checksum(size_t*, u64);
+extern void disk_seek(u64);
+extern u64 disk_tell();
+
+
+u64 hashstr(u8* str) {
+    u64 hash = 0;
+    int c;
+    while (c = *str++) {
+        hash = c + (hash << 6) + (hash << 16) - hash;
+    }
+    return hash;
+}
 
 
 #define TSFSVERSION "NOSPEC"
@@ -32,6 +47,17 @@ typedef struct {
     u8     flags;     // status and permission flags
     u64    position;  // corresponds to what `ftell()` returns
 } FDENTRY;
+
+/*
+Custom File System, see the stallOS spec for more details - Tristan
+DO NOT modify any instance provided by the file system
+*/
+typedef struct {
+    struct FileDriver* fdrive;
+    int kfd;
+    // in bytes
+    u64 partition_start;
+} FileSystem;
 
 /*
 stores data about the file system as a whole
