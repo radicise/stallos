@@ -54,6 +54,10 @@ assigns a kfd in the table and returns it
 returns -1 on error
 */
 int acquire_fd(FileSystem* fs, u64 disk_loc, pid_t pid, u8 flags) {
+    // full table :(
+    if (FDT_HOLE_COUNT == 0 && LARGEST_KFD == KFD_RESERVED_HI) {
+        return -1;
+    }
     // no holes in the table, just put it at the end
     // the ratio of holes to the largest kfd is small enough that iterating probably isn't worth it
     // or the largest assigned kfd is small enough BUT the ratio isn't too big
