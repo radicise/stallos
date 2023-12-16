@@ -1,19 +1,32 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
 
-#include "types.h"
+#ifndef __FSMOCKTEST
+#include "../types.h"
+#else
+typedef int pid_t;
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned long u32;
+typedef unsigned long long u64;
+#endif
+#include "../FileDriver.h"
 
-extern void* allocate(size_t);
-extern u64 compute_checksum(size_t*);
-extern u8 validate_checksum(size_t*, u64);
-extern void disk_seek(u64);
-extern u64 disk_tell();
+#include <stdlib.h>
+
+#define allocate malloc
+
+// extern void* allocate(size_t);
+// extern u64 compute_checksum(size_t*);
+// extern u8 validate_checksum(size_t*, u64);
+// extern void disk_seek(u64);
+// extern u64 disk_tell();
 
 
 u64 hashstr(u8* str) {
     u64 hash = 0;
     int c;
-    while (c = *str++) {
+    while ((c = *str++) != 0) {
         hash = c + (hash << 6) + (hash << 16) - hash;
     }
     return hash;
@@ -21,8 +34,6 @@ u64 hashstr(u8* str) {
 
 
 #define TSFSVERSION "NOSPEC"
-
-typedef int pid_t;
 
 /*maximum open filehandles*/
 const u16 SYS_MAX_FDS = 0xffff;

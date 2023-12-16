@@ -1,10 +1,8 @@
 #ifndef __TSFSINTERFACE_H__
 #define __TSFSINTERFACE_H__ 1
 
-#include "FileDriver.h"
-#include "types.h"
 #include "fsdefs.h"
-#include "os/kernel/errno.h"
+#include "../errno.h"
 
 // maps KFDs to disk locations, owners, and flags
 volatile FDENTRY FD_TABLE[SYS_MAX_FDS];
@@ -68,7 +66,7 @@ int acquire_fd(FileSystem* fs, u64 disk_loc, pid_t pid, u8 flags) {
         return LARGEST_KFD;
     }
     // iterate through the table up to largest kfd to find an open kfd
-    for (u16 check = KFD_RESERVED_LO; check < LARGEST_KFD; check) {
+    for (u16 check = KFD_RESERVED_LO; check < LARGEST_KFD; check ++) {
         if (!(FD_TABLE[check].flags & FDE_OPEN)) {
             FDT_HOLE_COUNT --; // a hole was just filled, so the count must reflect that
             // populate table entry

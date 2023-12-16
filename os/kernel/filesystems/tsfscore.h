@@ -1,8 +1,6 @@
 #ifndef __TSFSCORE_H__
 #define __TSFSCORE_H__ 1
 
-#include "FileDriver.h"
-#include "types.h"
 #include "fsdefs.h"
 #include <string.h>
 
