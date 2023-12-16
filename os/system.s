@@ -146,6 +146,76 @@ nop
 nop
 nop
 ret
+bus_outBlock_u32:
+.globl bus_outBlock_u32
+bus_outBlock_long:/* void bus_outBlock_long(u16, const long*, unsigned long) */
+.globl bus_outBlock_long
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %esi
+movl 12(%esp),%esi
+rep outsl
+popl %esi
+ret
+bus_outBlock_u16:
+.globl bus_outBlock_u16
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %esi
+movl 12(%esp),%esi
+rep outsw
+popl %esi
+ret
+bus_outBlock_u8:
+.globl bus_outBlock_u8
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %esi
+movl 8(%esp),%esi
+rep outsb
+popl %esi
+ret
+bus_inBlock_u32:
+.globl bus_inBlock_u32
+bus_inBlock_long:/* void bus_inBlock_long(u16, long*, unsigned long) */
+.globl bus_inBlock_long
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %edi
+movl 12(%esp),%edi
+pushw %es
+movw %ds,%ax
+movw %ax,%es
+rep insl
+popw %es
+popl %edi
+ret
+bus_inBlock_u16:
+.globl bus_inBlock_u16
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %edi
+movl 12(%esp),%edi
+pushw %es
+movw %ds,%ax
+movw %ax,%es
+rep insw
+popw %es
+popl %edi
+ret
+bus_inBlock_u8:
+.globl bus_inBlock_u8
+movw 4(%esp),%dx
+movl 12(%esp),%ecx
+pushl %edi
+movl 12(%esp),%edi
+pushw %es
+movw %ds,%ax
+movw %ax,%es
+rep insb
+popw %es
+popl %edi
+ret
 int_enable:
 .globl int_enable
 inb $0x70,%al
@@ -162,6 +232,11 @@ nop
 nop
 nop
 inb $0x71
+nop
+nop
+nop
+nop
+nop
 sti
 ret
 Mutex_acquire:# void Mutex_acquire(Mutex* mutex)

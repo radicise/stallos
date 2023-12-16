@@ -33,7 +33,7 @@ typedef unsigned char Mutex;
 extern void Mutex_acquire(Mutex*);
 extern void Mutex_release(Mutex*);
 extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
-extern void Mutex_wait();// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
+extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
 extern void Mutex_initUnlocked(Mutex*);
 #include "kernel/types.h"
 void* move(void* dst, void* buf, size_t count) {
@@ -60,7 +60,7 @@ void* cpy(void* dst, void* src, size_t count) {
 	return move(dst, src, count);
 }
 #include "kernel/VGATerminal.h"
-unsigned int strlen(char* str) {
+size_t strlen(const char* str) {
 	char* n = str;
 	while (*n++) {
 	}
@@ -111,13 +111,21 @@ extern u8 bus_in_u8(unsigned long);
 extern u16 bus_in_u16(unsigned long);
 extern u32 bus_in_u32(unsigned long);
 extern void bus_wait(void);
+extern void bus_outBlock_long(u16, const long*, unsigned long);
+extern void bus_outBlock_u32(u16, const u32*, unsigned long);
+extern void bus_outBlock_u16(u16, const u16*, unsigned long);
+extern void bus_outBlock_u8(u16, const u8*, unsigned long);
+extern void bus_inBlock_long(u16, long*, unsigned long);
+extern void bus_inBlock_u32(u16, u32*, unsigned long);
+extern void bus_inBlock_u16(u16, u16*, unsigned long);
+extern void bus_inBlock_u8(u16, u8*, unsigned long);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
 struct Keyboard8042 kbdMain;
 time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
-extern void timeIncrement();// Atomic, increment system time by 1 second
-extern time_t timeFetch();// Atomic, get system time (time in seconds)
+extern void timeIncrement(void);// Atomic, increment system time by 1 second
+extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;

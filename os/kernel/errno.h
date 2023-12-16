@@ -1,5 +1,10 @@
 #ifndef __ERRNO_H__
 #define __ERRNO_H__ 1
+/*
+ *
+ * Definitions of error values as specified by the Linux kernel-userspace interface and documented by POSIX.1
+ *
+ */
 #define EPERM 1
 #define ENOENT 2
 #define ESRCH 3
@@ -134,5 +139,4 @@
 #define ERFKILL 132
 #define EHWPOISON 133
 #define ENOTSUP 95
-int errno;
 #endif

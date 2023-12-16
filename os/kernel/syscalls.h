@@ -8,7 +8,7 @@
 #include "errno.h"
 #include "types.h"
 #include "capabilities.h"
-pid_t pid;
+#include "perProcess.h"
 int getDesc(int fd) {
 	if ((fd < 0) || (fd > 2)) {
 		return -1;

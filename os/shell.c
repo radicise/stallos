@@ -8,6 +8,7 @@ void _start() {
 	write(1, "Stall v0.0.2.0\n", 15);
 	unsigned char c;
 	ssize_t n;
+	time_t desTime = 0;
 	while (1) {
 		n = read(0, &c, (size_t) 1);
 		if (n == (-1)) {
@@ -17,6 +18,10 @@ void _start() {
 			continue;
 		}
 		c = (unsigned char) time(NULL);
+		write(1, &(hex[c >> 4]), 1);
+		write(1, &(hex[c & 0x0f]), 1);
+		write(1, "\n", 1);
+		c = stime(&desTime);
 		write(1, &(hex[c >> 4]), 1);
 		write(1, &(hex[c & 0x0f]), 1);
 		write(1, "\n", 1);

@@ -1,15 +1,20 @@
-#ifndef __TYPES_x86_32_H__
-#define __TYPES_x86_32_H__ 1
+#ifndef __TYPES_X86_32_H__
+#define __TYPES_X86_32_H__ 1
 /*
  *
- * Definitions for POSIX.1 types as in 32-bit i386 Linux
- * Source: Linux '/arch/x86/include/uapi/asm/posix_types_32.h'
+ * Definitions for Linux kernel-userspace interface types as in 32-bit i386 Linux
+ * Definitions: Linux '/arch/x86/include/uapi/asm/posix_types_32.h'
  *
  */
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef int pid_t;
 typedef long time_t;
+typedef long off_t;
+typedef long long loff_t;
+typedef unsigned short uid16_t;// For certain legacy architectures
+#define UID_OVERFLOW 65534
+typedef unsigned int uid32_t;
 /*
  *
  * Definitions for fundamental integer types

@@ -12,3 +12,4 @@
 /system-comp.s
 fstesting
 *.mock
+.vscode
