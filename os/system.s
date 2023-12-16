@@ -314,3 +314,25 @@ timeStore:
 movl 4(%esp),%eax
 movl %eax,currentTime# TODO Ensure atomic memory writes
 ret
+AtomicULong_get:
+.globl AtomicULong_get
+movl 4(%esp),%eax
+movl (%eax),%eax# TODO Ensure atomic memory reads
+ret
+AtomicULong_set:
+.globl AtomicULong_set
+movl 4(%esp),%eax
+movl 8(%esp),%edx
+movl %edx,(%eax)# TODO Ensure atomic memory writes
+ret
+AtomicULong_inc:
+.globl AtomicULong_inc
+movl 4(%esp),%eax
+lock incl (%eax)
+ret
+AtomicULong_dec:
+.globl AtomicULong_dec
+movl 4(%esp),%eax
+lock decl (%eax)
+ret
+

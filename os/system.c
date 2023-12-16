@@ -29,7 +29,26 @@ void bugCheck(void) {// Fatal kernel errors
 	}
 	return;
 }
+char hex[] = {0x30,
+	0x31,
+	0x32,
+	0x33,
+	0x34,
+	0x35,
+	0x36,
+	0x37,
+	0x38,
+	0x39,
+	0x41,
+	0x42,
+	0x43,
+	0x44,
+	0x45,
+	0x46}
 typedef unsigned char Mutex;
+typedef unsigned long AtomicULong;
+extern unsigned long AtomicULong_get(AtomicULong*);
+extern void AtomicULong_set(AtomicULong*, unsigned long);
 extern void Mutex_acquire(Mutex*);
 extern void Mutex_release(Mutex*);
 extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
@@ -188,12 +207,10 @@ void irupt_handler_7dh(void) {// IRQ 13
 	return;
 }
 void irupt_handler_7eh(void) {// IRQ 14
-	bugCheckNum(0x007e | FAILMASK_SYSTEM);
-	return;
+	return;// ATA IRQ
 }
 void irupt_handler_7fh(void) {// IRQ 15
-	bugCheckNum(0x007f | FAILMASK_SYSTEM);
-	return;
+	return;// ATA IRQ
 }
 void PICInit(unsigned char mOff, unsigned char sOff) {
 	if ((mOff & 0x07) || (sOff & 0x07)) {
