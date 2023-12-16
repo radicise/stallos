@@ -7,9 +7,9 @@
 
 
 
-int ata_readSectors(u16 ata, u32 LBA, void* dest,  count) {
+int ata_PIO_readSectors(u16 ata, u32 LBA, void* dest,  count) {
 	if (LBA & 0xf0000000) {
-		bugCheckNum(0x0001 | FAILMASK_ATA);
+		bugCheckNum(0x0001 | FAILMASK_ATA);// Not within LBA28 range
 	}
 	bus_out_u8(ata + 1, 0x00);
 	bus_out_u8(ata + 2, 
