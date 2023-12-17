@@ -44,7 +44,7 @@ char hex[] = {0x30,
 	0x43,
 	0x44,
 	0x45,
-	0x46}
+	0x46};
 typedef unsigned char Mutex;
 typedef unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
@@ -254,29 +254,29 @@ extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
 extern void int_enable(void);
-void substitute_irupt_address_vector(unsigned char iruptNum, void* addr, unsigned short segSel) {
+void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void), unsigned short segSel) {
 	(*((unsigned short*) (0x7f800 - RELOC + (iruptNum * 8)))) = ((long) addr);
 	(*((unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
 	(*((unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
 void systemEntry(void) {
 	PICInit(0x70, 0x78);
-	substitute_irupt_address_vector(0x70, (void*) irupt_70h, 0x18);
-	substitute_irupt_address_vector(0x71, (void*) irupt_71h, 0x18);
-	substitute_irupt_address_vector(0x72, (void*) irupt_72h, 0x18);
-	substitute_irupt_address_vector(0x73, (void*) irupt_73h, 0x18);
-	substitute_irupt_address_vector(0x74, (void*) irupt_74h, 0x18);
-	substitute_irupt_address_vector(0x75, (void*) irupt_75h, 0x18);
-	substitute_irupt_address_vector(0x76, (void*) irupt_76h, 0x18);
-	substitute_irupt_address_vector(0x77, (void*) irupt_77h, 0x18);
-	substitute_irupt_address_vector(0x78, (void*) irupt_78h, 0x18);
-	substitute_irupt_address_vector(0x79, (void*) irupt_79h, 0x18);
-	substitute_irupt_address_vector(0x7a, (void*) irupt_7ah, 0x18);
-	substitute_irupt_address_vector(0x7b, (void*) irupt_7bh, 0x18);
-	substitute_irupt_address_vector(0x7c, (void*) irupt_7ch, 0x18);
-	substitute_irupt_address_vector(0x7d, (void*) irupt_7dh, 0x18);
-	substitute_irupt_address_vector(0x7e, (void*) irupt_7eh, 0x18);
-	substitute_irupt_address_vector(0x7f, (void*) irupt_7fh, 0x18);
+	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);
+	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);
+	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);
+	substitute_irupt_address_vector(0x73, irupt_73h, 0x18);
+	substitute_irupt_address_vector(0x74, irupt_74h, 0x18);
+	substitute_irupt_address_vector(0x75, irupt_75h, 0x18);
+	substitute_irupt_address_vector(0x76, irupt_76h, 0x18);
+	substitute_irupt_address_vector(0x77, irupt_77h, 0x18);
+	substitute_irupt_address_vector(0x78, irupt_78h, 0x18);
+	substitute_irupt_address_vector(0x79, irupt_79h, 0x18);
+	substitute_irupt_address_vector(0x7a, irupt_7ah, 0x18);
+	substitute_irupt_address_vector(0x7b, irupt_7bh, 0x18);
+	substitute_irupt_address_vector(0x7c, irupt_7ch, 0x18);
+	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);
+	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);
+	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);
 	bus_out_u8(0x0043, 0x34);
 	bus_out_u8(0x0040, 0x9c);// 11932 lobyte
 	bus_out_u8(0x0040, 0x2e);// 11932 hibyte
@@ -295,7 +295,7 @@ void systemEntry(void) {
 	((struct VGACell*) (0x000b8000 - RELOC))->format ^= 0x77;
 	mainTerm.onlcr = 1;
 	mainTerm.cursor = 1;
-	substitute_irupt_address_vector(0x80, (void*) irupt_80h, 0x0018);
+	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
 	/* End-of-style */
 	int retVal = 0;
 	//bugCheck();

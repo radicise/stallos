@@ -13,20 +13,29 @@
 struct ATA {
 	u16 bus;
 	unsigned char slaveLastUsed;
+	unsigned char notUsed;
 	Mutex inUse;// There is an operation
 };
-init //TODO implement
-int ata_PIO_transferSectors(struct ATA* ata, u32 LBA, void* dest, unsigned long count, unsigned char slave, unsigned char write) {
+int ata_readBlock
+int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, unsigned long long amnt, unsigned char write, struct ATAFile* ataDrive) {
+	if (amnt > 256) {
+		bugCheckNum(0x0002 | FAILMASK_ATA);// Amount of sectors is too large
+	}
+	unsigned long count = amnt;
+	if (blockAddr & (~((unsigned long long) 0x0fffffff))) {
+
+	}
+	u32 LBA = blockAddr;
+	struct ATA* ata = ataDrive->ata;
+	unsigned char slave = ataDrive->slave;
 	Mutex_acquire(&(ata->inUse));
 	u16 bus = ata->bus;
 	if (LBA & 0xf0000000) {
 		bugCheckNum(0x0001 | FAILMASK_ATA);// Not within LBA28 range, do not assume that the drive supports LBA48
 	}
-	if (count > 256) {
-		bugCheckNum(0x0002 | FAILMASK_ATA);// Amount of sectors is too large
-	}
 	bus_out_u8(bus + 6, 0xe0 | (slave << 4) | (LBA >> 24));
-	if (ata->slaveLastUsed != slave) {
+	if ((ata->slaveLastUsed != slave) || ata->notUsed) {
+		ata->notUsed = 0x00;
 		ata->slaveLastUsed = slave;
 		for (int i = 0; i < 14; i++) {// For delay, suggested
 			bus_in_u8(bus + 7);
@@ -81,14 +90,34 @@ int ata_PIO_transferSectors(struct ATA* ata, u32 LBA, void* dest, unsigned long 
 	return 0;
 }
 struct ATAFile {
-	loff_t pos;
 	struct ATA* ata;
 	unsigned char slave;
 };
-struct ATAFile ATA_0m;// TODO Init
-struct ATAFile ATA_0s;// TODO Init
-struct ATAFile ATA_1m;// TODO Init
-struct ATAFile ATA_1s;// TODO Init
+struct ATA ATA_0;
+struct ATA ATA_1;
+struct ATAFile ATA_0m;// hda
+struct ATAFile ATA_0s;// hdb
+struct ATAFile ATA_1m;// hdc
+struct ATAFile ATA_1s;// hdd
+void initATA(void) {
+	ATA_0.bus = 0x01f0;
+	ATA_1.bus = 0x0170;
+	ATA_0.slaveLastUsed = 0x00;
+	ATA_1.slaveLastUsed = 0x00;
+	ATA_0.notUsed = 0x01;
+	ATA_1.notUsed = 0x01;
+	Mutex_initUnlocked(ATA_0.inUse);
+	Mutex_initUnlocked(ATA_1.inUse);
+	ATA_0m.ata = &ATA_0;
+	ATA_0m.slave = 0x00;
+	ATA_0s.ata = &ATA_0;
+	ATA_0s.slave = 0x01;
+	ATA_1m.ata = &ATA_1;
+	ATA_1m.slave = 0x00;
+	ATA_1s.ata = &ATA_1;
+	ATA_1s.slave = 0x01;
+}
+struct ATA_BlockFile = {
 ssize_t ATAFile_read(void* dat, size_t len, struct ATAFile* ata) {
 	if (((ata->pos) | len) & 0x1ff) {
 		// TODO support
