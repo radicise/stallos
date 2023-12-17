@@ -9,6 +9,7 @@
 #include "types.h"
 #include "capabilities.h"
 #include "perProcess.h"
+#include "../system.c"
 int getDesc(int fd) {
 	if ((fd < 0) || (fd > 2)) {
 		return -1;
@@ -23,7 +24,7 @@ int getDesc(int fd) {
 #include "VGATerminal.h"
 struct FileDriver* resolveFileDriver(int kfd) {
 	if ((kfd < 0) || (kfd > 2)) {
-		return NULL;
+		return (struct FileDriver*)NULL;
 	}// TODO Implement "kfd"-driver mapping
 	return &FileDriver_VGATerminal;
 }
