@@ -10,22 +10,37 @@
 #include "capabilities.h"
 #include "perProcess.h"
 int getDesc(int fd) {
-	if ((fd < 0) || (fd > 2)) {
-		return -1;
+	switch (fd) {
+		case (0):
+			return 0;
+		case (1):
+		case (2):
+			return 1;
+		case (3):
+		case (4):
+		case (5):
+		case (6):
+			return fd - 1;
+		default:
+			return (-1);
 	}
-	if (fd == 2) {
-		return 1;
-	}
-	return fd;
 }
 #include "FileDriver.h"
 // File drivers
 #include "VGATerminal.h"
 struct FileDriver* resolveFileDriver(int kfd) {
-	if ((kfd < 0) || (kfd > 2)) {
-		return (struct FileDriver*)NULL;
-	}// TODO Implement "kfd"-driver mapping
-	return &FileDriver_VGATerminal;
+	switch (kfd) {
+		case (0):
+		case (1):
+			return &FileDriver_VGATerminal;
+		case (2):
+		case (3):
+		case (4):
+		case (5):
+			return &FileDriver_ATA;
+		default:
+			return NULL;
+	}
 }
 unsigned int getMemOffset(pid_t pid) {
 	if (pid == ((pid_t) 1)) {
@@ -81,6 +96,38 @@ ssize_t read(int fd, void* buf, size_t count) {
 	}
 	return driver->read(kfd, buf, count);
 }
+off_t lseek(int fd, off_t off, int how) {
+	if (fd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+	int kfd = getDesc(fd);
+	if (kfd == (-1)) {
+		errno = EBADF;// File descriptor <fd> is not opened for the process
+		return -1;
+	}
+	struct FileDriver* driver = resolveFileDriver(kfd);
+	if (driver == NULL) {
+		bugCheck();
+	}
+	return driver->lseek(kfd, off, how);
+}
+int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {
+	if (fd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+	int kfd = getDesc(fd);
+	if (kfd == (-1)) {
+		errno = EBADF;// File descriptor <fd> is not opened for the process
+		return -1;
+	}
+	struct FileDriver* driver = resolveFileDriver(kfd);
+	if (driver == NULL) {
+		bugCheck();
+	}
+	return driver->_llseek(kfd, offHi, offLo, res, how);
+}
 time_t time(time_t* resAddr) {
 	time_t n = timeFetch();
 	if (resAddr != NULL) {
@@ -106,8 +153,12 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			return (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
 		case (13):
 			return (unsigned long) time((time_t*) (arg1 + getMemOffset(pid)));
+		case (19):
+			return (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
 		case (25):
 			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset(pid)));
+		case (140):// Prototype is sourced from man-pages lseek64(3)
+			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset(pid)), (int) arg5);
 		default:
 			bugCheck();// Unrecognised / unimplemented system call
 			return 0;

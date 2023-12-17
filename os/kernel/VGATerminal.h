@@ -179,7 +179,7 @@ off_t VGATerminal_lseek(int kfd, off_t off, int how) {
 	errno = ESPIPE;
 	return (-1);
 }
-int VGATerminal__llseek(unsigned int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
+int VGATerminal__llseek(int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
 	if (kfd & (~1)) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0400 | EBADF);
 	}

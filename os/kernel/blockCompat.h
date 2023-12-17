@@ -144,7 +144,7 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 	file->pos += oCount;
 	return oCount;
 }
-int Block__llseek(off_t hi, off_t lo, loff_t* res, unsigned int how, struct BlockFile* file) {
+int Block__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* file) {
 	long long rel = (hi << (sizeof(off_t) * CHAR_BIT)) | lo;
 	unsigned long long max = file->amnt << file->reliance->bs;
 	switch (how) {

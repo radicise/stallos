@@ -205,7 +205,7 @@ off_t ATA_lseek(int kfd, off_t off, int how) {
 	}
 	return 0;
 }
-int ATA__llseek(unsigned int kfd, off_t offHi, off_t offLo, loff_t* res, int how) {
+int ATA__llseek(int kfd, off_t offHi, off_t offLo, loff_t* res, int how) {
 	switch (kfd) {
 		case (2):
 			return Block__llseek(offHi, offLo, res, how, &ATA_0m_file);
@@ -221,5 +221,5 @@ int ATA__llseek(unsigned int kfd, off_t offHi, off_t offLo, loff_t* res, int how
 	return 0;
 }
 #include "FileDriver.h"
-struct FileDriver ATA_FileDriver = (struct FileDriver) {ATA_write, ATA_read, ATA_lseek, ATA__llseek};
+struct FileDriver FileDriver_ATA = (struct FileDriver) {ATA_write, ATA_read, ATA_lseek, ATA__llseek};
 #endif

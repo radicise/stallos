@@ -13,3 +13,5 @@
 fstesting
 *.mock
 .vscode
+/build
+/StallOS
