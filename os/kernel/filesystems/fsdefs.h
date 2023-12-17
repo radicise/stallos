@@ -1,22 +1,24 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
 
-#ifndef __FSMOCKTEST
+#ifndef __MOCKTEST
 #include "../types.h"
+extern void* allocate(size_t);
 #else
 typedef int pid_t;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 typedef unsigned long long u64;
-#endif
-#include "../FileDriver.h"
-
+typedef unsigned int uid32_t;
+typedef unsigned long long loff_t;
 #include <stdlib.h>
 
 #define allocate malloc
+#endif
+#include "../FileDriver.h"
 
-// extern void* allocate(size_t);
+
 // extern u64 compute_checksum(size_t*);
 // extern u8 validate_checksum(size_t*, u64);
 // extern void disk_seek(u64);
@@ -36,9 +38,9 @@ u64 hashstr(u8* str) {
 #define TSFSVERSION "NOSPEC"
 
 /*maximum open filehandles*/
-const u16 SYS_MAX_FDS = 0xffff;
+const u16 SYS_MAX_FDS = 0xff;
 const double FDT_ACQ_NITER_THRESH = 0.2; // threshold under which kfd_acquire shouldn't iter because it is unlikely to be fast enough
-const double FDT_ACQ_MITER_THRESH = 1.0; // threshold over which kfd_acquire MUST iter because holes are too prevalent in the table
+const double FDT_ACQ_MITER_THRESH = 0.5; // threshold over which kfd_acquire MUST iter because holes are too prevalent in the table
 const u16 FDT_ACQ_SMALL_LKFD = 200; // threshold under which kfd_acquire shouldn't iter because there aren't enough entries to care
 
 // is the file descriptor valid? e.g. no other process has deleted the file it refers to

@@ -2,6 +2,7 @@
 #define __TSFSINTERFACE_H__ 1
 
 #include "fsdefs.h"
+#include "../perProcess.h"
 #include "../errno.h"
 
 // maps KFDs to disk locations, owners, and flags
@@ -60,9 +61,13 @@ int acquire_fd(FileSystem* fs, u64 disk_loc, pid_t pid, u8 flags) {
     // the ratio of holes to the largest kfd is small enough that iterating probably isn't worth it
     // or the largest assigned kfd is small enough BUT the ratio isn't too big
     // above all, ensure that the kfd is NOT assigned within the hi reserved range
-    double ratio = FDT_HOLE_COUNT > 0 ? ((double)LARGEST_KFD / (double)FDT_HOLE_COUNT) : 0.0;
+    double ratio = FDT_HOLE_COUNT > 0 ? ((double)FDT_HOLE_COUNT / (double)LARGEST_KFD) : 0.0;
     if (LARGEST_KFD < KFD_RESERVED_HI && ratio < FDT_ACQ_MITER_THRESH && (FDT_HOLE_COUNT == 0 || LARGEST_KFD <= FDT_ACQ_SMALL_LKFD || ratio <= FDT_ACQ_NITER_THRESH)) {
         LARGEST_KFD ++;
+        FD_TABLE[LARGEST_KFD].flags = flags | FDE_OPEN | FDE_VALID;
+        FD_TABLE[LARGEST_KFD].procid = pid;
+        FD_TABLE[LARGEST_KFD].disk_loc = disk_loc;
+        FD_TABLE[LARGEST_KFD].position = 0;
         return LARGEST_KFD;
     }
     // iterate through the table up to largest kfd to find an open kfd

@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#define __FSMOCKTEST
+#define __MOCKTEST
+#define TARGET_PLATFORM "ARM"
 #include "os/kernel/filesystems/tsfs.h"
 
 int main(int argc, char** argv) {
