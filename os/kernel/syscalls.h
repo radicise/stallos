@@ -9,10 +9,19 @@
 #include "types.h"
 #include "capabilities.h"
 #include "perProcess.h"
+/*
+ *
+ * Reserved "kfd" values:
+ * 1: /dev/console
+ * 2: "/dev/hda" (this device file only exists if the device is present on the system)
+ * 3: "/dev/hdb" (this device file only exists if the device is present on the system)
+ * 5: "/dev/hdc" (this device file only exists if the device is present on the system)
+ * 6: "/dev/hdd" (this device file only exists if the device is present on the system)
+ *
+ */
 int getDesc(int fd) {
 	switch (fd) {
 		case (0):
-			return 0;
 		case (1):
 		case (2):
 			return 1;
@@ -30,7 +39,6 @@ int getDesc(int fd) {
 #include "VGATerminal.h"
 struct FileDriver* resolveFileDriver(int kfd) {
 	switch (kfd) {
-		case (0):
 		case (1):
 			return &FileDriver_VGATerminal;
 		case (2):

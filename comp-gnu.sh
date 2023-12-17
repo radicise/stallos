@@ -41,5 +41,5 @@ dd if=/dev/zero of=build/stall.bin bs=512 count=1 seek=2879
 mkdir -p StallOS
 cp build/stall.bin StallOS/stallos.bin
 cp build/stall.bin StallOS/hda.bin
-qemu-system-i386 -D log_qemu.txt -boot a -drive file=StallOS/stallos.bin,format=raw,index=0,if=floppy -drive file=StallOS/hda.bin,format=raw,index=0,if=ide
+qemu-system-i386 -D StallOS/log_qemu.txt -boot a -drive file=StallOS/stallos.bin,format=raw,index=0,if=floppy -drive file=StallOS/hda.bin,format=raw,index=0,if=ide
 exit 0

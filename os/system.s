@@ -71,7 +71,7 @@ iretl
 writePhysical:# void writePhysical(u32 byteAddr, u32 byte)
 .globl writePhysical
 movw $0x10,%ax
-movw %ax,%es
+movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
 movb 8(%esp),%cl
 movb %cl,%es:(%eax)
@@ -79,7 +79,7 @@ ret
 readPhysical:# u32 readPhysical(u32 byteAddr)
 .globl readPhysical
 movw $0x10,%ax
-movw %ax,%es
+movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
 movb %es:(%eax),%cl
 xorl %eax,%eax

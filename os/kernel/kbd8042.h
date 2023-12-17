@@ -310,7 +310,7 @@ ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
 	}
 }
 ssize_t kbd8042_read(int kfd, void* dat, size_t len) {
-	if (kfd != 0) {
+	if (kfd != 1) {
 		bugCheckNum(FAILMASK_KBD8042 | EBADF);
 	}
 	return kbd8042_readGiven(dat, len, &kbdMain);

@@ -141,6 +141,13 @@ int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	w |= kernelMsg("\n");
 	return w ? (-1) : 0;
 }
+int kernelInfoMsg(const char* msg) {
+	int w = 0;
+	w |= kernelMsg("Info.: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
+}
 extern int runELF(void*, void*, int*);
 #define FAILMASK_SYSTEM 0x00010000
 extern void bus_out_long(unsigned long, unsigned long);
@@ -160,6 +167,8 @@ extern void bus_inBlock_long(u16, long*, unsigned long);
 extern void bus_inBlock_u32(u16, u32*, unsigned long);
 extern void bus_inBlock_u16(u16, u16*, unsigned long);
 extern void bus_inBlock_u8(u16, u8*, unsigned long);
+extern u32 readPhysical(u32);
+extern void writePhysical(u32, u32);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
@@ -284,7 +293,24 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 	(*((unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
 void systemEntry(void) {
+	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
+	mainTerm.pos = readPhysical(0x00000506) & 0xffff;
+	mainTerm.format = readPhysical(0x00000508) & 0x00ff;
+	/*
+	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
+		((struct VGACell*) i)->format = mainTerm.format;
+		((struct VGACell*) i)->text = 0x20;
+	}
+	*/
+	/* Style */
+	((struct VGACell*) (0x000b8000  + (mainTerm.pos << 1) - RELOC))->format ^= 0x77;
+	mainTerm.onlcr = 1;
+	mainTerm.cursor = 1;
+	/* End-of-style */
+	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
+	kernelMsg("done\n");
+	kernelMsg("Setting interrupt handlers . . . ");
 	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);
 	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);
 	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);
@@ -301,29 +327,24 @@ void systemEntry(void) {
 	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);
 	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);
 	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);
+	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
+	kernelMsg("done\n");
+	kernelMsg("Redefining Intel 8253 / 8254 Programmable Interval Timer channel 0 interval . . . ");
 	bus_out_u8(0x0043, 0x34);
 	bus_out_u8(0x0040, 0x9c);// 11932 lobyte
 	bus_out_u8(0x0040, 0x2e);// 11932 hibyte
-	bus_wait();
-	//bugCheck();
+	bus_wait();// TODO Remove this line when it is deemed unnecessary
+	kernelMsg("done\n");
+	kernelMsg("Performing Intel 8042 CHMOS 8-bit Slave Microcontroller driver and PS/2 keyboard driver initialization  . . . ");
 	initKeyboard8042(kbdBuf, KBDBUF_SIZE, 0, &kbdMain);
-	//bugCheck();
-	int_enable();
-	//bugCheck();
-	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
-	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
-		((struct VGACell*) i)->format = mainTerm.format;
-		((struct VGACell*) i)->text = 0x20;
-	}
-	/* Style */
-	((struct VGACell*) (0x000b8000 - RELOC))->format ^= 0x77;
-	mainTerm.onlcr = 1;
-	mainTerm.cursor = 1;
-	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
-	/* End-of-style */
+	kernelMsg("done\n");
+	kernelMsg("Initializing ATA driver . . . ");
 	initATA();
+	kernelMsg("done\n");
+	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
+	int_enable();
+	kernelMsg("done\n");
 	int retVal = 0;
-	//bugCheck();
 	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);
 	(*((unsigned char*) (0xb8000 - RELOC))) = errVal + 0x30;
 	while (1) {

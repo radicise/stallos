@@ -167,20 +167,20 @@ ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
 	return VGATerminalWrite(&mainTerm, (unsigned char*) data, len);
 }
 ssize_t VGATerminal_read(int kfd, void* data, size_t siz) {
-	if (kfd != 0) {
+	if (kfd != 1) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0200 | EBADF);
 	}
 	return mainTerm.read(kfd, data, siz);
 }
 off_t VGATerminal_lseek(int kfd, off_t off, int how) {
-	if (kfd & (~1)) {
+	if (kfd != 1) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0400 | EBADF);
 	}
 	errno = ESPIPE;
 	return (-1);
 }
 int VGATerminal__llseek(int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
-	if (kfd & (~1)) {
+	if (kfd != 1) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0400 | EBADF);
 	}
 	errno = ESPIPE;
