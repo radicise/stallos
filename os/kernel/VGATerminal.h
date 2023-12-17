@@ -159,18 +159,33 @@ ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned
 }
 #include "types.h"
 #include "errno.h"
+#include "perProcess.h"
 ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
 	if (kfd != 1) {
-		bugCheckNum(FAILMASK_VGATERMINAL | EBADF);
+		bugCheckNum(FAILMASK_VGATERMINAL | 0x0100 | EBADF);
 	}
 	return VGATerminalWrite(&mainTerm, (unsigned char*) data, len);
 }
 ssize_t VGATerminal_read(int kfd, void* data, size_t siz) {
 	if (kfd != 0) {
-		bugCheckNum(FAILMASK_VGATERMINAL | EBADF);
+		bugCheckNum(FAILMASK_VGATERMINAL | 0x0200 | EBADF);
 	}
 	return mainTerm.read(kfd, data, siz);
 }
+off_t VGATerminal_lseek(int kfd, off_t off, int how) {
+	if (kfd & (~1)) {
+		bugCheckNum(FAILMASK_VGATERMINAL | 0x0400 | EBADF);
+	}
+	errno = ESPIPE;
+	return (-1);
+}
+int VGATerminal__llseek(unsigned int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
+	if (kfd & (~1)) {
+		bugCheckNum(FAILMASK_VGATERMINAL | 0x0400 | EBADF);
+	}
+	errno = ESPIPE;
+	return (-1);
+}
 #include "FileDriver.h"
-struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write, VGATerminal_read};
+struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write, VGATerminal_read, VGATerminal_lseek, VGATerminal__llseek};
 #endif

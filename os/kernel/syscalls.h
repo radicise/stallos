@@ -9,7 +9,6 @@
 #include "types.h"
 #include "capabilities.h"
 #include "perProcess.h"
-#include "../system.c"
 int getDesc(int fd) {
 	if ((fd < 0) || (fd > 2)) {
 		return -1;
@@ -113,5 +112,5 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			bugCheck();// Unrecognised / unimplemented system call
 			return 0;
 	}
-}// TODO Allow returning of values wider than the `int' type
+}// TODO Allow returning of values wider than the `long' type
 #endif

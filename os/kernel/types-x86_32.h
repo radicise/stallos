@@ -17,6 +17,12 @@ typedef unsigned short uid16_t;// For certain legacy architectures
 typedef unsigned int uid32_t;
 /*
  *
+ * Definition of CHAR_BIT
+ *
+ */
+#define CHAR_BIT 8
+/*
+ *
  * Definitions for fundamental integer types
  *
  */

@@ -1,4 +1,5 @@
 #define RELOC 0x00040000
+#define __STALLOS__ 1
 unsigned long long PIT0Ticks = 0;
 void bugMsg(void) {
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
@@ -78,22 +79,6 @@ void* move(void* dst, void* buf, size_t count) {
 void* cpy(void* dst, void* src, size_t count) {
 	return move(dst, src, count);
 }
-#include "kernel/VGATerminal.h"
-size_t strlen(const char* str) {
-	char* n = str;
-	while (*n++) {
-	}
-	return n - str - 1;
-}
-struct VGATerminal mainTerm;
-int kernelMsg(char* msg) {
-	unsigned int len = strlen(msg);
-	if (len != VGATerminalWrite(&mainTerm, (unsigned char*) msg, len)) {
-		return (-1);
-	}
-	return 0;
-}
-extern int runELF(void*, void*, int*);
 void bugCheckNum_u32(u32 num) {
 	bugMsg();
 	(*((unsigned char*) (0xb80a0 - RELOC))) = 0x49;
@@ -120,6 +105,43 @@ void bugCheckNum_u32(u32 num) {
 void bugCheckNum(unsigned long num) {// Fatal kernel errors
 	bugCheckNum_u32(num);
 }
+#include "kernel/VGATerminal.h"
+size_t strlen(const char* str) {
+	char* n = str;
+	while (*n++) {
+	}
+	return n - str - 1;
+}
+struct VGATerminal mainTerm;
+int kernelMsg(const char* msg) {
+	unsigned int len = strlen(msg);
+	if (len != VGATerminalWrite(&mainTerm, (unsigned char*) msg, len)) {
+		return (-1);
+	}
+	return 0;
+}
+int kernelWarnMsg(const char* msg) {
+	kernelMsg("Warning: ");
+	kernelMsg(msg);
+	kernelMsg("\n");
+}
+int kernelWarnMsgCode(const char* msg, unsigned long code) {
+	int w = 0;
+	w |= kernelMsg("Warning: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("0x");
+	int n;
+	unsigned char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
+	tx[n] = 0x00;
+	while (n--) {
+		tx[n] = hex[code & 0x0f];
+		code >>= 4;
+	}
+	w |= kernelMsg(tx);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
+}
+extern int runELF(void*, void*, int*);
 #define FAILMASK_SYSTEM 0x00010000
 extern void bus_out_long(unsigned long, unsigned long);
 extern void bus_out_u8(unsigned long, u8);
@@ -235,6 +257,8 @@ void PICInit(unsigned char mOff, unsigned char sOff) {
 	bus_out_u8(0x00a1, sOr);
 	bus_wait();
 }
+#include "kernel/ATA.h"
+#include "kernel/blockCompat.h"
 #include "kernel/syscalls.h"
 extern void irupt_70h(void);
 extern void irupt_71h(void);
@@ -297,6 +321,7 @@ void systemEntry(void) {
 	mainTerm.cursor = 1;
 	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
 	/* End-of-style */
+	initATA();
 	int retVal = 0;
 	//bugCheck();
 	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);
