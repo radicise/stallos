@@ -4,6 +4,7 @@
 #include "fsdefs.h"
 #include "../perProcess.h"
 #include "../errno.h"
+#include "../kfds.h"
 /*
 flushes the associated file if buffered
 non-zero return value indicates an error
