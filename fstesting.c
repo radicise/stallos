@@ -67,6 +67,15 @@ int main(int argc, char** argv) {
     if (s == 0) {
         s = loadFS(&fdrive, 0, 0);
     }
+    if (s->rootblock == 0) {
+        printf("ERROR LOADING FS\n");
+        free(s);
+        goto closemock;
+    }
+    if (s->rootblock->breakver == 0) {
+        printf("BAD CHECKSUM\n");
+        goto dealloc;
+    }
     printf("psize: %llu\n", s->rootblock->partition_size);
     printf("bsize: %d\n", s->rootblock->block_size);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));

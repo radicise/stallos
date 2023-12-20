@@ -19,7 +19,12 @@ typedef unsigned long long loff_t;
 #define allocate malloc
 #endif
 #include "../FileDriver.h"
-
+#include "./gensizes.h"
+// imagine there are '.'s between each digit
+#define VERNOHI 001
+#define VERNOLO 002
+// only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
+#define VERNOBN 2
 
 
 
@@ -32,13 +37,45 @@ u64 hashstr(u8* str) {
     return hash;
 }
 
+u64 hashsized(u8* data, off_t size) {
+    // printf("data size: %li\n", size);
+    u64 hash = 0;
+    int c;
+    while (size) {
+        c = (*data++);
+        // printf("%02x ", c);
+        hash = c + (hash << 6) + (hash << 16) - hash;
+        size --;
+    }
+    // putchar('\n');
+    return hash;
+}
+
+typedef struct {
+    u16 length;
+    u8* buffer;
+} WBuffer;
 
 #define TSFSVERSION "NOSPEC"
 
 /*
 stores data about the file system as a whole
+u16   breakver;
+u64   partition_size;
+u8    system_size;
+u64   creation_time;
+char  version[16];
+u16   block_size;
+u64   top_dir;
+u64   checksum;
 */
 typedef struct {
+    /*
+    PYGENSTART
+    comment: the size of rootblock data stored on disk
+    name: TSFSROOTBLOCK_DSIZE
+    */
+    u16   breakver;
     u64   partition_size;
     u8    system_size;
     u64   creation_time;
