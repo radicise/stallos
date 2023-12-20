@@ -9,15 +9,17 @@ void _start() {
 	unsigned char c;
 	ssize_t n;
 	time_t desTime = 0;
-	unsigned char dat[16];
-	c = read(3, dat, 16);
+	unsigned char dat[512];
+	c = read(3, dat, 512);
 	write(1, &(hex[c >> 4]), 1);
 	write(1, &(hex[c & 0x0f]), 1);
 	write(1, "\n", 1);
-	c = dat[0];
-	write(1, &(hex[c >> 4]), 1);
-	write(1, &(hex[c & 0x0f]), 1);
-	write(1, "\n", 1);
+	for (int i = 0; i < 512; i++) {
+		c = dat[i];
+		write(1, &(hex[c >> 4]), 1);
+		write(1, &(hex[c & 0x0f]), 1);
+		write(1, "\n", 1);
+	}
 	while (1) {
 		n = read(0, &c, (size_t) 1);
 		if (n == (-1)) {

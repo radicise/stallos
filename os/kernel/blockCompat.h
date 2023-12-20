@@ -12,10 +12,10 @@ struct BDSpec {
 };
 struct BlockFile {
 	struct BDSpec* reliance;
-	unsigned long long pos;// in address units
+	loff_t pos;// in address units
 	unsigned long long amnt;// in blocks
 	void* obj;
-};
+};// TODO Utilise `loff_t' appropriately throughout the functions and structures instead of using `unsigned long long'
 ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*) = file->reliance->writeBlock;
 	int (*readBlock)(unsigned long long, unsigned long long, void*, void*) = file->reliance->readBlock;
@@ -52,7 +52,7 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 			return oCount;
 		}
 		count -= cCount;
-		data += cCount;
+		data = ((const char*) data) + cCount;
 		pos += cCount;
 	}
 	unsigned long long wm = (mask + 1) * writeMax;
@@ -61,13 +61,13 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 		}
 		pos += wm;
 		count -= wm;
-		data += wm;
+		data = ((const char*) data) + wm;
 	}
 	if (count >> bs) {
 		while (writeBlock(pos >> bs, count >> bs, data, obj)) {
 		}
 		pos += count & (~mask);
-		data += count & (~mask);
+		data = ((const char*) data) + (count & (~mask));
 		count &= mask;
 	}
 	if (!count) {
@@ -83,11 +83,9 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 	return oCount;
 }
 ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
-	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*) = file->reliance->writeBlock;
 	int (*readBlock)(unsigned long long, unsigned long long, void*, void*) = file->reliance->readBlock;
 	u8 bs = file->reliance->bs;
 	unsigned long long readMax = file->reliance->readMax;
-	unsigned long long writeMax = file->reliance->writeMax;
 	void* obj = file->obj;
 	unsigned long long pos = file->pos;
 	unsigned long long amnt = file->amnt;
@@ -116,22 +114,22 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 			return oCount;
 		}
 		count -= cCount;
-		data += cCount;
+		data = ((char*) data) + cCount;
 		pos += cCount;
 	}
 	unsigned long long wm = (mask + 1) * readMax;
-	while ((count >> bs) >= writeMax) {
+	while ((count >> bs) >= readMax) {
 		while (readBlock(pos >> bs, readMax, data, obj)) {
 		}
 		pos += wm;
 		count -= wm;
-		data += wm;
+		data = ((char*) data) + wm;
 	}
 	if (count >> bs) {
 		while (readBlock(pos >> bs, count >> bs, data, obj)) {
 		}
 		pos += count & (~mask);
-		data += count & (~mask);
+		data = ((char*) data) + (count & (~mask));
 		count &= mask;
 	}
 	if (!count) {
@@ -145,8 +143,8 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 	return oCount;
 }
 int Block__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* file) {
-	long long rel = (hi << (sizeof(off_t) * CHAR_BIT)) | lo;
-	unsigned long long max = file->amnt << file->reliance->bs;
+	loff_t rel = (((loff_t) hi) << (sizeof(off_t) * CHAR_BIT)) | ((loff_t) lo);
+	loff_t max = file->amnt << file->reliance->bs;
 	switch (how) {
 		case (SEEK_END):
 			rel += max - file->pos;

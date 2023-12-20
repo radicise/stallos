@@ -8,7 +8,7 @@ printf ".if staltstd_str_commandline_addr\n  .err # The command line address is 
 cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNTw >> build/stall-comp.s
 cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s ${DHULB_PATH}/src/DLib/stall/stack.s ${DHULB_PATH}/src/DLib/stall/sys.s ${DHULB_PATH}/src/DLib/dos/api_bindings.s kernel/int.s >> build/stall-comp.s
 as -o build/stall.o build/stall-comp.s
-ld -T ./newf -o build/stall.elf build/stall.o
+ld -Ttext=0 -o build/stall.elf build/stall.o
 strip build/stall.elf
 objcopy --dump-section .text=build/stall.bin build/stall.elf /dev/null
 dhulbpp - - < sys32.dhulb > build/kern32-comp.dhulb

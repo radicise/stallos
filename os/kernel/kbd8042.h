@@ -17,6 +17,7 @@ struct Keyboard8042 {
 	unsigned char shift;
 	unsigned char ctrl;
 	unsigned char alt;
+	u8 state;
 };
 extern struct Keyboard8042 kbdMain;
 void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
@@ -34,11 +35,9 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 	kbd->shift = 0;
 	kbd->ctrl = 0;
 	kbd->alt = 0;
-	//bugCheck();
 	while (bus_in_u8(0x0064) & 0x02) {
 		bus_wait();
 	}
-	//bugCheck();
 	bus_out_u8(0x0064, 0xad);
 	bus_wait();
 	while (bus_in_u8(0x0064) & 0x02) {
@@ -124,7 +123,6 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 		}
 		bus_wait();
 	}
-	//bugCheck();
 	res = bus_in_u8(0x0060);
 	if (res == 0xfe) {
 		goto initKeyboard8042__disable_sc;
@@ -221,22 +219,6 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 	if (res != 0xfa) {
 		bugCheckNum(0x0800 | res | FAILMASK_KBD8042);
 	}
-	/*
-	setup |= 0x01;
-	while (bus_in_u8(0x0064) & 0x02) {// TODO Remove if unnecessary
-		bus_wait();
-	}
-	bus_out_u8(0x0064, 0x60);
-	bus_wait();
-	while (bus_in_u8(0x0064) & 0x02) {
-		bus_wait();
-	}
-	bus_out_u8(0x0060, setup);
-	bus_wait();
-	while (bus_in_u8(0x0064) & 0x02) {// Waiting for sureness of the IRQ having been enabled
-		bus_wait();
-	}
-	*/
 	return;
 }
 void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
@@ -257,28 +239,147 @@ void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
 		(kbd->avail)++;
 	}
 }
-void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// `bufLock' must have been acquired and is NOT released
+kbd8042_outChar
+kbd8042_outSeq
+int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
+	if (kbd->set != 2) {
+		return (-1);// TODO Implement
+	}
+	u16 code = ((u16) dat) + ((u16) kbd->state);// State when set 2: 0: N; 1: 0xe0 N; 2: 0xf0 N; 3: 0xe0 0xf0 N; 4: 0xe1 N; 5: 0xe1 0x14 N; 6: 0xe1 0xf0 N; 7: 0xe1 0xf0 0x14 N; 8: 0xe1 0xf0 0x14 0xf0 N
+	unsigned char caps = (kbd->shift ? 1 : 0) ^ (kbd->capL ? 1 : 0);
+	unsigned char shift = kbd->shift;
+	switch (code) {
+		case (0x1c):
+			kbd8042_outChar(caps ? 0x41 : 0x61);
+			return 0;
+		case (0x32):
+			kbd8042_outChar(caps ? 0x42 : 0x62);
+			return 0;
+		case (0x21):
+			kbd8042_outChar(caps ? 0x43 : 0x63);
+			return 0;
+		case (0x23):
+			kbd8042_outChar(caps ? 0x44 : 0x64);
+			return 0;
+		case (0x24):
+			kbd8042_outChar(caps ? 0x45 : 0x65);
+			return 0;
+		case (0x2b):
+			kbd8042_outChar(caps ? 0x46 : 0x66);
+			return 0;
+		case (0x34):
+			kbd8042_outChar(caps ? 0x47 : 0x67);
+			return 0;
+		case (0x33):
+			kbd8042_outChar(caps ? 0x48 : 0x68);
+			return 0;
+		case (0x43):
+			kbd8042_outChar(caps ? 0x49 : 0x69);
+			return 0;
+		case (0x3b):
+			kbd8042_outChar(caps ? 0x4a : 0x6a);
+			return 0;
+		case (0x42):
+			kbd8042_outChar(caps ? 0x4b : 0x6b);
+			return 0;
+		case (0x4b):
+			kbd8042_outChar(caps ? 0x4c : 0x6c);
+			return 0;
+		case (0x3a):
+			kbd8042_outChar(caps ? 0x4d : 0x6d);
+			return 0;
+		case (0x31):
+			kbd8042_outChar(caps ? 0x4e : 0x6e);
+			return 0;
+		case (0x44):
+			kbd8042_outChar(caps ? 0x4f : 0x6f);
+			return 0;
+		case (0x4d):
+			kbd8042_outChar(caps ? 0x50 : 0x70);
+			return 0;
+		case (0x15):
+			kbd8042_outChar(caps ? 0x51 : 0x71);
+			return 0;
+		case (0x2d):
+			kbd8042_outChar(caps ? 0x52 : 0x72);
+			return 0;
+		case (0x1b):
+			kbd8042_outChar(caps ? 0x53 : 0x73);
+			return 0;
+		case (0x2c):
+			kbd8042_outChar(caps ? 0x54 : 0x74);
+			return 0;
+		case (0x3c):
+			kbd8042_outChar(caps ? 0x55 : 0x75);
+			return 0;
+		case (0x2a):
+			kbd8042_outChar(caps ? 0x56 : 0x76);
+			return 0;
+		case (0x1d):
+			kbd8042_outChar(caps ? 0x57 : 0x77);
+			return 0;
+		case (0x22):
+			kbd8042_outChar(caps ? 0x58 : 0x78);
+			return 0;
+		case (0x35):
+			kbd8042_outChar(caps ? 0x59 : 0x79);
+			return 0;
+		case (0x1a):
+			kbd8042_outChar(caps ? 0x5a : 0x7a);
+			return 0;
+
+
+	}
+}
+void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
+	if (kbd->ID != 0x00) {
+		bugCheckNum(0x0102 | FAILMASK_KBD8042);
+	}
+	int i = 0;
+	while (1) {
+		if (kbd->avail == i) {
+			kbd->avail = 0;
+			i = 0;
+			break;
+		}
+		if (kbd8042_process(kbd->buf[i])) {
+			if (i) {
+				kbd->avail -= i;
+				move(kbd->buf, kbd->buf + i, kbd->avail);
+			}
+			i = 1;
+			break;
+		}
+		i++;
+	}
+	if (!i) {
+		while (1) {
+			if (!(bus_in_u8(0x0064) & 0x01)) {
+				return;
+			}
+			unsigned char res = bus_in_u8(0x0060);
+			if (kbd8042_process(res)) {
+				kbd->buf[kbd->avail = 1] = res;
+				break;
+			}
+		}
+	}
 	while (1) {
 		if (kbd->avail == kbd->bufSize) {
 			return;
-		}
-		if (kbd->ID != 0x00) {
-			bugCheckNum(0x0102 | FAILMASK_KBD8042);
 		}
 		if (!(bus_in_u8(0x0064) & 0x01)) {
 			return;
 		}
 		kbd->buf[kbd->avail] = bus_in_u8(0x0060);
-		(kbd->avail)++;
+		kbd->avail++;
 	}
 }
 void kbd8042_onIRQ(struct Keyboard8042* kbd) {
-	//bugCheck();
 	int service = Mutex_tryAcquire(&(kbd->bufLock));
 	if (!service) {
 		return;//TODO URGENT Set timer to service the IRQ when it can
 	}
-	//bugCheck();
 	kbd8042_serviceIRQ(kbd);
 	Mutex_release(&(kbd->bufLock));
 	return;

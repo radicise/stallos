@@ -56,7 +56,7 @@ extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 
 extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
 extern void Mutex_initUnlocked(Mutex*);
 #include "kernel/types.h"
-void* move(void* dst, void* buf, size_t count) {
+void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
 	if (dst < buf) {
 		while (count--) {
@@ -76,7 +76,7 @@ void* move(void* dst, void* buf, size_t count) {
 	}
 	return m;
 }
-void* cpy(void* dst, void* src, size_t count) {
+void* cpy(void* dst, const void* src, size_t count) {
 	return move(dst, src, count);
 }
 void bugCheckNum_u32(u32 num) {
@@ -107,8 +107,8 @@ void bugCheckNum(unsigned long num) {// Fatal kernel errors
 }
 #include "kernel/VGATerminal.h"
 size_t strlen(const char* str) {
-	char* n = str;
-	while (*n++) {
+	const char* n = str;
+	while (*(n++)) {
 	}
 	return n - str - 1;
 }
@@ -131,7 +131,7 @@ int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	w |= kernelMsg(msg);
 	w |= kernelMsg("0x");
 	int n;
-	unsigned char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
+	char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
 	tx[n] = 0x00;
 	while (n--) {
 		tx[n] = hex[code & 0x0f];
