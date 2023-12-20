@@ -143,7 +143,8 @@ _dishe:
     nop
     jmp trep
 .set dist_twty, . - _start
-.space 256 - dist_twty
+.set dist_twtyar, 256 - dist_twty
+.space dist_twtyar
 _diwr:
     # TODO implement as an interrupt
     # doc:
