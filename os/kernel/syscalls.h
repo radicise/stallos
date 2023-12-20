@@ -12,7 +12,7 @@
 /*
  *
  * Reserved "kfd" values:
- * 1: /dev/console
+ * 1: "/dev/console"
  * 2: "/dev/hda" (this device file only exists if the device is present on the system)
  * 3: "/dev/hdb" (this device file only exists if the device is present on the system)
  * 5: "/dev/hdc" (this device file only exists if the device is present on the system)
@@ -168,7 +168,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		case (140):// Prototype is sourced from man-pages lseek64(3)
 			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset(pid)), (int) arg5);
 		default:
-			bugCheck();// Unrecognised / unimplemented system call
+			bugCheckNum(0xABADCA11);// Unrecognised / unimplemented system call ("A BAD CALL")
 			return 0;
 	}
 }// TODO Allow returning of values wider than the `long' type

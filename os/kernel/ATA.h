@@ -21,7 +21,7 @@ struct ATAFile {
 	struct ATA* ata;
 	unsigned char slave;
 };
-int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, unsigned long long amnt, unsigned char write, struct ATAFile* ataDrive) {
+int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, const void* src, unsigned long long amnt, unsigned char write, struct ATAFile* ataDrive) {
 	if (amnt > 256) {
 		bugCheckNum(0x0002 | FAILMASK_ATA);// Amount of sectors is too large
 	}
@@ -79,11 +79,12 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, unsigned l
 	}
 	if (write) {
 		amnt <<= 8;
+		const u16* from = src;
 		while (amnt--) {
 			while (!(bus_in_u8(bus + 7) & ATA_SR_DRQ)) {
 			}// TODO Do not run for first iteration
-			bus_out_u16(bus, *((u16*) dest));
-			dest = (char*) (dest + 2);
+			bus_out_u16(bus, *from);
+			from++;
 		}
 		while (!(bus_in_u8(bus + 7) & ATA_SR_DRDY)) {
 		}
@@ -96,12 +97,13 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, unsigned l
 		Mutex_release(&(ata->inUse));
 	}
 	else {
+		u16* to = dest;
 		amnt <<= 8;
 		while (amnt--) {
 			while (!(bus_in_u8(bus + 7) & ATA_SR_DRQ)) {
 			}// TODO Do not run for first iteration
-			(*((u16*) dest)) = bus_in_u16(bus);
-			dest = (char*) (dest + 2);
+			(*to) = bus_in_u16(bus);
+			to++;
 		}
 	}
 	while (bus_in_u8(bus + 7) & ATA_SR_BSY) {
@@ -110,10 +112,10 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, unsigned l
 	return 0;
 }
 int ata_readBlock(unsigned long long block, unsigned long long amnt, void* dst, void* drive) {
-	return ata_PIO_transferSectors(block, dst, amnt, 0, (struct ATAFile*) drive);
+	return ata_PIO_transferSectors(block, dst, NULL, amnt, 0, (struct ATAFile*) drive);
 }
 int ata_writeBlock(unsigned long long block, unsigned long long amnt, const void* src, void* drive) {
-	return ata_PIO_transferSectors(block, src, amnt, 1, (struct ATAFile*) drive);
+	return ata_PIO_transferSectors(block, NULL, src, amnt, 1, (struct ATAFile*) drive);
 }
 struct ATA ATA_0;
 struct ATA ATA_1;
