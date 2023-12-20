@@ -72,7 +72,7 @@ u64   checksum;
 typedef struct {
     /*
     PYGENSTART
-    comment: the size of rootblock data stored on disk
+    comment: the size of root block data stored on disk
     name: TSFSROOTBLOCK_DSIZE
     */
     u16   breakver;
@@ -84,6 +84,24 @@ typedef struct {
     u64   top_dir;
     u64   checksum;
 } TSFSRootBlock;
+
+typedef struct {
+    /*
+    PYGENSTART
+    comment: size of data block metadata stored on disk
+    name: TSFSDBLOCKMETA_DSIZE
+    */
+    u8    storage_flags;
+} TSFSDBlockMeta;
+
+typedef struct {
+    /*
+    PYGENSTART
+    comment: size of data block data stored on disk
+    name: TSFSDATABLOCK_DSIZE
+    */
+   TSFSDBlockMeta* meta;
+} TSFSDataBlock;
 
 /*
 Custom File System, see the stallOS spec for more details - Tristan

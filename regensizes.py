@@ -34,15 +34,13 @@ sizings: dict[str,int] = {
     "s32":4,
     "u64":8,
     "s64":8,
-    "int":4,
-    "short":2,
-    "long":8,
 }
 keys = sizings.keys()
 
 def parsePygen(gens: list[str]):
     global content
     l = len(gens)
+    typedef: bool = False
     comment: str = None
     name: str = None
     start = 0
@@ -50,6 +48,10 @@ def parsePygen(gens: list[str]):
         line = gens[i].strip()
         if line == "*/":
             start = i+1
+            break
+        if line == "pygen-typedef":
+            start = i+1
+            typedef = True
             break
         parts = line.split(":", 1)
         for j in range(len(parts)):
@@ -62,13 +64,19 @@ def parsePygen(gens: list[str]):
         raise ValueError("UNNAMED PYGEN")
     sizesum = 0
     for i in range(start, l):
+        if typedef and gens[i].strip() == "pygen-end":
+            sizings[name] = sizesum
+            return
         if endpat.match(gens[i]) != None:
+            sizings[gens[i].strip()[1:-1].strip()] = sizesum
             break
         line = gens[i].strip().split()
         if len(line) == 0:
             continue
         if line[0] == "unsigned":
             line.pop(0)
+        if line[0].endswith("*"):
+            line[0] = line[0][:-1]
         if line[0] not in keys:
             continue
         if "[" in line[1]:
