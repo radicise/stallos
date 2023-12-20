@@ -30,6 +30,7 @@ sizings: dict[str,int] = {
 keys = sizings.keys()
 
 def parsePygen(gens: list[str]):
+    global content
     l = len(gens)
     comment: str = None
     name: str = None
@@ -50,9 +51,11 @@ def parsePygen(gens: list[str]):
         raise ValueError("UNNAMED PYGEN")
     sizesum = 0
     for i in range(start, l):
-        if re.match(line) != None:
+        if endpat.match(lines[i]) != None:
             break
         line = lines[i].strip().split()
+        if len(line) == 0:
+            continue
         if line[0] == "unsigned":
             line.pop(0)
         if line[0] not in keys:
@@ -62,13 +65,16 @@ def parsePygen(gens: list[str]):
             sizesum += sizings[line[0]] * int(x[x.index("[")+1:x.index("]")])
         sizesum += sizings[line[0]]
     if comment:
-        content += f"// {comment}\n"
-    content += f"#define {name} {sizesum}\n"
+        content += f"\n// {comment}\n"
+    content += f"#define {name} {sizesum}"
 
 l = len(lines)
 for i in range(l):
-    if lines[l] == "PYGENSTART":
+    if lines[i].strip() == "PYGENSTART":
+        # print(lines[i:min(i+20,l)])
         parsePygen(lines[i:])
+
+content += "\n"
 
 with open("os/kernel/filesystems/gensizes.h", "wt") as f:
     f.truncate()
