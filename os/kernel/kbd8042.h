@@ -27,10 +27,11 @@ struct Keyboard8042 {
 	unsigned char ctrlL;
 	unsigned char ctrlR;
 	unsigned char modeApp;
+	struct VGATerminal* term;// TODO URGENT Make a shared TTY setting object with a lock instead of locking terminal output
 	u8 state;
 };
 extern struct Keyboard8042 kbdMain;
-void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm, size_t bufTermSize, u8 ID, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
+void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm, size_t bufTermSize, u8 ID, struct VGATerminal* term, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
 	if (ID != 0) {
 		bugCheckNum(0x0101 | FAILMASK_KBD8042);
 	}
@@ -55,6 +56,7 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm
 	kbd->bufTerm = bufTerm;
 	kbd->bufTermSize = bufTermSize;
 	kbd->availTerm = 0;
+	kbd->term = term;
 	while (bus_in_u8(0x0064) & 0x02) {
 		bus_wait();
 	}
@@ -262,6 +264,12 @@ void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
 int kbd8042_outChar(unsigned char val, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->ctrl) {
 		val &= 0x1f;
+	}
+	if ((val == 0x13) || (val == 0x11)) {
+		if (AtomicULong_get(&(kbd->term->xctrl))) {
+			AtomicULong_set(&(kbd->term->xon), val == 0x11);
+			return 0;// "alt" keys have no effect in this case because no sequence reaches the host
+		}
 	}
 	if (kbd->alt) {
 		if (!((kbd->bufTermSize - kbd->availTerm) & (~((size_t) 1)))) {

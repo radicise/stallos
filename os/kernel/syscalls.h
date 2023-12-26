@@ -160,7 +160,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		case (4):
 			return (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
 		case (13):
-			return (unsigned long) time((time_t*) (arg1 + getMemOffset(pid)));
+			return (unsigned long) time((time_t*) ((arg1 == 0) ? 0 : (arg1 + getMemOffset(pid))));
 		case (19):
 			return (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
 		case (25):

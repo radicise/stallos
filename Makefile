@@ -19,8 +19,7 @@ build/stall.bin: build/stall.elf build/kernel.bin build/prgm.elf build/shell.elf
 	dd if=/dev/zero of=build/stall.bin bs=512 count=1 seek=2879
 
 run: StallOS/stallos.bin
-	printf 'NO LONGER SUPPORTED - USE /run.sh\n'
-	false
+	./run.sh
 
 build/shell.elf: build/shell-asm.elf build/shell-ul.elf
 	${LDPRGM} ${LDFLAGS} -o build/shell.elf build/shell-ul.elf build/shell-asm.elf -lgcc
@@ -69,12 +68,14 @@ build/stall.elf: build/stall.o
 build/stall.o: build/stall-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/stall.o build/stall-comp.s
 
-build/stall-comp.s: build/Salth.class stall.slth sys16.dhulb stall.s
+build/stall-comp.s: build/Salth.class stall.slth sys16.dhulb stall.s shell.s kernel/int.s
 	cp stall.s build/stall-comp.s
 	java -cp build Salth n staltstd < stall.slth >> build/stall-comp.s
 	printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n" >> build/stall-comp.s
 	cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNT >> build/stall-comp.s
 	cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s ${DHULB_PATH}/src/DLib/stall/stack.s ${DHULB_PATH}/src/DLib/stall/sys.s ${DHULB_PATH}/src/DLib/dos/api_bindings.s kernel/int.s >> build/stall-comp.s
+	# TODO Make this rule run when any of the used "DLib" things have been updated
+
 
 build/Salth.class: Salth.java
 	javac -d build Salth.java

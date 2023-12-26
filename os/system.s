@@ -255,7 +255,7 @@ ret
 Mutex_release:# void Mutex_release(Mutex* mutex)
 .globl Mutex_release
 movl 4(%esp),%edx
-xorb %al,%al
+xorl %eax,%eax
 lock xchgb %al,(%edx)
 ret
 Mutex_tryAcquire:# int Mutex_tryAcquire(Mutex* mutex)
