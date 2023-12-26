@@ -10,35 +10,32 @@ void _start() {
 	ssize_t n;
 	time_t desTime = 0;
 	unsigned char dat[512];
-	c = read(3, dat, 512);
-	write(1, &(hex[c >> 4]), 1);
-	write(1, &(hex[c & 0x0f]), 1);
-	write(1, "\n", 1);
-	for (int i = 0; i < 512; i++) {
-		c = dat[i];
-		write(1, &(hex[c >> 4]), 1);
-		write(1, &(hex[c & 0x0f]), 1);
+	n = read(3, dat, 511);
+	if (n != 511) {
+		write(1, "eeee", 4);
+		while (1) {
+		}
+	}
+	for (int i = 0; i < 511; i++) {
+		write(1, hex + (dat[i] >> 4), 1);
+		write(1, hex + (dat[i] & 0x0f), 1);
 		write(1, "\n", 1);
 	}
 	while (1) {
-		n = read(0, &c, (size_t) 1);
-		if (n == (-1)) {
+		write(1, "3210", 4);
+		n = read(0, dat, 24);
+		if (n != 24) {
+			write(1, "eeee", 4);
 			break;
 		}
-		if (n == 0) {
-			continue;
-		}
-		while (1) {
-			n = write(1, &c, (size_t) 1);
-			if (n == 0) {
-				continue;
-			}
-			if (n == (-1)) {
-				while (1) {
-				}
-			}
+		write(1, "3210", 4);
+		n = write(3, dat, 24);
+		if (n != 24) {
+			write(1, "eeee", 4);
 			break;
 		}
+		write(1, "0123", 4);
+		break;
 	}
 	while (1) {
 	}

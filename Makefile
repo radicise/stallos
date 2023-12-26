@@ -41,7 +41,7 @@ build/system-comp.s: os/system.s os/irupt_generic.s
 	cp os/system.s build/system-comp.s
 	awk '1{gsub(/NUM/, thenum, $$0);print($$0);}' thenum=70 os/irupt_generic.s thenum=71 os/irupt_generic.s thenum=72 os/irupt_generic.s thenum=73 os/irupt_generic.s thenum=74 os/irupt_generic.s thenum=75 os/irupt_generic.s thenum=76 os/irupt_generic.s thenum=77 os/irupt_generic.s thenum=78 os/irupt_generic.s thenum=79 os/irupt_generic.s thenum=7a os/irupt_generic.s thenum=7b os/irupt_generic.s thenum=7c os/irupt_generic.s thenum=7d os/irupt_generic.s thenum=7e os/irupt_generic.s thenum=7f os/irupt_generic.s >> build/system-comp.s
 
-build/prgm-ul.elf: os/system.c
+build/prgm-ul.elf: os/system.c os/kernel/*.h
 	${CCPRGM} ${CFLAGS} -o build/prgm-ul.elf os/system.c
 
 build/kernel.bin: build/kernel.o build/sysc.elf build/irupts.o

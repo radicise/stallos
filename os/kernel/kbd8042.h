@@ -818,8 +818,9 @@ ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
 			Mutex_release(&(kbd->bufLock));
 			return oCount;
 		}
-		count -= kbd->availTerm;
 		cpy(dats, kbd->bufTerm, kbd->availTerm);
+		count -= kbd->availTerm;
+		dats += kbd->availTerm;
 		kbd->availTerm = 0;
 	}
 }
