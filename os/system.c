@@ -172,6 +172,8 @@ extern void writePhysical(u32, u32);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
+#define KBDBUFTERM_SIZE 32
+unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
 struct Keyboard8042 kbdMain;
 time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
@@ -336,7 +338,7 @@ void systemEntry(void) {
 	bus_wait();// TODO Remove this line when it is deemed unnecessary
 	kernelMsg("done\n");
 	kernelMsg("Performing Intel 8042 CHMOS 8-bit Slave Microcontroller driver and PS/2 keyboard driver initialization  . . . ");
-	initKeyboard8042(kbdBuf, KBDBUF_SIZE, 0, &kbdMain);
+	initKeyboard8042(kbdBuf, KBDBUF_SIZE, kbdBufTerm, KBDBUFTERM_SIZE, 0, &kbdMain);
 	kernelMsg("done\n");
 	kernelMsg("Initializing ATA driver . . . ");
 	initATA();

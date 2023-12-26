@@ -28,14 +28,17 @@ void _start() {
 		if (n == 0) {
 			continue;
 		}
-		c = (unsigned char) time(NULL);
-		write(1, &(hex[c >> 4]), 1);
-		write(1, &(hex[c & 0x0f]), 1);
-		write(1, "\n", 1);
-		c = stime(&desTime);
-		write(1, &(hex[c >> 4]), 1);
-		write(1, &(hex[c & 0x0f]), 1);
-		write(1, "\n", 1);
+		while (1) {
+			n = write(1, &c, (size_t) 1);
+			if (n == 0) {
+				continue;
+			}
+			if (n == (-1)) {
+				while (1) {
+				}
+			}
+			break;
+		}
 	}
 	while (1) {
 	}

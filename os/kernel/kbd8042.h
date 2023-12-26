@@ -6,9 +6,12 @@
 #define FAILMASK_KBD8042 0x00020000
 struct Keyboard8042 {
 	size_t bufSize;
+	size_t bufTermSize;
 	unsigned char* buf;
 	size_t avail;
-	Mutex bufLock;// Lock over reading and writing of `avail' and the data at `buf'
+	unsigned char* bufTerm;
+	size_t availTerm;
+	Mutex bufLock;// Lock over reading and writing of `avail' and `availTerm' and the data at `buf' and the data at `bufTerm'
 	u8 ID;
 	unsigned char set;// 1: set 1; 2: set 2; 3: set 3
 	unsigned char capL;
@@ -17,10 +20,17 @@ struct Keyboard8042 {
 	unsigned char shift;
 	unsigned char ctrl;
 	unsigned char alt;
+	unsigned char shiftL;
+	unsigned char shiftR;
+	unsigned char altL;
+	unsigned char altR;
+	unsigned char ctrlL;
+	unsigned char ctrlR;
+	unsigned char modeApp;
 	u8 state;
 };
 extern struct Keyboard8042 kbdMain;
-void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
+void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm, size_t bufTermSize, u8 ID, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
 	if (ID != 0) {
 		bugCheckNum(0x0101 | FAILMASK_KBD8042);
 	}
@@ -35,6 +45,16 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, u8 ID, struct Keyboard
 	kbd->shift = 0;
 	kbd->ctrl = 0;
 	kbd->alt = 0;
+	kbd->shiftL = 0;
+	kbd->shiftR = 0;
+	kbd->altL = 0;
+	kbd->altR = 0;
+	kbd->ctrlL = 0;
+	kbd->ctrlR = 0;
+	kbd->modeApp = 0;
+	kbd->bufTerm = bufTerm;
+	kbd->bufTermSize = bufTermSize;
+	kbd->availTerm = 0;
 	while (bus_in_u8(0x0064) & 0x02) {
 		bus_wait();
 	}
@@ -239,97 +259,493 @@ void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
 		(kbd->avail)++;
 	}
 }
-kbd8042_outChar
-kbd8042_outSeq
+int kbd8042_outChar(unsigned char val, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
+	if (kbd->ctrl) {
+		val &= 0x1f;
+	}
+	if (kbd->alt) {
+		if (!((kbd->bufTermSize - kbd->availTerm) & (~((size_t) 1)))) {
+			return (-1);
+		}
+		kbd->bufTerm[kbd->availTerm] = 0x1b;
+		kbd->bufTerm[kbd->availTerm + 1] = val;
+		kbd->availTerm += 2;
+		return 0;
+	}
+	if (!(kbd->bufTermSize - kbd->availTerm)) {
+		return (-1);
+	}
+	kbd->bufTerm[kbd->availTerm] = val;
+	kbd->availTerm++;
+	return 0;
+}
+int kbd8042_outSeq(const void* dat, size_t siz, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
+	if (kbd->alt) {
+		if ((kbd->availTerm + siz + 1) > kbd->bufTermSize) {
+			return (-1);
+		}
+		kbd->bufTerm[kbd->availTerm] = 0x1b;
+		kbd->availTerm++;
+	}
+	else {
+		if ((kbd->availTerm + siz) > kbd->bufTermSize) {
+			return (-1);
+		}
+	}
+	cpy(kbd->bufTerm + kbd->availTerm, dat, siz);
+	kbd->availTerm += siz;
+	return 0;
+}
 int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->set != 2) {
 		return (-1);// TODO Implement
 	}
-	u16 code = ((u16) dat) + ((u16) kbd->state);// State when set 2: 0: N; 1: 0xe0 N; 2: 0xf0 N; 3: 0xe0 0xf0 N; 4: 0xe1 N; 5: 0xe1 0x14 N; 6: 0xe1 0xf0 N; 7: 0xe1 0xf0 0x14 N; 8: 0xe1 0xf0 0x14 0xf0 N
+	u8 state = kbd->state;
+	u16 code = ((u16) dat) + (((u16) state) << 8);// State when set 2: 0: N; 1: 0xe0 N; 2: 0xf0 N; 3: 0xe0 0xf0 N; 4: 0xe1 N; 5: 0xe1 0x14 N; 6: 0xe1 0xf0 N; 7: 0xe1 0xf0 0x14 N; 8: 0xe1 0xf0 0x14 0xf0 N
 	unsigned char caps = (kbd->shift ? 1 : 0) ^ (kbd->capL ? 1 : 0);
 	unsigned char shift = kbd->shift;
+	unsigned char ctrl = kbd->ctrl;
+	unsigned char numL = kbd->numL;
+	unsigned char modeApp = kbd->modeApp;
+	int i = 0;
 	switch (code) {
+		case (0xe0):
+			kbd->state = 1;
+			break;
+		case (0xf0):
+			kbd->state = 2;
+			break;
+		case (0x01f0):
+			kbd->state = 3;
+			break;
+		case (0xe1):
+			kbd->state = 4;
+			break;
+		case (0x0414):
+			kbd->state = 5;
+			break;
+		case (0x04f0):
+			kbd->state = 6;
+			break;
+		case (0x0614):
+			kbd->state = 7;
+			break;
+		case (0x07f0):
+			kbd->state = 8;
+			break;
+		case (0x0577):
+			i = kbd8042_outChar(0x1a, kbd);
+			break;
 		case (0x1c):
-			kbd8042_outChar(caps ? 0x41 : 0x61);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x41 : 0x61, kbd);
+			break;
 		case (0x32):
-			kbd8042_outChar(caps ? 0x42 : 0x62);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x42 : 0x62, kbd);
+			break;
 		case (0x21):
-			kbd8042_outChar(caps ? 0x43 : 0x63);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x43 : 0x63, kbd);
+			break;
 		case (0x23):
-			kbd8042_outChar(caps ? 0x44 : 0x64);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x44 : 0x64, kbd);
+			break;
 		case (0x24):
-			kbd8042_outChar(caps ? 0x45 : 0x65);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x45 : 0x65, kbd);
+			break;
 		case (0x2b):
-			kbd8042_outChar(caps ? 0x46 : 0x66);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x46 : 0x66, kbd);
+			break;
 		case (0x34):
-			kbd8042_outChar(caps ? 0x47 : 0x67);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x47 : 0x67, kbd);
+			break;
 		case (0x33):
-			kbd8042_outChar(caps ? 0x48 : 0x68);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x48 : 0x68, kbd);
+			break;
 		case (0x43):
-			kbd8042_outChar(caps ? 0x49 : 0x69);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x49 : 0x69, kbd);
+			break;
 		case (0x3b):
-			kbd8042_outChar(caps ? 0x4a : 0x6a);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4a : 0x6a, kbd);
+			break;
 		case (0x42):
-			kbd8042_outChar(caps ? 0x4b : 0x6b);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4b : 0x6b, kbd);
+			break;
 		case (0x4b):
-			kbd8042_outChar(caps ? 0x4c : 0x6c);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4c : 0x6c, kbd);
+			break;
 		case (0x3a):
-			kbd8042_outChar(caps ? 0x4d : 0x6d);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4d : 0x6d, kbd);
+			break;
 		case (0x31):
-			kbd8042_outChar(caps ? 0x4e : 0x6e);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4e : 0x6e, kbd);
+			break;
 		case (0x44):
-			kbd8042_outChar(caps ? 0x4f : 0x6f);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x4f : 0x6f, kbd);
+			break;
 		case (0x4d):
-			kbd8042_outChar(caps ? 0x50 : 0x70);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x50 : 0x70, kbd);
+			break;
 		case (0x15):
-			kbd8042_outChar(caps ? 0x51 : 0x71);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x51 : 0x71, kbd);
+			break;
 		case (0x2d):
-			kbd8042_outChar(caps ? 0x52 : 0x72);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x52 : 0x72, kbd);
+			break;
 		case (0x1b):
-			kbd8042_outChar(caps ? 0x53 : 0x73);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x53 : 0x73, kbd);
+			break;
 		case (0x2c):
-			kbd8042_outChar(caps ? 0x54 : 0x74);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x54 : 0x74, kbd);
+			break;
 		case (0x3c):
-			kbd8042_outChar(caps ? 0x55 : 0x75);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x55 : 0x75, kbd);
+			break;
 		case (0x2a):
-			kbd8042_outChar(caps ? 0x56 : 0x76);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x56 : 0x76, kbd);
+			break;
 		case (0x1d):
-			kbd8042_outChar(caps ? 0x57 : 0x77);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x57 : 0x77, kbd);
+			break;
 		case (0x22):
-			kbd8042_outChar(caps ? 0x58 : 0x78);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x58 : 0x78, kbd);
+			break;
 		case (0x35):
-			kbd8042_outChar(caps ? 0x59 : 0x79);
-			return 0;
+			i = kbd8042_outChar(caps ? 0x59 : 0x79, kbd);
+			break;
 		case (0x1a):
-			kbd8042_outChar(caps ? 0x5a : 0x7a);
-			return 0;
-
-
+			i = kbd8042_outChar(caps ? 0x5a : 0x7a, kbd);
+			break;
+		case (0x45):
+			i = kbd8042_outChar(shift ? 0x29 : 0x30, kbd);
+			break;
+		case (0x16):
+			i = kbd8042_outChar(shift ? 0x21 : 0x31, kbd);
+			break;
+		case (0x1e):
+			i = kbd8042_outChar(shift ? 0x40 : 0x32, kbd);
+			break;
+		case (0x26):
+			i = kbd8042_outChar(shift ? 0x23 : 0x33, kbd);
+			break;
+		case (0x25):
+			i = kbd8042_outChar(shift ? 0x24 : 0x34, kbd);
+			break;
+		case (0x2e):
+			i = kbd8042_outChar(shift ? 0x25 : 0x35, kbd);
+			break;
+		case (0x36):
+			i = kbd8042_outChar(shift ? 0x5e : 0x36, kbd);
+			break;
+		case (0x3d):
+			i = kbd8042_outChar(shift ? 0x26 : 0x37, kbd);
+			break;
+		case (0x3e):
+			i = kbd8042_outChar(shift ? 0x2a : 0x38, kbd);
+			break;
+		case (0x46):
+			i = kbd8042_outChar(shift ? 0x28 : 0x39, kbd);
+			break;
+		case (0x0e):
+			i = kbd8042_outChar(shift ? 0x7e : 0x60, kbd);
+			break;
+		case (0x4e):
+			i = kbd8042_outChar(shift ? 0x5f : 0x2d, kbd);
+			break;
+		case (0x55):
+			i = kbd8042_outChar(shift ? 0x2b : 0x3d, kbd);
+			break;
+		case (0x5d):
+			i = kbd8042_outChar(shift ? 0x7c : 0x5c, kbd);
+			break;
+		case (0x66):
+			i = kbd8042_outChar(0x7f, kbd);
+			break;
+		case (0x29):
+			i = kbd8042_outChar(ctrl ? 0x00 : 0x20, kbd);
+			break;
+		case (0x0d):
+			i = kbd8042_outChar(0x09, kbd);
+			break;
+		case (0x58):
+			kbd->capL = !kbd->capL;
+			// TODO Lock lights
+			break;
+		case (0x12):
+			kbd->shiftL = 1;
+			kbd->shift = 1;
+			break;
+		case (0x0212):
+			kbd->shiftL = 0;
+			if (!kbd->shiftR) {
+				kbd->shift = 0;
+			}
+			break;
+		case (0x14):
+			kbd->ctrlL = 1;
+			kbd->ctrl = 1;
+			break;
+		case (0x0214):
+			kbd->ctrlL = 0;
+			if (!kbd->ctrlR) {
+				kbd->ctrl = 0;
+			}
+			break;
+		case (0x11):
+			kbd->altL = 1;
+			kbd->alt = 1;
+			break;
+		case (0x0211):
+			kbd->altL = 0;
+			if (!kbd->altR) {
+				kbd->alt = 0;
+			}
+			break;
+		case (0x59):
+			kbd->shiftR = 1;
+			kbd->shift = 1;
+			break;
+		case (0x0259):
+			kbd->shiftR = 0;
+			if (!kbd->shiftL) {
+				kbd->shift = 0;
+			}
+			break;
+		case (0x5a):
+		case (0x015a):
+			i = kbd8042_outChar(0x0d, kbd);
+			break;
+		case (0x76):
+			i = kbd8042_outChar(0x1b, kbd);
+			break;
+		case (0x05):
+			i = kbd8042_outSeq("\033OP", 3, kbd);
+			break;
+		case (0x06):
+			i = kbd8042_outSeq("\033OQ", 3, kbd);
+			break;
+		case (0x04):
+			i = kbd8042_outSeq("\033OR", 3, kbd);
+			break;
+		case (0x0c):
+			i = kbd8042_outSeq("\033OS", 3, kbd);
+			break;
+		case (0x03):
+			i = kbd8042_outSeq("\033[15~", 5, kbd);
+			break;
+		case (0x0b):
+			i = kbd8042_outSeq("\033[17~", 5, kbd);
+			break;
+		case (0x83):
+			i = kbd8042_outSeq("\033[18~", 5, kbd);
+			break;
+		case (0x0a):
+			i = kbd8042_outSeq("\033[19~", 5, kbd);
+			break;
+		case (0x01):
+			i = kbd8042_outSeq("\033[20~", 5, kbd);
+			break;
+		case (0x09):
+			i = kbd8042_outSeq("\033[21~", 5, kbd);
+			break;
+		case (0x78):
+			i = kbd8042_outSeq("\033[23~", 5, kbd);
+			break;
+		case (0x07):
+			i = kbd8042_outSeq("\033[24~", 5, kbd);
+			break;
+		case (0x7e):
+			kbd->scrlL = 1;
+			// TODO Lock lights
+			break;
+		case (0x54):
+			i = kbd8042_outChar(shift ? 0x7b : 0x5b, kbd);
+			break;
+		case (0x77):
+			kbd->numL = 1;
+			// TODO Lock lights
+			break;
+		case (0x7c):
+			i = kbd8042_outChar(0x2a, kbd);
+			break;
+		case (0x7b):
+			i = kbd8042_outChar(0x2d, kbd);
+			break;
+		case (0x79):
+			i = kbd8042_outChar(0x2b, kbd);
+			break;
+		case (0x71):
+			if (numL) {
+				i = kbd8042_outChar(0x2e, kbd);
+			}
+			else {
+				i = kbd8042_outSeq("\033[3~", 4, kbd);
+			}
+			break;
+		case (0x70):
+			if (numL) {
+				i = kbd8042_outChar(0x30, kbd);
+			}
+			else {
+				i = kbd8042_outSeq("\033[2~", 4, kbd);
+			}
+			break;
+		case (0x69):
+			if (numL) {
+				i = kbd8042_outChar(0x31, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OF" : "\033[F", 3, kbd);
+			}
+			break;
+		case (0x72):
+			if (numL) {
+				i = kbd8042_outChar(0x32, kbd);
+				break;
+			}
+		case (0x0172):
+			if (ctrl) {
+				i = kbd8042_outSeq("\033[1;5B", 6, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OB" : "\033[B", 3, kbd);
+			}
+			break;
+		case (0x7a):
+			if (numL) {
+				i = kbd8042_outChar(0x33, kbd);
+			}
+			else {
+				i = kbd8042_outSeq("\033[6~", 4, kbd);
+			}
+			break;
+		case (0x6b):
+			if (numL) {
+				i = kbd8042_outChar(0x34, kbd);
+				break;
+			}
+		case (0x016b):
+			if (ctrl) {
+				i = kbd8042_outSeq("\033[1;5D", 6, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OD" : "\033[D", 3, kbd);
+			}
+			break;
+		case (0x73):
+			if (numL) {
+				i = kbd8042_outChar(0x35, kbd);
+			}
+			break;
+		case (0x74):
+			if (numL) {
+				i = kbd8042_outChar(0x36, kbd);
+				break;
+			}
+		case (0x0174):
+			if (ctrl) {
+				i = kbd8042_outSeq("\033[1;5C", 6, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OC" : "\033[C", 3, kbd);
+			}
+			break;
+		case (0x6c):
+			if (numL) {
+				i = kbd8042_outChar(0x37, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OH" : "\033[H", 3, kbd);
+			}
+			break;
+		case (0x75):
+			if (numL) {
+				i = kbd8042_outChar(0x38, kbd);
+				break;
+			}
+		case (0x0175):
+			if (ctrl) {
+				i = kbd8042_outSeq("\033[1;5A", 6, kbd);
+			}
+			else {
+				i = kbd8042_outSeq(modeApp ? "\033OA" : "\033[A", 3, kbd);
+			}
+			break;
+		case (0x7d):
+			if (numL) {
+				i = kbd8042_outChar(0x39, kbd);
+			}
+			else {
+				i = kbd8042_outSeq("\033[5~", 4, kbd);
+			}
+			break;
+		case (0x5b):
+			i = kbd8042_outChar(shift ? 0x7d : 0x5d, kbd);
+			break;
+		case (0x4c):
+			i = kbd8042_outChar(shift ? 0x3a : 0x3b, kbd);
+			break;
+		case (0x52):
+			i = kbd8042_outChar(shift ? 0x22 : 0x27, kbd);
+			break;
+		case (0x41):
+			i = kbd8042_outChar(shift ? 0x3c : 0x2c, kbd);
+			break;
+		case (0x49):
+			i = kbd8042_outChar(shift ? 0x3e : 0x2e, kbd);
+			break;
+		case (0x4a):
+			i = kbd8042_outChar(shift ? 0x3f : 0x2f, kbd);
+			break;
+		case (0x0114):
+			kbd->ctrlR = 1;
+			kbd->ctrl = 1;
+			break;
+		case (0x0314):
+			kbd->ctrlR = 0;
+			if (!kbd->ctrlL) {
+				kbd->ctrl = 0;
+			}
+			break;
+		case (0x0111):
+			kbd->altR = 1;
+			kbd->alt = 1;
+			break;
+		case (0x0311):
+			kbd->altR = 0;
+			if (!kbd->altL) {
+				kbd->alt = 0;
+			}
+			break;
+		case (0x0170):
+			i = kbd8042_outSeq("\033[2~", 4, kbd);
+			break;
+		case (0x016c):
+			i = kbd8042_outSeq(modeApp ? "\033OH" : "\033[H", 3, kbd);
+			break;
+		case (0x017d):
+			i = kbd8042_outSeq("\033[5~", 4, kbd);
+			break;
+		case (0x0171):
+			i = kbd8042_outSeq("\033[3~", 4, kbd);
+			break;
+		case (0x0169):
+			i = kbd8042_outSeq(modeApp ? "\033OF" : "\033[F", 3, kbd);
+			break;
+		case (0x017a):
+			i = kbd8042_outSeq("\033[6~", 4, kbd);
+			break;
+		case (0x014a):
+			i = kbd8042_outChar(0x2f, kbd);
+			break;
+		default:
+			break;
 	}
+	if (i) {
+		return (-1);
+	}
+	if (state == kbd->state) {
+		kbd->state = 0;
+	}
+	return 0;
 }
 void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->ID != 0x00) {
@@ -342,7 +758,7 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have 
 			i = 0;
 			break;
 		}
-		if (kbd8042_process(kbd->buf[i])) {
+		if (kbd8042_process(kbd->buf[i], kbd)) {
 			if (i) {
 				kbd->avail -= i;
 				move(kbd->buf, kbd->buf + i, kbd->avail);
@@ -358,7 +774,7 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have 
 				return;
 			}
 			unsigned char res = bus_in_u8(0x0060);
-			if (kbd8042_process(res)) {
+			if (kbd8042_process(res, kbd)) {
 				kbd->buf[kbd->avail = 1] = res;
 				break;
 			}
@@ -389,25 +805,22 @@ ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
 	unsigned char* dats = (unsigned char*) dat;
 	Mutex_acquire(&(kbd->bufLock));
 	while (1) {
-		if (kbd->avail == 0) {
+		if (kbd->availTerm == 0) {
 			Mutex_release(&(kbd->bufLock));
 			Mutex_wait();
-			//for (int i = 0; i < 100000; i++) {
-			//	Mutex_wait();
-			//}
 			Mutex_acquire(&(kbd->bufLock));
 			continue;
 		}
-		if (kbd->avail >= count) {
-			cpy(dats, kbd->buf, count);
-			kbd->avail -= count;
-			move(kbd->buf, kbd->buf + count, kbd->avail);
+		if (kbd->availTerm >= count) {
+			cpy(dats, kbd->bufTerm, count);
+			kbd->availTerm -= count;
+			move(kbd->bufTerm, kbd->bufTerm + count, kbd->availTerm);
 			Mutex_release(&(kbd->bufLock));
 			return oCount;
 		}
-		count -= kbd->avail;
-		cpy(dats, kbd->buf, kbd->avail);
-		kbd->avail = 0;
+		count -= kbd->availTerm;
+		cpy(dats, kbd->bufTerm, kbd->availTerm);
+		kbd->availTerm = 0;
 	}
 }
 ssize_t kbd8042_read(int kfd, void* dat, size_t len) {
