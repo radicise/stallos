@@ -59,7 +59,12 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, const void
 	bus_out_u8(bus + 3, LBA);
 	bus_out_u8(bus + 4, LBA >> 8);
 	bus_out_u8(bus + 5, LBA >> 16);
-	bus_out_u8(bus + 7, 0x20);
+	if (write) {
+		bus_out_u8(bus + 7, 0x30);
+	}
+	else {
+		bus_out_u8(bus + 7, 0x20);
+	}
 	for (int i = 0; i < 4; i++) {// For delay
 		bus_in_u8(bus + 7);
 	}
@@ -76,11 +81,12 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, const void
 	}
 	while (!(status & ATA_SR_DRQ)) {
 		bus_wait();
+		status = bus_in_u8(bus + 7);
 	}
 	if (write) {
-		amnt <<= 8;
+		count <<= 8;
 		const u16* from = src;
-		while (amnt--) {
+		while (count--) {
 			while (!(bus_in_u8(bus + 7) & ATA_SR_DRQ)) {
 			}// TODO Do not run for first iteration
 			bus_out_u16(bus, *from);
@@ -95,11 +101,12 @@ int ata_PIO_transferSectors(unsigned long long blockAddr, void* dest, const void
 		while (bus_in_u8(bus + 7) & ATA_SR_BSY) {
 		}
 		Mutex_release(&(ata->inUse));
+		return 0;
 	}
 	else {
 		u16* to = dest;
-		amnt <<= 8;
-		while (amnt--) {
+		count <<= 8;
+		while (count--) {
 			while (!(bus_in_u8(bus + 7) & ATA_SR_DRQ)) {
 			}// TODO Do not run for first iteration
 			(*to) = bus_in_u16(bus);

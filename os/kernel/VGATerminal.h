@@ -7,16 +7,22 @@ struct VGACell {
 	unsigned char format;
 };
 struct VGATerminal {
-	/* Basic information */
+	/* Basic Information */
 	unsigned char extra[15];
 	unsigned char format;
 	unsigned int pos;
 	unsigned int width;
 	unsigned int total;
 	struct VGACell* screen;
-	/* Terminal settings */
+	/* TTY Output Settings */
 	unsigned char onlcr;
+	AtomicULong xctrl;
+	AtomicULong xon;
+	/* Other Terminal Settings */
 	unsigned char cursor;
+	/* Mutex for Locking Access */
+	Mutex accessLock;
+	/* Input */
 	ssize_t (*read)(int, void*, size_t);
 };
 extern struct VGATerminal mainTerm;
@@ -29,7 +35,10 @@ void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigne
 	term->screen = screen;
 	term->onlcr = 0;
 	term->cursor = 0;
+	AtomicULong_set(&(term->xctrl), 0);
+	AtomicULong_set(&(term->xon), 0);
 	term->read = read;
+	Mutex_initUnlocked(&(term->accessLock));
 	return;
 }
 void VGATerminalAdjustVis(struct VGATerminal* term) {
@@ -148,6 +157,13 @@ unsigned int writeDataVGATerminal(struct VGATerminal* term, unsigned char* data,
 	}
 }
 ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned int len) {/* For UTF-8 */
+	Mutex_acquire(&(term->accessLock));
+	while (1) {
+		if ((!AtomicULong_get(&(term->xctrl))) || AtomicULong_get(&(term->xon))) {
+			break;
+		}
+		Mutex_wait();
+	}
 	if (term->cursor) {
 		(term->screen[term->pos].format) ^= 0x77;
 	}
@@ -155,6 +171,7 @@ ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned
 	if (term->cursor) {
 		(term->screen[term->pos].format) ^= 0x77;
 	}
+	Mutex_release(&(term->accessLock));
 	return res;
 }
 #include "types.h"

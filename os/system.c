@@ -50,8 +50,8 @@ typedef unsigned char Mutex;
 typedef unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
 extern void AtomicULong_set(AtomicULong*, unsigned long);
-extern void Mutex_acquire(Mutex*);
-extern void Mutex_release(Mutex*);
+extern void Mutex_acquire(Mutex*);// Idempotent
+extern void Mutex_release(Mutex*);// Idempotent
 extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
 extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
 extern void Mutex_initUnlocked(Mutex*);
@@ -172,6 +172,8 @@ extern void writePhysical(u32, u32);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
+#define KBDBUFTERM_SIZE 32
+unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
 struct Keyboard8042 kbdMain;
 time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
@@ -305,8 +307,11 @@ void systemEntry(void) {
 	/* Style */
 	((struct VGACell*) (0x000b8000  + (mainTerm.pos << 1) - RELOC))->format ^= 0x77;
 	mainTerm.onlcr = 1;
+	AtomicULong_set(&(mainTerm.xon), 1);
+	AtomicULong_set(&(mainTerm.xctrl), 1);
 	mainTerm.cursor = 1;
 	/* End-of-style */
+	kernelMsg("Stall Kernel v0.0.1.0-dev\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
@@ -336,7 +341,7 @@ void systemEntry(void) {
 	bus_wait();// TODO Remove this line when it is deemed unnecessary
 	kernelMsg("done\n");
 	kernelMsg("Performing Intel 8042 CHMOS 8-bit Slave Microcontroller driver and PS/2 keyboard driver initialization  . . . ");
-	initKeyboard8042(kbdBuf, KBDBUF_SIZE, 0, &kbdMain);
+	initKeyboard8042(kbdBuf, KBDBUF_SIZE, kbdBufTerm, KBDBUFTERM_SIZE, 0, &mainTerm, &kbdMain);
 	kernelMsg("done\n");
 	kernelMsg("Initializing ATA driver . . . ");
 	initATA();

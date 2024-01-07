@@ -34,7 +34,7 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 		count = (amnt << bs) - pos;
 	}
 	size_t oCount = count;
-	if ((pos >> bs) != 0) {
+	if (pos & mask) {
 		size_t cCount;
 		if (((pos & mask) + count) > (mask + 1)) {
 			cCount = mask + 1 - (pos & mask);
@@ -76,7 +76,7 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 	}
 	while (readBlock(pos >> bs, 1, buf, obj)) {
 	}
-	cpy(buf + (pos & mask), data, count);
+	cpy(buf, data, count);
 	while (writeBlock(pos >> bs, 1, buf, obj)) {
 	}
 	file->pos += oCount;
@@ -98,7 +98,7 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 		count = (amnt << bs) - pos;
 	}
 	size_t oCount = count;
-	if ((pos >> bs) != 0) {
+	if (pos & mask) {
 		size_t cCount;
 		if (((pos & mask) + count) > (mask + 1)) {
 			cCount = mask + 1 - (pos & mask);
@@ -138,7 +138,7 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 	}
 	while (readBlock(pos >> bs, 1, buf, obj)) {
 	}
-	cpy(data, buf + (pos & mask), count);
+	cpy(data, buf, count);
 	file->pos += oCount;
 	return oCount;
 }
