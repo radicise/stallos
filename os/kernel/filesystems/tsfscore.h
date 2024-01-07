@@ -3,7 +3,6 @@
 
 #include "./fsdefs.h"
 #include "./sizedberw.h"
-#include "./hashing.h"
 // #include <string.h>
 // #undef __MOCKTEST
 #ifndef __MOCKTEST
@@ -25,7 +24,7 @@ DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u8 blocksize, u64 curr_time) {
-    if (blocksize < 10 || blocksize > 32) {
+    if (blocksize < 10 || blocksize > BLK_SIZE_MAX) {
         return 0;
     }
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
@@ -117,6 +116,78 @@ FileSystem* loadFS(struct FileDriver* fdr, int kfd, u64 p_start) {
         rblock->breakver = 0;
     }
     return fs;
+}
+
+int longseek(FileSystem* fs, loff_t offset, int whence) {
+    loff_t x = 0;
+    return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
+}
+int seek(FileSystem* fs, off_t offset, int whence) {
+    return fs->fdrive->lseek(fs->kfd, offset, whence);
+}
+
+struct PosDat {
+    TSFSDataBlock bloc;
+    u32   poff; // how far the start of the data of the block is into the entity
+};
+
+// traverses the data blocks until it reaches the specified data position, then returns the location on disk
+// returns zero if OOB
+// when this function returns, the current position on disk will be the start of the data block
+struct PosDat traverse(FileSystem* fs, TSFSStructNode* sn, u32 position) {
+    struct FileDriver* fdr = fs->fdrive;
+    int kfd = fs->kfd;
+    struct PosDat pd;
+    TSFSDataBlock databloc;
+    longseek(fs, sn->data_loc, SEEK_SET);
+    read_datablock(fs, &databloc);
+    u32 cpos = 0; // current position as seen by program, not absolute location on disk
+    while (1) {
+        // check if this block contains target position
+        if (cpos + databloc.data_length >= position) {
+            // write info to containing struct
+            pd.poff = cpos;
+            pd.bloc = databloc;
+            break;
+        }
+        cpos += databloc.data_length;
+        // tail of a chain, traverse as linked list
+        if (databloc.storage_flags & TSFS_SF_TAIL_BLOCK) {
+            longseek(fs, databloc.next_block, SEEK_SET);
+            read_datablock(fs, &databloc);
+            continue;
+        }
+        // within a chain, traverse as array list
+        longseek(fs, fs->rootblock->block_size - TSFSDATABLOCK_DSIZE, SEEK_CUR);
+        read_datablock(fs, &databloc);
+    }
+    longseek(fs, databloc.disk_loc, SEEK_SET);
+    return pd;
+}
+
+int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
+    struct PosDat data_loc = traverse(fs, sn, position);
+    u32 realoffset = position-data_loc.poff;
+    seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
+    size_t cpos = 0;
+    // while (data_loc.bloc.data_length - realoffset < size) {
+    //     //
+    // }
+    if (size > 0) {
+        write_buf(fs, data+cpos, size);
+    }
+    return 0;
+}
+
+int data_read(FileSystem* fs, TSFSStructNode* sn, u32 position, void* data, size_t size) {
+    struct PosDat data_loc = traverse(fs, sn, position);
+    u32 realoffset = position - data_loc.poff;
+    seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
+    size_t cpos = 0;
+    if (size > 0) {
+        read_buf(fs, data+cpos, size);
+    }
+    return 0;
 }
 
 #endif

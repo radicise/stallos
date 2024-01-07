@@ -27,7 +27,7 @@ def dhash(ba: bytearray) -> int:
 with open("FSMOCKFILE.mock", "rb") as f:
     b = f.read(numbytes)
     ba = bytearray(b)
-    print(hex(dhash(ba[0:-int(sys.argv[2])])))
+    # print(hex(dhash(ba[0:-int(sys.argv[2])])))
     for s in sys.argv[3:]:
         l = int(s)
         bs = ba[p:p+l]

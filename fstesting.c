@@ -55,14 +55,11 @@ int main(int argc, char** argv) {
     // struct FileDriver fdrive = {.write=fdrive_write,.read=fdrive_read,.lseek=fdrive_lseek,.tell=fdrive_tell};
     struct FileDriver fdrive = {.write=fdrive_write,.read=fdrive_read,.lseek=fdrive_lseek,._llseek=fdrive__llseek};
     FileSystem* s = 0;
-    for (int i = 0; i < argc; i ++) {
-        if (argc > 3) {
-            printf("REGEN\n");
-            ftruncate(fd, 0);
-            ftruncate(fd, MDISK_SIZE);
-            s = createFS(&fdrive, 0, 0, MDISK_SIZE, 10, (u64) time(NULL));
-            break;
-        }
+    if (argc > 3) {
+        printf("REGEN\n");
+        ftruncate(fd, 0);
+        ftruncate(fd, MDISK_SIZE);
+        s = createFS(&fdrive, 0, 0, MDISK_SIZE, 10, (u64) time(NULL));
     }
     if (s == 0) {
         s = loadFS(&fdrive, 0, 0);
@@ -79,6 +76,27 @@ int main(int argc, char** argv) {
     printf("psize: %llu\n", s->rootblock->partition_size);
     printf("bsize: %d\n", s->rootblock->block_size);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));
+    TSFSStructNode sn = {0};
+    TSFSDataBlock db  = {0};
+    u16 bsize = s->rootblock->block_size;
+    sn.data_loc = (u64)(bsize*2);
+    db.disk_loc = (u64)(bsize*2);
+    printf("seek 1\n");
+    longseek(s, (loff_t)bsize, SEEK_SET);
+    printf("write struct node\n");
+    write_structnode(s, &sn);
+    printf("seek 2\n");
+    longseek(s, (loff_t)db.disk_loc, SEEK_SET);
+    printf("write data block\n");
+    write_datablock(s, &db);
+    printf("write data\n");
+    data_write(s, &sn, 0, "hi", 2);
+    printf("done writing\n");
+    char x[3];
+    printf("readback:\n");
+    data_read(s, &sn, 0, x, 2);
+    x[2] = 0;
+    printf("%s\n", x);
     dealloc:
     free(s->rootblock);
     free(s);
