@@ -153,6 +153,12 @@ struct PosDat traverse(FileSystem* fs, TSFSStructNode* sn, u32 position) {
         cpos += databloc.data_length;
         // tail of a chain, traverse as linked list
         if (databloc.storage_flags & TSFS_SF_TAIL_BLOCK) {
+            if (databloc.next_block == 0) {
+                databloc.storage_flags &= (!TSFS_SF_VALID);
+                pd.bloc = databloc;
+                pd.poff = 0;
+                return pd;
+            }
             longseek(fs, databloc.next_block, SEEK_SET);
             read_datablock(fs, &databloc);
             continue;
@@ -167,6 +173,9 @@ struct PosDat traverse(FileSystem* fs, TSFSStructNode* sn, u32 position) {
 
 int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
     struct PosDat data_loc = traverse(fs, sn, position);
+    if (!(data_loc.bloc.storage_flags & TSFS_SF_VALID)) {
+        return -1;
+    }
     u32 realoffset = position-data_loc.poff;
     seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
     size_t cpos = 0;
@@ -175,12 +184,18 @@ int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* dat
     // }
     if (size > 0) {
         write_buf(fs, data+cpos, size);
+        longseek(fs, data_loc.bloc.disk_loc, SEEK_SET);
+        data_loc.bloc.data_length += (u32)size;
+        write_datablock(fs, &data_loc.bloc);
     }
     return 0;
 }
 
 int data_read(FileSystem* fs, TSFSStructNode* sn, u32 position, void* data, size_t size) {
     struct PosDat data_loc = traverse(fs, sn, position);
+    if (!(data_loc.bloc.storage_flags & TSFS_SF_VALID)) {
+        return -1;
+    }
     u32 realoffset = position - data_loc.poff;
     seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
     size_t cpos = 0;

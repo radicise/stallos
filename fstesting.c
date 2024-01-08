@@ -77,25 +77,54 @@ int main(int argc, char** argv) {
     printf("bsize: %d\n", s->rootblock->block_size);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));
     TSFSStructNode sn = {0};
-    TSFSDataBlock db  = {0};
     u16 bsize = s->rootblock->block_size;
-    sn.data_loc = (u64)(bsize*2);
-    db.disk_loc = (u64)(bsize*2);
-    printf("seek 1\n");
-    longseek(s, (loff_t)bsize, SEEK_SET);
-    printf("write struct node\n");
-    write_structnode(s, &sn);
-    printf("seek 2\n");
-    longseek(s, (loff_t)db.disk_loc, SEEK_SET);
-    printf("write data block\n");
-    write_datablock(s, &db);
-    printf("write data\n");
-    data_write(s, &sn, 0, "hi", 2);
-    printf("done writing\n");
-    char x[3];
-    printf("readback:\n");
-    data_read(s, &sn, 0, x, 2);
-    x[2] = 0;
+    if (argc > 3) {
+        TSFSDataBlock db  = {0};
+        sn.data_loc = (u64)(bsize*2);
+        db.disk_loc = (u64)(bsize*2);
+        db.storage_flags = TSFS_SF_VALID | TSFS_SF_HEAD_BLOCK | TSFS_SF_TAIL_BLOCK;
+        printf("seek 1\n");
+        longseek(s, (loff_t)bsize, SEEK_SET);
+        printf("write struct node\n");
+        write_structnode(s, &sn);
+        printf("seek 2\n");
+        longseek(s, (loff_t)db.disk_loc, SEEK_SET);
+        printf("write data block\n");
+        write_datablock(s, &db);
+        printf("write data\n");
+        char sequence[11];
+        int c = 0;
+        while (c < 10) {
+            char s = (char) getchar();
+            if (s == 10) {
+                break;
+            }
+            sequence[c] = s;
+            c ++;
+        }
+        char v = (char) c;
+        if (data_write(s, &sn, 0, &v, 1) < 0) {
+            printf("WRITE SIZE FAILURE\n");
+            goto dealloc;
+        }
+        if (data_write(s, &sn, 1, sequence, c) < 0) {
+            printf("WRITE DATA FAILURE\n");
+            goto dealloc;
+        }
+        printf("done writing\n");
+    } else {
+        longseek(s, (loff_t)(bsize), SEEK_SET);
+        read_structnode(s, &sn);
+    }
+    char x[11];
+    printf("sequence length:\n");
+    char l = 0;
+    data_read(s, &sn, 0, &l, 1);
+    printf("%d\n", l);
+    printf("readback sequence\n");
+    data_read(s, &sn, 1, x, l);
+    x[l] = 0;
+    printf("print readback:\n");
     printf("%s\n", x);
     dealloc:
     free(s->rootblock);
