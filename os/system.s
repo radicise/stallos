@@ -239,6 +239,29 @@ nop
 nop
 sti
 ret
+int_disable:
+.globl int_disable
+inb $0x70,%al
+orb $0x80,%al
+outb %al,$0x70
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+inb $0x71
+nop
+nop
+nop
+nop
+nop
+cli
+ret
 Mutex_acquire:# void Mutex_acquire(Mutex* mutex)
 .globl Mutex_acquire
 movl 4(%esp),%edx
@@ -335,4 +358,17 @@ AtomicULong_dec:
 movl 4(%esp),%eax
 lock decl (%eax)
 ret
-
+bugCheck:# void bugCheck(void)
+.globl bugCheck
+movl (%esp),%eax
+pushl %eax
+call bugCheckWrapped
+ret
+bugCheckNum:# void bugCheckNum(unsigned long)
+.globl bugCheckNum
+movl (%esp),%eax
+movl 4(%esp),%edx
+pushl %eax
+pushl %edx
+call bugCheckNumWrapped
+ret
