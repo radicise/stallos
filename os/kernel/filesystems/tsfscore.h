@@ -2,7 +2,7 @@
 #define __TSFSCORE_H__ 1
 
 #include "./fsdefs.h"
-#include "./sizedberw.h"
+#include "./tsfsmanage.h"
 // #include <string.h>
 // #undef __MOCKTEST
 #ifndef __MOCKTEST
@@ -23,7 +23,7 @@ available for external use
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
-FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u8 blocksize, u64 curr_time) {
+FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u8 blocksize, s64 curr_time) {
     if (blocksize < 10 || blocksize > BLK_SIZE_MAX) {
         return 0;
     }
@@ -31,22 +31,19 @@ FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
     fs -> partition_start = p_start;
-    loff_t verifseek = 0;
-    fdr->_llseek(kfd, (off_t)(p_start >> 32), (off_t)(p_start&0xffffffff), &verifseek, SEEK_SET);
-    if (verifseek != (loff_t)p_start) {
-        return fs;
-    }
+    fdr->lseek(kfd, 0, SEEK_SET);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
     rblock->breakver = VERNOBN;
     strcpy(rblock->version, TSFSVERSION);
     rblock->block_size = 2<<(blocksize-1);
     rblock->partition_size = p_size;
-    rblock->creation_time = curr_time;
+    rblock->creation_time = *((u64*)(&curr_time));
     rblock->top_dir = 0;
     // write_u16be(fs, VERNOBN);
     // write_u64be(fs, rblock->partition_size);
-    rblock->system_size = 64;
+    rblock->usedleft = 1;
+    rblock->usedright = (u32)(rblock->partition_size / rblock->block_size) - 1;
     // fs->fdrive->write(fs->kfd, &rblock->system_size, 1);
     // write_u64be(fs, curr_time);
     // fs->fdrive->write(fs->kfd, rblock->version, 16);
@@ -58,6 +55,11 @@ FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u
     write_rootblock(fs, rblock);
     // write_u64be(fs, checksum);
     return fs;
+}
+
+void releaseFS(FileSystem* fs) {
+    deallocate(fs->rootblock, sizeof(TSFSRootBlock));
+    deallocate(fs, sizeof(FileSystem));
 }
 
 // void dbp(FileSystem* fs, char* msg) {
@@ -78,11 +80,7 @@ FileSystem* loadFS(struct FileDriver* fdr, int kfd, u64 p_start) {
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
     fs -> partition_start = p_start;
-    loff_t verifseek = 0;
-    fdr->_llseek(kfd, (off_t)(p_start >> 32), (off_t)(p_start&0xffffffff), &verifseek, SEEK_SET);
-    if (verifseek != (loff_t)p_start) {
-        return fs;
-    }
+    fdr->lseek(kfd, 0, SEEK_SET);
     // u16 breakvno = read_u16be(fs);
     // if (breakvno != VERNOBN) {
     //     return fs;
@@ -107,73 +105,21 @@ FileSystem* loadFS(struct FileDriver* fdr, int kfd, u64 p_start) {
     // printf("OCHECKSUM: %llx\n", rblock->checksum);
     read_rootblock(fs, rblock);
     if (rblock->breakver != VERNOBN) {
-        rblock->breakver = 0;
-        return fs;
+        releaseFS(fs);
+        return 0;
     }
     u64 comphash = hash_rootblock(rblock);
     // printf("NCHECKSUM: %llx\n", comphash);
     if (comphash != rblock->checksum) {
-        rblock->breakver = 0;
+        releaseFS(fs);
+        return 0;
     }
     return fs;
 }
 
-int longseek(FileSystem* fs, loff_t offset, int whence) {
-    loff_t x = 0;
-    return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
-}
-int seek(FileSystem* fs, off_t offset, int whence) {
-    return fs->fdrive->lseek(fs->kfd, offset, whence);
-}
-
-struct PosDat {
-    TSFSDataBlock bloc;
-    u32   poff; // how far the start of the data of the block is into the entity
-};
-
-// traverses the data blocks until it reaches the specified data position, then returns the location on disk
-// returns zero if OOB
-// when this function returns, the current position on disk will be the start of the data block
-struct PosDat traverse(FileSystem* fs, TSFSStructNode* sn, u32 position) {
-    struct FileDriver* fdr = fs->fdrive;
-    int kfd = fs->kfd;
-    struct PosDat pd;
-    TSFSDataBlock databloc;
-    longseek(fs, sn->data_loc, SEEK_SET);
-    read_datablock(fs, &databloc);
-    u32 cpos = 0; // current position as seen by program, not absolute location on disk
-    while (1) {
-        // check if this block contains target position
-        if (cpos + databloc.data_length >= position) {
-            // write info to containing struct
-            pd.poff = cpos;
-            pd.bloc = databloc;
-            break;
-        }
-        cpos += databloc.data_length;
-        // tail of a chain, traverse as linked list
-        if (databloc.storage_flags & TSFS_SF_TAIL_BLOCK) {
-            if (databloc.next_block == 0) {
-                databloc.storage_flags &= (!TSFS_SF_VALID);
-                pd.bloc = databloc;
-                pd.poff = 0;
-                return pd;
-            }
-            longseek(fs, databloc.next_block, SEEK_SET);
-            read_datablock(fs, &databloc);
-            continue;
-        }
-        // within a chain, traverse as array list
-        longseek(fs, fs->rootblock->block_size - TSFSDATABLOCK_DSIZE, SEEK_CUR);
-        read_datablock(fs, &databloc);
-    }
-    longseek(fs, databloc.disk_loc, SEEK_SET);
-    return pd;
-}
-
 int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
-    struct PosDat data_loc = traverse(fs, sn, position);
-    if (!(data_loc.bloc.storage_flags & TSFS_SF_VALID)) {
+    struct PosDat data_loc = tsfs_traverse(fs, sn, position);
+    if (data_loc.bloc.storage_flags == 0) {
         return -1;
     }
     u32 realoffset = position-data_loc.poff;
@@ -191,9 +137,10 @@ int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* dat
     return 0;
 }
 
+// TODO: make work with more than one data block
 int data_read(FileSystem* fs, TSFSStructNode* sn, u32 position, void* data, size_t size) {
-    struct PosDat data_loc = traverse(fs, sn, position);
-    if (!(data_loc.bloc.storage_flags & TSFS_SF_VALID)) {
+    struct PosDat data_loc = tsfs_traverse(fs, sn, position);
+    if (data_loc.bloc.storage_flags == 0) {
         return -1;
     }
     u32 realoffset = position - data_loc.poff;

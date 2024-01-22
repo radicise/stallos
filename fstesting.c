@@ -40,45 +40,42 @@ int fdrive__llseek(int _, off_t offhi, off_t offlo, loff_t* posptr, int whence) 
     return 0;
 }
 
+#undef fsflush
+#define fsflush(fs) fflush(fp)
+
 #define MDISK_SIZE 1024*1024*4
 
-int main(int argc, char** argv) {
-    int fd;
-    if ((fd=open("FSMOCKFILE.mock", O_RDWR | O_CREAT)) == -1) {
-        printf("ERROR\n");
-        goto bottom;
-    }
-    if ((fp=fdopen(fd, "rb+")) == 0) {
-        printf("ERROR\n");
-        goto closefd;
-    }
-    // struct FileDriver fdrive = {.write=fdrive_write,.read=fdrive_read,.lseek=fdrive_lseek,.tell=fdrive_tell};
-    struct FileDriver fdrive = {.write=fdrive_write,.read=fdrive_read,.lseek=fdrive_lseek,._llseek=fdrive__llseek};
+int regen_mock(int fd) {
+    ftruncate(fd, 0);
+    ftruncate(fd, MDISK_SIZE);
+    return 0;
+}
+
+int data_test(struct FileDriver* fdrive, int fd, char regen) {
     FileSystem* s = 0;
-    if (argc > 3) {
+    if (regen) {
         printf("REGEN\n");
-        ftruncate(fd, 0);
-        ftruncate(fd, MDISK_SIZE);
-        s = createFS(&fdrive, 0, 0, MDISK_SIZE, 10, (u64) time(NULL));
+        regen_mock(fd);
+        s = createFS(fdrive, 0, 0, MDISK_SIZE, 10, (s64) time(NULL));
     }
     if (s == 0) {
-        s = loadFS(&fdrive, 0, 0);
+        s = loadFS(fdrive, 0, 0);
     }
     if (s->rootblock == 0) {
         printf("ERROR LOADING FS\n");
         free(s);
-        goto closemock;
+        return 0;
     }
     if (s->rootblock->breakver == 0) {
         printf("BAD CHECKSUM\n");
         goto dealloc;
     }
-    printf("psize: %llu\n", s->rootblock->partition_size);
+    printf("psize (blocks): %lu\n", s->rootblock->partition_size);
     printf("bsize: %d\n", s->rootblock->block_size);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));
     TSFSStructNode sn = {0};
     u16 bsize = s->rootblock->block_size;
-    if (argc > 3) {
+    if (regen) {
         TSFSDataBlock db  = {0};
         sn.data_loc = (u64)(bsize*2);
         db.disk_loc = (u64)(bsize*2);
@@ -129,10 +126,86 @@ int main(int argc, char** argv) {
     dealloc:
     free(s->rootblock);
     free(s);
+    return 0;
+}
+
+int manip_test(struct FileDriver* fdrive, int fd, char kind) {
+    if (kind == 0) {
+        printf("bad test kind\n");
+        return 0;
+    }
+    if (kind == 1) {
+        regen_mock(fd);
+        FileSystem* s = 0;
+        s = createFS(fdrive, 0, 0, MDISK_SIZE, 10, (u64) time(NULL));
+        dmanip_fill(s, 0, 2, 97);
+        dmanip_null_shift_right(s, 0, 2, 2);
+        fflush(fp);
+        getchar();
+        dmanip_null_shift_left(s, 2, 2, 1);
+        free(s->rootblock);
+        free(s);
+    }
+    return 0;
+}
+
+int stringcmp(const char* s1, const char* s2) {
+    int c = 0;
+    char c1;
+    char c2;
+    while ((c1 = s1[c]) != 0 && (c2 = s2[c]) != 0) {
+        if (c1 != c2) {
+            return 0;
+        }
+        c ++;
+    }
+    return 1;
+}
+
+int harness(char flag, int(*tst)(struct FileDriver*, int, char)) {
+    int retc = 0;
+    int fd;
+    if ((fd=open("FSMOCKFILE.mock", O_RDWR | O_CREAT)) == -1) {
+        printf("ERROR\n");
+        goto bottom;
+    }
+    if ((fp=fdopen(fd, "rb+")) == 0) {
+        printf("ERROR\n");
+        goto closefd;
+    }
+    struct FileDriver fdrive = {.write=fdrive_write,.read=fdrive_read,.lseek=fdrive_lseek,._llseek=fdrive__llseek};
+    retc = tst(&fdrive, fd, flag);
     closemock:
     fclose(fp);
     closefd:
     close(fd);
     bottom:
+    return retc;
+}
+
+int main(int argc, char** argv) {
+    char flags[] = {0, 0};
+    for (int i = 1; i < argc; i ++) {
+        if (stringcmp(argv[i], "-regen")) {
+            flags[1] = 1;
+        } else if (stringcmp(argv[i], "struct")) {
+            flags[0] = 1;
+        } else if (stringcmp(argv[i], "manip")) {
+            flags[0] = 2;
+        } else if (stringcmp(argv[i], "-shift")) {
+            flags[1] = 1;
+        }
+    }
+    switch (flags[0]) {
+        case 1:
+            harness(flags[1], data_test);
+            break;
+        case 2:
+            harness(flags[1], manip_test);
+            break;
+        default:
+            printf("bad args\n");
+            break;
+    }
     return 0;
 }
