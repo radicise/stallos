@@ -1,0 +1,46 @@
+(disk) Data Invariants:
+a data block will be completely filled before one or more new data blocks are created (eg. no data block has unused space except the last data block belonging to a file)
+
+the only way to cause the amount of data within a block to decrease is through truncation
+
+data will grow from both ends of the partition towards the center, THERE SHALL BE NO GAPS (this is more an assumption on what the user of the file system is okay with)
+
+Assumptions on invocation:
+all file system operations are invoked in a thread-safe manner, the file system itself is designed with the assumption of being single-threaded
+attempting multiple fs operations concurrently is undefined behavior and is likely to cause data corruption
+
+never shall the OS maintain a seperate copy of a struct node, as this WILL lead to invalid accesses
+
+Path Names:
+a path fragment (anything between two '/' eg. '/data/' -> 'data') can NEVER be more than 64 bytes long (on disk), it a fragment would be longer than this, it will be modified to instead be recorded as the first 56 bytes + an 8 byte hash of the REST of the name (eg. the first 56 bytes are NOT hashed)
+
+as all path fragments are at most 64 bytes, any fragment on disk will be terminated upon either a null or reaching the 64th byte, to avoid ambiguity between a less-than-64 byte fragment and a truncated one with a hash containing a null byte, all bytes after the name will be null bytes, and all 64 bytes will be used for any comparasons
+NOTE: the hash shall be stored in big endian byte order
+
+Data Blocks:
+- the user of the file system is okay with deletion operations taking a while in return for other operations having worst case linear time
+- even though deletion takes a while, it should only be a higher coefficient of a linear time growth
+- deletion will not rearrange more blocks than were deleted
+
+StructX differences:
+structnode -> data about the structure and where its data is, size is less than one block, and multiple may be packed into the same block on disk
+structblock -> takes up an entire block, stores the child nodes of some node
+
+nodes and blocks only refer to each other through ids, this allows for them to be rearranged without too much disruption
+
+StructBlock child name storage:
+<a> (length of original name)
+<b> (hash of name)
+<c> (first byte(s) of name)
+<d> (last byte(s) of name)
+<e> (id of node)
+<f> (flags)
+<8 b><2 a><2 c><2 e><1 d><1 f>
+16-bytes in total
+
+flags:
+<hgfedcba>
+<a> (extended child table)
+<b> (directory)
+<c> (file)
+<d> (sym-link)

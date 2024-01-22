@@ -3,27 +3,42 @@
 
 #ifndef __MOCKTEST
 #include "../types.h"
-extern void* allocate(size_t);
+extern void* alloc(size_t);
+extern void dealloc(void*, size_t);
 extern u64 compute_checksum(size_t*);
 extern u8 validate_checksum(size_t*, u64);
+#define allocate alloc
+#define deallocate dealloc
 #else
 typedef int pid_t;
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned long u32;
 typedef unsigned long long u64;
+typedef char s8;
+typedef short s16;
+typedef long s32;
+typedef long long s64;
 typedef unsigned int uid32_t;
 typedef unsigned long long loff_t;
 #include <stdlib.h>
+#include <stdio.h>
+
+void dalloc(void* p, size_t s) {
+    free(p);
+}
 
 #define allocate malloc
+#define deallocate dalloc
 #endif
 #include "../FileDriver.h"
 // imagine there are '.'s between each digit
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 3
+#define VERNOBN 4
+
+#define TSFS_MAX_HELD_NODES 100
 
 /*
 PYGENSTART
@@ -45,12 +60,6 @@ sbufread: areadu{size}be
 sbufwrite: awriteu{size}be
 bufcpy: awrite_buf
 hashf: hashsized
-pygen-end
-*/
-
-/*
-aPYGENSTART
-pygen-rw-pre: pyg_
 pygen-end
 */
 
@@ -115,12 +124,15 @@ typedef struct {
     pygen-mk-rw: rootblock
     */
     u16   breakver;
-    u64   partition_size;
-    u8    system_size;
+    u32   partition_size;
     u64   creation_time;
     char  version[16];
     u16   block_size;
-    u64   top_dir;
+    u32   top_dir;
+    // LH blocks used
+    u32   usedleft;
+    // RH blocks used
+    u32   usedright;
     u64   checksum;
 } TSFSRootBlock;
 
@@ -134,11 +146,15 @@ typedef struct {
 #define TSFS_SF_TAIL_BLOCK 0b010000
 // does this block contain a checksum for its data?
 #define TSFS_SF_CHECKSUM 0b1000000
+// is this block the last one belonging to a file?
+#define TSFS_SF_FINAL_BLOCK 0b10000000
+// IF HEAD & FINAL & !TAIL THEN FIRST
 
 #define TSFS_KIND_DATA 0
 #define TSFS_KIND_DIR  1
 #define TSFS_KIND_FILE 2
 #define TSFS_KIND_LINK 3
+#define TSFS_KIND_HARD 4
 
 typedef struct {
     /*
@@ -149,14 +165,14 @@ typedef struct {
     */
     // flags on how the block is stored and its status
     u8    storage_flags;
+    // how many hard links refer to this
+    u8    refcount;
     // location on disk of this block
-    u64   disk_loc;
-    // disk location of the file that owns this data
-    u16   owner_id;
-    u64   next_block;
-    u64   prev_block;
+    u32   disk_loc;
+    u32   next_block;
+    u32   prev_block;
     // how much of this block actually contains data
-    u32   data_length;
+    u16   data_length;
     // CAN ONLY BE NON-ZERO FOR THE FIRST BLOCK OF A CONTIGUOUS GROUP
     u8    blocks_to_terminus;
     u64   metachecksum;
@@ -174,15 +190,17 @@ typedef struct {
     pygen-mk-rw: structnode
     */
     u8    storage_flags;
-    u16   nodeid;
-    u64   data_loc;
-    u16   parent_id;
+    u16   nameid;
+    u32   data_loc;
+    u32   disk_loc;
+    u32   parent_loc;
+    u32   blocks; // number of blocks forming the data of this node
     char  name[NAME_LENGTH];
     u64   checksum;
 } TSFSStructNode;
 
 /*
-this block contains some number of struct nodes
+contains up to 63 child entries
 */
 typedef struct {
     /*
@@ -190,9 +208,10 @@ typedef struct {
     comment: size of structblock
     name: TSFSSTRUCTBLOCK_DSIZE
     */
-    u16   entrycount;
-    u16   blockid;
-    u64   disk_loc;
+    u8    entrycount;
+    u8    flags;
+    u16   nameid;
+    u32   disk_loc;
     u64   checksum;
 } TSFSStructBlock;
 
@@ -206,6 +225,7 @@ typedef struct {
     // in bytes
     u64 partition_start;
     TSFSRootBlock* rootblock;
+    TSFSStructNode TSFS_NODE_TABLE[TSFS_MAX_HELD_NODES];
 } FileSystem;
 
 void awriteu64be(unsigned char* buf, u64 n) {
@@ -306,5 +326,55 @@ void read_buf(FileSystem* fs, void* buf, size_t size) {
     (fs->fdrive->read)(fs->kfd,buf,size);
 }
 #include "./gensizes.h"
+
+int longseek(FileSystem* fs, loff_t offset, int whence) {
+    loff_t x = 0;
+    // if (whence == SEEK_SET) {
+    //     offset += fs->partition_start;
+    // }
+    if (whence == SEEK_END) {
+        offset = fs->partition_start + fs->rootblock->partition_size - offset;
+        whence = SEEK_SET;
+    }
+    return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
+}
+int seek(FileSystem* fs, off_t offset, int whence) {
+    // if (whence == SEEK_SET) {
+    //     longseek(fs, 0, SEEK_SET);
+    //     whence = SEEK_CUR;
+    // }
+    if (whence == SEEK_END) {
+        longseek(fs, 0, SEEK_END);
+        offset *= -1;
+        whence = SEEK_CUR;
+    }
+    return fs->fdrive->lseek(fs->kfd, offset, whence);
+}
+
+/*
+like seek, but goes in increments of the block size
+if abs is zero, offset is absolute, otherwise relative
+negative absolute seeking is invalid
+*/
+int block_seek(FileSystem* fs, s32 offset, char abs) {
+    u16 bs = fs->rootblock->block_size;
+    if (abs) {
+        return fs->fdrive->lseek(fs->kfd, (off_t)(((s32)bs) * offset), SEEK_CUR);
+    }
+    if (offset < 0) {
+        return -1;
+    }
+    loff_t ac = ((u64)bs) * ((u64)offset);
+    loff_t x = 0;
+    return fs->fdrive->_llseek(fs->kfd, ac>>32, ac&0xffffffff, &x, SEEK_SET);
+}
+
+void tsfs_dummy_flush(FileSystem* fs) {}
+
+#ifndef fsflush
+#define fsflush(fs) fs->fdrive->fsync(fs->kfd);
+#endif
+
+#include "./diskmanip.h"
 
 #endif
