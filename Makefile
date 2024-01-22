@@ -60,7 +60,7 @@ build/irupts.o: sys32/irupts.s
 
 build/kernel-comp.s: sys32.dhulb
 	dhulbpp - - < sys32.dhulb > build/kern32-comp.dhulb
-	dhulbc 32 -tNGT < build/kern32-comp.dhulb > build/kernel-comp.s
+	dhulbc 32 -tNGTw < build/kern32-comp.dhulb > build/kernel-comp.s
 
 build/stall.elf: build/stall.o
 	${LDPRGM} ${LDFLAGS} -o build/stall.elf build/stall.o -lgcc
@@ -72,7 +72,7 @@ build/stall-comp.s: build/Salth.class stall.slth sys16.dhulb stall.s shell.s ker
 	cp stall.s build/stall-comp.s
 	java -cp build Salth n staltstd < stall.slth >> build/stall-comp.s
 	printf ".if staltstd_str_commandline_addr\n  .err # The command line address is offset from the start of the shell's static text segment\n.endif\n" >> build/stall-comp.s
-	cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNT >> build/stall-comp.s
+	cat sys16.dhulb | dhulbpp - - | dhulbc 16 -tNTw >> build/stall-comp.s
 	cat ${DHULB_PATH}/src/DLib/pc/io.s ${DHULB_PATH}/src/DLib/util_16.s shell.s ${DHULB_PATH}/src/DLib/stall/stack.s ${DHULB_PATH}/src/DLib/stall/sys.s ${DHULB_PATH}/src/DLib/dos/api_bindings.s kernel/int.s >> build/stall-comp.s
 	# TODO Make this rule run when any of the used "DLib" things have been updated
 

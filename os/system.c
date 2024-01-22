@@ -1,7 +1,13 @@
 #define RELOC 0x00040000
 #define __STALLOS__ 1
+#include "kernel/types.h"
 unsigned long long PIT0Ticks = 0;
-void bugMsg(void) {
+extern void int_enable(void);
+extern void int_disable(void);
+extern void bugCheck(void);
+extern void bugCheckNum(unsigned long);
+void bugMsg(uintptr addr) {
+	int_disable();
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((unsigned short*) (i - RELOC))) = 0x4720;
 	}
@@ -23,9 +29,31 @@ void bugMsg(void) {
 	(*((unsigned short*) (0xb801e - RELOC))) = 0x4752;
 	(*((unsigned short*) (0xb8020 - RELOC))) = 0x474f;
 	(*((unsigned short*) (0xb8022 - RELOC))) = 0x4752;
+	(*((unsigned short*) (0xb80a0 - RELOC))) = 0x4741;
+	(*((unsigned short*) (0xb80a2 - RELOC))) = 0x4774;
+	(*((unsigned short*) (0xb80a4 - RELOC))) = 0x4720;
+	(*((unsigned short*) (0xb80a6 - RELOC))) = 0x4761;
+	(*((unsigned short*) (0xb80a8 - RELOC))) = 0x4764;
+	(*((unsigned short*) (0xb80aa - RELOC))) = 0x4764;
+	(*((unsigned short*) (0xb80ac - RELOC))) = 0x4772;
+	(*((unsigned short*) (0xb80ae - RELOC))) = 0x4765;
+	(*((unsigned short*) (0xb80b0 - RELOC))) = 0x4773;
+	(*((unsigned short*) (0xb80b2 - RELOC))) = 0x4773;
+	(*((unsigned short*) (0xb80b4 - RELOC))) = 0x4720;
+	(*((unsigned short*) (0xb80b6 - RELOC))) = 0x4730;
+	(*((unsigned short*) (0xb80b8 - RELOC))) = 0x4778;
+	for (unsigned char* i = (void*) (0xb80b8 - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb80b8 - RELOC); i -= 2) {
+		if ((addr & 0x0f) < 10) {
+			*i = ((addr & 0x0f) + 0x30);
+		}
+		else {
+			*i = ((addr & 0x0f) + 0x37);
+		}
+		addr >>= 4;
+	}	
 }
-void bugCheck(void) {// Fatal kernel errors
-	bugMsg();
+void bugCheckWrapped(uintptr addr) {// Fatal kernel errors
+	bugMsg(addr);
 	while (1) {
 	}
 	return;
@@ -55,7 +83,6 @@ extern void Mutex_release(Mutex*);// Idempotent
 extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
 extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
 extern void Mutex_initUnlocked(Mutex*);
-#include "kernel/types.h"
 void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
 	if (dst < buf) {
@@ -79,17 +106,24 @@ void* move(void* dst, const void* buf, size_t count) {
 void* cpy(void* dst, const void* src, size_t count) {
 	return move(dst, src, count);
 }
-void bugCheckNum_u32(u32 num) {
-	bugMsg();
-	(*((unsigned char*) (0xb80a0 - RELOC))) = 0x49;
-	(*((unsigned char*) (0xb80a2 - RELOC))) = 0x4e;
-	(*((unsigned char*) (0xb80a4 - RELOC))) = 0x46;
-	(*((unsigned char*) (0xb80a6 - RELOC))) = 0x4f;
-	(*((unsigned char*) (0xb80a8 - RELOC))) = 0x3a;
-	(*((unsigned char*) (0xb80aa - RELOC))) = 0x20;
-	(*((unsigned char*) (0xb80ac - RELOC))) = 0x30;
-	(*((unsigned char*) (0xb80ae - RELOC))) = 0x78;
-	unsigned char* place = (unsigned char*) (0xb80ae - RELOC);
+void* set(void* ptr, int val, size_t count) {
+	char* n = ptr;
+	while (count--) {
+		*(n++) = val;
+	}
+	return ptr;
+}
+void bugCheckNum_u32(u32 num, uintptr addr) {
+	bugMsg(addr);
+	(*((unsigned char*) (0xb8140 - RELOC))) = 0x49;
+	(*((unsigned char*) (0xb8142 - RELOC))) = 0x4e;
+	(*((unsigned char*) (0xb8144 - RELOC))) = 0x46;
+	(*((unsigned char*) (0xb8146 - RELOC))) = 0x4f;
+	(*((unsigned char*) (0xb8148 - RELOC))) = 0x3a;
+	(*((unsigned char*) (0xb814a - RELOC))) = 0x20;
+	(*((unsigned char*) (0xb814c - RELOC))) = 0x30;
+	(*((unsigned char*) (0xb814e - RELOC))) = 0x78;
+	unsigned char* place = (unsigned char*) (0xb814e - RELOC);
 	for (unsigned char* i = place + 16; i != place; i -= 2) {
 		if ((num & 0x0f) < 10) {
 			*i = ((num & 0x0f) + 0x30);
@@ -102,8 +136,8 @@ void bugCheckNum_u32(u32 num) {
 	while (1) {
 	}
 }
-void bugCheckNum(unsigned long num) {// Fatal kernel errors
-	bugCheckNum_u32(num);
+void bugCheckNumWrapped(unsigned long num, uintptr addr) {// Fatal kernel errors
+	bugCheckNum_u32(num, addr);
 }
 #include "kernel/VGATerminal.h"
 size_t strlen(const char* str) {
@@ -172,8 +206,10 @@ extern void writePhysical(u32, u32);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
-#define KBDBUFTERM_SIZE 32
+#define KBDBUFTERM_SIZE 320
 unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
+#define KBDBUFTERMCANON_SIZE 256
+unsigned char kbdBufTermCanon[KBDBUFTERMCANON_SIZE];
 struct Keyboard8042 kbdMain;
 time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
@@ -288,7 +324,6 @@ extern void irupt_7dh(void);
 extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
-extern void int_enable(void);
 void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void), unsigned short segSel) {
 	(*((unsigned short*) (0x7f800 - RELOC + (iruptNum * 8)))) = ((long) addr);
 	(*((unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
@@ -341,13 +376,16 @@ void systemEntry(void) {
 	bus_wait();// TODO Remove this line when it is deemed unnecessary
 	kernelMsg("done\n");
 	kernelMsg("Performing Intel 8042 CHMOS 8-bit Slave Microcontroller driver and PS/2 keyboard driver initialization  . . . ");
-	initKeyboard8042(kbdBuf, KBDBUF_SIZE, kbdBufTerm, KBDBUFTERM_SIZE, 0, &mainTerm, &kbdMain);
+	initKeyboard8042(kbdBuf, KBDBUF_SIZE, kbdBufTerm, KBDBUFTERM_SIZE, kbdBufTermCanon, KBDBUFTERMCANON_SIZE, 0, &mainTerm, &kbdMain);
 	kernelMsg("done\n");
 	kernelMsg("Initializing ATA driver . . . ");
 	initATA();
 	kernelMsg("done\n");
 	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
 	int_enable();
+	kernelMsg("done\n");
+	kernelMsg("Initializing system call interface . . . ");
+	initSystemCallInterface();
 	kernelMsg("done\n");
 	int retVal = 0;
 	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);

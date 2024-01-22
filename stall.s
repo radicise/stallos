@@ -1,11 +1,13 @@
 /*
-  stall.s
-  File created on 2022-08-22 by root
-*/
-.globl _start
+ *
+ * stall.s
+ * File created on 2022-08-22 by root
+ *
+ */
 .text
 .code16
 _start:
+.globl _start
     ljmpw $0x07c0,$0x0005
     movw $0x07c0,%ax
     movw %ax,%ss

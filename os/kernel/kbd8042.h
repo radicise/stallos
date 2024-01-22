@@ -11,7 +11,11 @@ struct Keyboard8042 {
 	size_t avail;
 	unsigned char* bufTerm;
 	size_t availTerm;
-	Mutex bufLock;// Lock over reading and writing of `avail' and `availTerm' and the data at `buf' and the data at `bufTerm'
+	unsigned char* bufCanon;
+	size_t bufCanonSize;
+	size_t availCanon;
+	unsigned char canonLocked;
+	Mutex bufLock;// Lock over reading and writing of `avail' and `availTerm' and `availCanon' and 	`canonLocked' and the data at `buf' and the data at `bufTerm' and the data at `bufCanon'
 	u8 ID;
 	unsigned char set;// 1: set 1; 2: set 2; 3: set 3
 	unsigned char capL;
@@ -31,7 +35,7 @@ struct Keyboard8042 {
 	u8 state;
 };
 extern struct Keyboard8042 kbdMain;
-void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm, size_t bufTermSize, u8 ID, struct VGATerminal* term, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
+void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm, size_t bufTermSize, unsigned char* bufCanon, size_t bufCanonSize, u8 ID, struct VGATerminal* term, struct Keyboard8042* kbd) {// Disables other PS/2 device connected to the controller
 	if (ID != 0) {
 		bugCheckNum(0x0101 | FAILMASK_KBD8042);
 	}
@@ -57,6 +61,10 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm
 	kbd->bufTermSize = bufTermSize;
 	kbd->availTerm = 0;
 	kbd->term = term;
+	kbd->bufCanon = bufCanon;
+	kbd->bufCanonSize = bufCanonSize;
+	kbd->availCanon = 0;
+	kbd->canonLocked = 0;
 	while (bus_in_u8(0x0064) & 0x02) {
 		bus_wait();
 	}
@@ -733,6 +741,9 @@ int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufL
 			i = kbd8042_outSeq("\033[5~", 4, kbd);
 			break;
 		case (0x0171):
+			if (ctrl && kbd->alt) {
+				bugCheckNum(0xceebc0de);
+			}
 			i = kbd8042_outSeq("\033[3~", 4, kbd);
 			break;
 		case (0x0169):

@@ -9,46 +9,41 @@
 #include "types.h"
 #include "capabilities.h"
 #include "perProcess.h"
-/*
- *
- * Reserved "kfd" values:
- * 1: "/dev/console"
- * 2: "/dev/hda" (this device file only exists if the device is present on the system)
- * 3: "/dev/hdb" (this device file only exists if the device is present on the system)
- * 5: "/dev/hdc" (this device file only exists if the device is present on the system)
- * 6: "/dev/hdd" (this device file only exists if the device is present on the system)
- *
- */
-int getDesc(int fd) {
-	switch (fd) {
-		case (0):
-		case (1):
-		case (2):
-			return 1;
-		case (3):
-		case (4):
-		case (5):
-		case (6):
-			return fd - 1;
-		default:
-			return (-1);
+#include "Map.h"
+struct FileKey {
+	pid_t pid;
+	int fd;
+};
+int FileKeyComparator(uintptr a, uintptr b) {
+	struct FileKey* aF = (struct FileKey*) (((struct Map_pair*) a)->key);
+	struct FileKey* bF = (struct FileKey*) b;
+	return (aF->pid != bF->pid) || (aF->fd != bF->fd);
+}
+struct Map* FileKeyKfdMap;
+int getDesc(pid_t pIdent, int fd) {
+	struct FileKey match;
+	match.pid = pIdent;
+	match.fd = fd;
+	uintptr i = Map_findByCompare((uintptr) &match, FileKeyComparator, FileKeyKfdMap);
+	if (i == (uintptr) (-1)) {
+		return (-1);
 	}
+	i = Map_fetch(i, FileKeyKfdMap);
+	if (i == (uintptr) (-1)) {
+		return (-1);
+	}
+	return i;
 }
 #include "FileDriver.h"
-// File drivers
 #include "VGATerminal.h"
+#include "ATA.h"
+struct Map* kfdDriverMap;
 struct FileDriver* resolveFileDriver(int kfd) {
-	switch (kfd) {
-		case (1):
-			return &FileDriver_VGATerminal;
-		case (2):
-		case (3):
-		case (4):
-		case (5):
-			return &FileDriver_ATA;
-		default:
-			return NULL;
+	uintptr drvr = Map_fetch(kfd, kfdDriverMap);
+	if (drvr == (uintptr) (-1)) {
+		return NULL;
 	}
+	return (struct FileDriver*) drvr;
 }
 unsigned int getMemOffset(pid_t pid) {
 	if (pid == ((pid_t) 1)) {
@@ -57,16 +52,62 @@ unsigned int getMemOffset(pid_t pid) {
 	bugCheck();
 	return 0;
 }
+void initSystemCallInterface(void) {
+	kmem_init();
+	kfdDriverMap = Map_create();// Map, int "kfd" -> struct FileDriver* "driver"
+	Map_add(1, (uintptr) &FileDriver_VGATerminal, kfdDriverMap);// "/dev/console"
+	Map_add(2, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hda"
+	Map_add(3, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdb"
+	Map_add(4, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdc"
+	Map_add(5, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdd"
+	FileKeyKfdMap = Map_create();// Map, struct FileKey* "file key" -> int "kfd"
+	struct FileKey* k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 0;
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdin" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 1;
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdout" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 2;
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stderr" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 3;
+	Map_add((uintptr) k, 2, FileKeyKfdMap);// "ATA Drive 1" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 0x77777777;
+	k->fd = 4;
+	Map_add((uintptr) k, 3, FileKeyKfdMap);// "ATA Drive 2" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 5;
+	Map_add((uintptr) k, 4, FileKeyKfdMap);// "ATA Drive 3" for the userspace boot process
+	k = alloc(sizeof(struct FileKey));
+	k->pid = 1;
+	k->fd = 6;
+	Map_add((uintptr) k, 5, FileKeyKfdMap);// "ATA Drive 4" for the userspace boot process
+	return;
+}
+void endingCleanup(void) {
+	Map_destroy(FileKeyKfdMap);
+	Map_destroy(kfdDriverMap);
+	// TODO Check whether the heap has been cleared
+	return;
+}
+void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a process
+	// TODO Remove associated entries from `FileKeyKfdMap'
+	// TODO Remove entries from `kfdDriverMap' that are not held by other processes and are associated with the `kfd' values that were the values of key-value pairs removed from `FileKeyKfdMap'
+	return;
+}
 /*
  *
  * NOTES:
  *
  * On entry:
  * - Set `pid'
- *
- * "kfd" values:
- * 0 - Main terminal input
- * 1 - Main terminal output
  *
  */
 int validateCap(int cap) {
@@ -77,7 +118,7 @@ ssize_t write(int fd, const void* buf, size_t count) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(fd);
+	int kfd = getDesc(pid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -93,7 +134,7 @@ ssize_t read(int fd, void* buf, size_t count) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(fd);
+	int kfd = getDesc(pid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -109,7 +150,7 @@ off_t lseek(int fd, off_t off, int how) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(fd);
+	int kfd = getDesc(pid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -125,7 +166,7 @@ int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(fd);
+	int kfd = getDesc(pid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -167,7 +208,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset(pid)));
 		case (140):// Prototype is sourced from man-pages lseek64(3)
 			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset(pid)), (int) arg5);
-		default:
+		default:// TODO Do not allow the system to crash upon the provision of non-existent system call numbers
 			bugCheckNum(0xABADCA11);// Unrecognised / unimplemented system call ("A BAD CALL")
 			return 0;
 	}
