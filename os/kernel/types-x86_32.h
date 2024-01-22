@@ -10,11 +10,13 @@ typedef unsigned int size_t;
 typedef int ssize_t;
 typedef int pid_t;
 typedef long time_t;
+typedef long long time64_t;
 typedef long off_t;
 typedef long long loff_t;
 typedef unsigned short uid16_t;// For certain legacy architectures
 #define UID_OVERFLOW 65534
 typedef unsigned int uid32_t;
+typedef unsigned short mode_t;
 /*
  *
  * Definition of CHAR_BIT
