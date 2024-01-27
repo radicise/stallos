@@ -21,6 +21,7 @@ typedef long s32;
 typedef long long s64;
 typedef unsigned int uid32_t;
 typedef unsigned long long loff_t;
+#define kernelWarnMsg(msg) ;
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -32,11 +33,14 @@ void dalloc(void* p, size_t s) {
 #define deallocate dalloc
 #endif
 #include "../FileDriver.h"
+#include "../fsiface.h"
+typedef struct FSReturn FSRet;
+#define u48 u64
 // imagine there are '.'s between each digit
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 4
+#define VERNOBN 5
 
 #define TSFS_MAX_HELD_NODES 100
 
@@ -69,8 +73,8 @@ pygen-macro
 */
 #define NAME_LENGTH 64
 
-// no blocks greater than 4 megabytes
-#define BLK_SIZE_MAX 22
+// no blocks greater than 4094 bytes
+#define BLK_SIZE_MAX 12
 
 
 
@@ -124,11 +128,11 @@ typedef struct {
     pygen-mk-rw: rootblock
     */
     u16   breakver;
-    u32   partition_size;
+    u8    partition_size;
     u64   creation_time;
     char  version[16];
     u16   block_size;
-    u32   top_dir;
+    u48   top_dir;
     // LH blocks used
     u32   usedleft;
     // RH blocks used
@@ -136,18 +140,18 @@ typedef struct {
     u64   checksum;
 } TSFSRootBlock;
 
-// is this block valid? (allows for fast delete by not overwriting data)
-#define TSFS_SF_VALID 0b1
+// // is this block valid? (allows for fast delete by not overwriting data)
+// #define TSFS_SF_VALID 0b1
 // what kind of thing is this? (file, directory, link, data)
 #define TSFS_SF_KIND  0b1110
 // is this block the head of a run of blocks storing data for the same owner?
-#define TSFS_SF_HEAD_BLOCK 0b100000
+#define TSFS_SF_HEAD_BLOCK 0b10
 // is this block the tail of a run of blocks storing data for the same owner?
-#define TSFS_SF_TAIL_BLOCK 0b010000
+#define TSFS_SF_TAIL_BLOCK 0b0100
 // does this block contain a checksum for its data?
-#define TSFS_SF_CHECKSUM 0b1000000
+#define TSFS_SF_CHECKSUM 0b1
 // is this block the last one belonging to a file?
-#define TSFS_SF_FINAL_BLOCK 0b10000000
+#define TSFS_SF_FINAL_BLOCK 0b1000
 // IF HEAD & FINAL & !TAIL THEN FIRST
 
 #define TSFS_KIND_DATA 0
@@ -161,22 +165,26 @@ typedef struct {
     PYGENSTART
     comment: size of data block data stored on disk
     name: TSFSDATABLOCK_DSIZE
+    pygen-over: [storage_flags, data_length] 2 {
+    write: (`data_length` | ((u16)`storage_flags`)<<12)
+    data_length: (`$TMP`&0x0fff)
+    storage_flags: (u8)(`$TMP`>>12)
+    }
     pygen-mk-rw: datablock
     */
     // flags on how the block is stored and its status
     u8    storage_flags;
     // how many hard links refer to this
     u8    refcount;
-    // location on disk of this block
-    u32   disk_loc;
-    u32   next_block;
-    u32   prev_block;
+    // // location on disk of this block
+    u48   disk_loc;
+    u48   next_block;
+    u48   prev_block;
     // how much of this block actually contains data
     u16   data_length;
     // CAN ONLY BE NON-ZERO FOR THE FIRST BLOCK OF A CONTIGUOUS GROUP
     u8    blocks_to_terminus;
-    u64   metachecksum;
-    u64   datachecksum;
+    u64   checksum;
 } TSFSDataBlock;
 
 /*
@@ -190,12 +198,12 @@ typedef struct {
     pygen-mk-rw: structnode
     */
     u8    storage_flags;
-    u16   nameid;
-    u32   data_loc;
-    u32   disk_loc;
-    u32   parent_loc;
+    u48   data_loc;
+    // u32   disk_loc;
+    u48   parent_loc;
     u32   blocks; // number of blocks forming the data of this node
-    char  name[NAME_LENGTH];
+    u64   size;
+    char  name[255];
     u64   checksum;
 } TSFSStructNode;
 
@@ -207,11 +215,11 @@ typedef struct {
     PYGENSTART
     comment: size of structblock
     name: TSFSSTRUCTBLOCK_DSIZE
+    pygen-mk-rw: structblock
     */
     u8    entrycount;
     u8    flags;
-    u16   nameid;
-    u32   disk_loc;
+    u48   disk_loc;
     u64   checksum;
 } TSFSStructBlock;
 
@@ -222,8 +230,7 @@ DO NOT modify any instance provided by the file system
 typedef struct {
     struct FileDriver* fdrive;
     int kfd;
-    // in bytes
-    u64 partition_start;
+    int err;
     TSFSRootBlock* rootblock;
     TSFSStructNode TSFS_NODE_TABLE[TSFS_MAX_HELD_NODES];
 } FileSystem;
@@ -237,6 +244,14 @@ void awriteu64be(unsigned char* buf, u64 n) {
     buf[5] = (unsigned char)((n>>16)&0xff);
     buf[6] = (unsigned char)((n>>8)&0xff);
     buf[7] = (unsigned char)(n&0xff);
+}
+void awriteu48be(unsigned char* buf, u48 n) {
+    buf[0] = (unsigned char)((n>>40)&0xff);
+    buf[1] = (unsigned char)((n>>32)&0xff);
+    buf[2] = (unsigned char)((n>>24)&0xff);
+    buf[3] = (unsigned char)((n>>16)&0xff);
+    buf[4] = (unsigned char)((n>>8)&0xff);
+    buf[5] = (unsigned char)(n&0xff);
 }
 void awriteu32be(unsigned char* buf, u32 n) {
     buf[0] = (unsigned char)((n>>24)&0xff);
@@ -260,6 +275,15 @@ u64 areadu64be(unsigned char* buf) {
     (((u64)(buf[6])) << 8) |
     ((u64)(buf[7]));
 }
+u48 areadu48be(unsigned char* buf) {
+    return
+    (((u64)(buf[0])) << 40) |
+    (((u64)(buf[1])) << 32) |
+    (((u64)(buf[2])) << 24) |
+    (((u64)(buf[3])) << 16) |
+    (((u64)(buf[4])) << 8) |
+    ((u64)(buf[5]));
+}
 u32 areadu32be(unsigned char* buf) {
     return
     (((u32)buf[0]) << 24) |
@@ -282,48 +306,48 @@ void awrite_buf(void* dstp, void* srcp, size_t size) {
 void write_u64be(FileSystem* fs, u64 n) {
     unsigned char ptr[8];
     awriteu64be(ptr, n);
-    (fs->fdrive->write)(fs->kfd,ptr,8);
+    if ((fs->fdrive->write)(fs->kfd,ptr,8)) fs->err = 1;
 }
 void write_u32be(FileSystem* fs, u32 n) {
     unsigned char ptr[4];
     awriteu32be(ptr, n);
-    (fs->fdrive->write)(fs->kfd,ptr,4);
+    if ((fs->fdrive->write)(fs->kfd,ptr,4)) fs->err = 1;
 }
 void write_u16be(FileSystem* fs, u16 n) {
     unsigned char ptr[2];
     awriteu16be(ptr, n);
-    (fs->fdrive->write)(fs->kfd,ptr,2);
+    if ((fs->fdrive->write)(fs->kfd,ptr,2)) fs->err = 1;
 }
 void write_u8(FileSystem* fs, u8 n) {
-    (fs->fdrive->write)(fs->kfd,&n,1);
+    if ((fs->fdrive->write)(fs->kfd,&n,1)) fs->err = 1;
 }
 void write_buf(FileSystem* fs, const void* buf, size_t size) {
-    (fs->fdrive->write)(fs->kfd,buf,size);
+    if ((fs->fdrive->write)(fs->kfd,buf,size)) fs->err = 1;
 }
 
 u64 read_u64be(FileSystem* fs) {
     unsigned char ptr[8];
-    (fs->fdrive->read)(fs->kfd,ptr,8);
+    if ((fs->fdrive->read)(fs->kfd,ptr,8)) fs->err = 1;
     return areadu64be(ptr);
 }
 u32 read_u32be(FileSystem* fs) {
     unsigned char ptr[4];
-    (fs->fdrive->read)(fs->kfd,ptr,4);
+    if ((fs->fdrive->read)(fs->kfd,ptr,4)) fs->err = 1;
     return areadu32be(ptr);
 }
 u16 read_u16be(FileSystem* fs) {
     unsigned char ptr[2];
-    (fs->fdrive->read)(fs->kfd,ptr,2);
+    if ((fs->fdrive->read)(fs->kfd,ptr,2)) fs->err = 1;
     return areadu16be(ptr);
 }
 u8 read_u8(FileSystem* fs) {
     u8 n = 0;
-    (fs->fdrive->read)(fs->kfd,&n,1);
+    if ((fs->fdrive->read)(fs->kfd,&n,1)) fs->err = 1;
     return n;
 }
 
 void read_buf(FileSystem* fs, void* buf, size_t size) {
-    (fs->fdrive->read)(fs->kfd,buf,size);
+    if ((fs->fdrive->read)(fs->kfd,buf,size)) fs->err = 1;
 }
 #include "./gensizes.h"
 
@@ -333,7 +357,7 @@ int longseek(FileSystem* fs, loff_t offset, int whence) {
     //     offset += fs->partition_start;
     // }
     if (whence == SEEK_END) {
-        offset = fs->partition_start + fs->rootblock->partition_size - offset;
+        offset = fs->rootblock->partition_size - offset;
         whence = SEEK_SET;
     }
     return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
@@ -344,7 +368,7 @@ int seek(FileSystem* fs, off_t offset, int whence) {
     //     whence = SEEK_CUR;
     // }
     if (whence == SEEK_END) {
-        longseek(fs, 0, SEEK_END);
+        if (longseek(fs, 0, SEEK_END)) return -1;
         offset *= -1;
         whence = SEEK_CUR;
     }
@@ -368,6 +392,20 @@ int block_seek(FileSystem* fs, s32 offset, char abs) {
     loff_t x = 0;
     return fs->fdrive->_llseek(fs->kfd, ac>>32, ac&0xffffffff, &x, SEEK_SET);
 }
+
+// #define loc_seek(fs, loc) block_seek(fs, (s32)((loc>>7)*fs->rootblock->block_size + (loc&7f)*128));
+
+int loc_seek(FileSystem* fs, u32 loc) {
+    u32 sub = loc & 0x7f;
+    u32 blk = loc >> 7;
+    int b = block_seek(fs, (s32)(blk), 0);
+    return b | seek(fs, (off_t)(sub * 128), SEEK_CUR);
+}
+
+#undef u48
+
+#define BSEEK_SET 0
+#define BSEEK_CUR 1
 
 void tsfs_dummy_flush(FileSystem* fs) {}
 

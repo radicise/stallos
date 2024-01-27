@@ -43,11 +43,12 @@ int fdrive__llseek(int _, off_t offhi, off_t offlo, loff_t* posptr, int whence) 
 #undef fsflush
 #define fsflush(fs) fflush(fp)
 
-#define MDISK_SIZE 1024*1024*4
+#define MDISK_SIZE 23
+// #define MDISK_SIZE 1024*1024*4
 
 int regen_mock(int fd) {
     ftruncate(fd, 0);
-    ftruncate(fd, MDISK_SIZE);
+    ftruncate(fd, 2<<(MDISK_SIZE-1));
     return 0;
 }
 
@@ -56,10 +57,10 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
     if (regen) {
         printf("REGEN\n");
         regen_mock(fd);
-        s = createFS(fdrive, 0, 0, MDISK_SIZE, 10, (s64) time(NULL));
+        s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64) time(NULL)).retptr;
     }
     if (s == 0) {
-        s = loadFS(fdrive, 0, 0);
+        s = loadFS(fdrive, 0).retptr;
     }
     if (s->rootblock == 0) {
         printf("ERROR LOADING FS\n");
@@ -70,7 +71,7 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
         printf("BAD CHECKSUM\n");
         goto dealloc;
     }
-    printf("psize (blocks): %lu\n", s->rootblock->partition_size);
+    printf("psize (blocks): %lu\n", 2lu<<(s->rootblock->partition_size - 1));
     printf("bsize: %d\n", s->rootblock->block_size);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));
     TSFSStructNode sn = {0};
@@ -78,14 +79,14 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
     if (regen) {
         TSFSDataBlock db  = {0};
         sn.data_loc = (u64)(bsize*2);
-        db.disk_loc = (u64)(bsize*2);
-        db.storage_flags = TSFS_SF_VALID | TSFS_SF_HEAD_BLOCK | TSFS_SF_TAIL_BLOCK;
+        db.disk_loc = sn.data_loc;
+        db.storage_flags = TSFS_SF_HEAD_BLOCK | TSFS_SF_TAIL_BLOCK | TSFS_SF_FINAL_BLOCK;
         printf("seek 1\n");
         longseek(s, (loff_t)bsize, SEEK_SET);
         printf("write struct node\n");
         write_structnode(s, &sn);
         printf("seek 2\n");
-        longseek(s, (loff_t)db.disk_loc, SEEK_SET);
+        block_seek(s, 2, BSEEK_SET);
         printf("write data block\n");
         write_datablock(s, &db);
         printf("write data\n");
@@ -137,7 +138,7 @@ int manip_test(struct FileDriver* fdrive, int fd, char kind) {
     if (kind == 1) {
         regen_mock(fd);
         FileSystem* s = 0;
-        s = createFS(fdrive, 0, 0, MDISK_SIZE, 10, (u64) time(NULL));
+        s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64) time(NULL)).retptr;
         dmanip_fill(s, 0, 2, 97);
         dmanip_null_shift_right(s, 0, 2, 2);
         fflush(fp);
@@ -160,6 +161,13 @@ int stringcmp(const char* s1, const char* s2) {
         c ++;
     }
     return 1;
+}
+
+int fmt_test(struct FileDriver* fdrive, int fd, char f) {
+    regen_mock(fd);
+    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+    releaseFS(s);
+    return 0;
 }
 
 int harness(char flag, int(*tst)(struct FileDriver*, int, char)) {
@@ -194,6 +202,8 @@ int main(int argc, char** argv) {
             flags[0] = 2;
         } else if (stringcmp(argv[i], "-shift")) {
             flags[1] = 1;
+        } else if (stringcmp(argv[i], "format")) {
+            flags[0] = 3;
         }
     }
     switch (flags[0]) {
@@ -202,6 +212,9 @@ int main(int argc, char** argv) {
             break;
         case 2:
             harness(flags[1], manip_test);
+            break;
+        case 3:
+            harness(flags[1], fmt_test);
             break;
         default:
             printf("bad args\n");
