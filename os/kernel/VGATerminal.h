@@ -16,7 +16,7 @@ struct VGATerminal {
 	struct VGACell* screen;
 	/* TTY Output Settings */
 	unsigned char onlcr;
-	AtomicULong xctrl;
+	AtomicULong xctrl;// Keep at 0 because of deadlocking when echoing is enabled
 	AtomicULong xon;
 	/* Other Terminal Settings */
 	unsigned char cursor;

@@ -273,12 +273,14 @@ int kbd8042_outChar(unsigned char val, struct Keyboard8042* kbd) {// Mutex `bufL
 	if (kbd->ctrl) {
 		val &= 0x1f;
 	}
+	/*
 	if ((val == 0x13) || (val == 0x11)) {
 		if (AtomicULong_get(&(kbd->term->xctrl))) {
 			AtomicULong_set(&(kbd->term->xon), val == 0x11);
 			return 0;// "alt" keys have no effect in this case because no sequence reaches the host
 		}
 	}
+	*/
 	if (kbd->alt) {
 		if (!((kbd->bufTermSize - kbd->availTerm) & (~((size_t) 1)))) {
 			return (-1);

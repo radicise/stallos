@@ -228,7 +228,7 @@ lgdt (%eax)
 	return 0;
 }
 int execELF(addr base, uint entry, *s32 code, addr stackAddr) {
-	int i = makeMemseg(base, 0x00);/* TODO Change privilege level *//* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
+	int i = makeMemseg(base, 0x00);/* TODO Set privilege level appropriately *//* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
 	if (i != 0) {
 		return i;
 	}

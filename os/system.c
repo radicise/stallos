@@ -81,7 +81,7 @@ extern void AtomicULong_set(AtomicULong*, unsigned long);
 extern void Mutex_acquire(Mutex*);// Idempotent
 extern void Mutex_release(Mutex*);// Idempotent
 extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
-extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
+extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the thread attempting to acquire is not interrupted
 extern void Mutex_initUnlocked(Mutex*);
 void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
@@ -149,7 +149,7 @@ size_t strlen(const char* str) {
 struct VGATerminal mainTerm;
 int kernelMsg(const char* msg) {
 	unsigned int len = strlen(msg);
-	if (len != VGATerminalWrite(&mainTerm, (unsigned char*) msg, len)) {
+	if (len != VGATerminal_write(1, msg, len)) {
 		return (-1);
 	}
 	return 0;
@@ -162,6 +162,21 @@ int kernelWarnMsg(const char* msg) {
 int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
 	w |= kernelMsg("Warning: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("0x");
+	int n;
+	char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
+	tx[n] = 0x00;
+	while (n--) {
+		tx[n] = hex[code & 0x0f];
+		code >>= 4;
+	}
+	w |= kernelMsg(tx);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
+}
+int kernelMsgCode(const char* msg, unsigned long code) {
+	int w = 0;
 	w |= kernelMsg(msg);
 	w |= kernelMsg("0x");
 	int n;
@@ -211,15 +226,18 @@ unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
 #define KBDBUFTERMCANON_SIZE 256
 unsigned char kbdBufTermCanon[KBDBUFTERMCANON_SIZE];
 struct Keyboard8042 kbdMain;
-time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
+time_t ___currentTime___ = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
 extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
-void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
+#include "kernel/threads.h"
+void irupt_handler_70h(struct Thread_state* state) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
+		kernelMsgCode("Time: ", timeFetch());
 	}
+	Thread_restore(state, 0x70);
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
@@ -343,7 +361,7 @@ void systemEntry(void) {
 	((struct VGACell*) (0x000b8000  + (mainTerm.pos << 1) - RELOC))->format ^= 0x77;
 	mainTerm.onlcr = 1;
 	AtomicULong_set(&(mainTerm.xon), 1);
-	AtomicULong_set(&(mainTerm.xctrl), 1);
+	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
 	kernelMsg("Stall Kernel v0.0.1.0-dev\n");
@@ -388,8 +406,11 @@ void systemEntry(void) {
 	initSystemCallInterface();
 	kernelMsg("done\n");
 	int retVal = 0;
-	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);
-	(*((unsigned char*) (0xb8000 - RELOC))) = errVal + 0x30;
+	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (int*) (((char*) &retVal) + RELOC));
+	if (errVal) {
+		bugCheckNum(FAILMASK_SYSTEM | 0x0100 | (errVal & 0xff));
+	}
+	kernelMsgCode("Program exited with code ", retVal);
 	while (1) {
 	}
 }

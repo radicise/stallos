@@ -326,16 +326,16 @@ nop
 ret
 timeIncrement:
 .globl timeIncrement
-lock incl currentTime
+lock incl ___currentTime___
 ret
 timeFetch:
 .globl timeFetch
-movl currentTime,%eax# TODO Ensure atomic memory reads
+movl ___currentTime___,%eax# TODO Ensure atomic memory reads
 ret
 timeStore:
 .globl timeStore
 movl 4(%esp),%eax
-movl %eax,currentTime# TODO Ensure atomic memory writes
+movl %eax,___currentTime___# TODO Ensure atomic memory writes
 ret
 AtomicULong_get:
 .globl AtomicULong_get
@@ -372,3 +372,40 @@ pushl %eax
 pushl %edx
 call bugCheckNumWrapped
 ret
+Thread_restore:# void Thread_restore(struct Thread_state*, long)
+.globl Thread_restore# Only invoke this from in interrupt that masks maskable interrupts
+movl 4(%esp),%ebx
+movl 8(%esp),%eax
+movw 0x2c(%ebx),%dx
+movw %dx,%ss
+movw 0x2e(%ebx),%dx
+movw %dx,%es
+movw 0x30(%ebx),%dx
+movw %dx,%fs
+movw 0x32(%ebx),%dx
+movw %dx,%gs
+movl 0x10(%ebx),%ebp
+movl 0x14(%ebx),%esp
+movl 0x18(%ebx),%esi
+movl 0x1c(%ebx),%edi
+pushl 0x24(%ebx)
+pushw $0x00
+pushw 0x28(%ebx)
+pushl 0x20(%ebx)
+pushl (%ebx)
+pushl 0x04(%ebx)
+pushl 0x08(%ebx)
+pushl 0x0c(%ebx)
+pushw 0x2a(%ebx)
+popw %ds
+popl %edx
+popl %ecx
+popl %ebx
+testb $0x08,%al
+movb $0x20,%al
+jz Thread_restore__1
+outb %al,$0xa0
+Thread_restore__1:
+outb %al,$0x20
+popl %eax
+iretl
