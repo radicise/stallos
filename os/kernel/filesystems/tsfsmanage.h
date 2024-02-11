@@ -12,9 +12,9 @@ struct PosDat {
 };
 
 TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockno) {
-    u16 bsize = fs->rootblock->block_size;
     TSFSDataBlock databloc;
     longseek(fs, sn->data_loc, SEEK_SET);
+    // loc_seek(fs, sn->data_loc);
     read_datablock(fs, &databloc);
     u16 cblock = 0;
     while (1) {
@@ -26,15 +26,18 @@ TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockn
             break;
         }
         if (databloc.storage_flags & TSFS_SF_HEAD_BLOCK && databloc.blocks_to_terminus > 0) {
-            longseek(fs, (loff_t)(databloc.disk_loc + (databloc.blocks_to_terminus * bsize)), SEEK_SET);
+            longseek(fs, databloc.disk_loc, SEEK_SET);
+            // loc_seek(fs, (databloc.disk_loc + databloc.blocks_to_terminus<<7));
             cblock += databloc.blocks_to_terminus;
         } else {
-            longseek(fs, (loff_t)databloc.next_block, SEEK_SET);
+            longseek(fs, databloc.disk_loc, SEEK_SET);
+            // loc_seek(fs, databloc.next_block);
             cblock ++;
         }
         read_datablock(fs, &databloc);
     }
     longseek(fs, databloc.disk_loc, SEEK_SET);
+    // loc_seek(fs, databloc.disk_loc);
     return databloc;
 }
 
@@ -76,21 +79,26 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
     return ul - count;
 }
 
+void write_datablock_at(FileSystem* fs, TSFSDataBlock* db, u64 dlock) {
+    longseek(fs, dlock, SEEK_SET);
+    write_datablock(fs, db);
+}
+
 /*
 adds count new data blocks to the end of a file structure, returns zero on success
 */
 int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
-    u64 prev = sn->blocks ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
+    u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
     sn->blocks += count;
-    longseek(fs, (loff_t)sn->disk_loc, SEEK_SET);
+    longseek(fs, sn->data_loc, SEEK_SET);
     write_structnode(fs, sn);
-    u64 fblock = (u64)allocate_blocks(fs, 1, count);
+    u32 fblock = allocate_blocks(fs, 1, count);
+    block_seek(fs, (s32)fblock, BSEEK_SET);
     u64 bsize = (u64)(fs->rootblock->block_size);
-    longseek(fs, (loff_t)(fblock * bsize), SEEK_SET);
-    TSFSDataBlock hdb = {.blocks_to_terminus=255, .storage_flags=TSFS_SF_VALID|TSFS_SF_HEAD_BLOCK};
-    TSFSDataBlock tdb = {.storage_flags=TSFS_SF_VALID|TSFS_SF_TAIL_BLOCK};
-    TSFSDataBlock mdb = {.storage_flags=TSFS_SF_VALID};
-    u64 curr = bsize * fblock;
+    TSFSDataBlock hdb = {.blocks_to_terminus=255, .storage_flags=TSFS_SF_HEAD_BLOCK};
+    TSFSDataBlock tdb = {.storage_flags=TSFS_SF_TAIL_BLOCK};
+    TSFSDataBlock mdb = {0};
+    u64 curr = ((u64)fblock) * bsize;
     u64 next = curr + bsize;
     while (count > 256) {
         hdb.prev_block = prev;
@@ -99,7 +107,7 @@ int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
         prev = curr;
         curr = next;
         next += bsize;
-        write_datablock(fs, &hdb);
+        write_datablock_at(fs, &hdb, curr);
         for (int i = 254; i > 0; i --) {
             mdb.prev_block = prev;
             mdb.next_block = next;
@@ -107,7 +115,7 @@ int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
             prev = curr;
             curr = next;
             next += bsize;
-            write_datablock(fs, &mdb);
+            write_datablock_at(fs, &mdb, curr);
         }
         tdb.prev_block = prev;
         tdb.next_block = next;
@@ -115,24 +123,24 @@ int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
         prev = curr;
         curr = next;
         next += bsize;
-        write_datablock(fs, &tdb);
+        write_datablock_at(fs, &tdb, curr);
     }
     if (count) {
         hdb.prev_block = prev;
         hdb.next_block = next;
         hdb.disk_loc = curr;
         if (count == 1) {
-            hdb.storage_flags = TSFS_SF_VALID | TSFS_SF_HEAD_BLOCK | TSFS_SF_TAIL_BLOCK | TSFS_SF_FINAL_BLOCK;
+            hdb.storage_flags = TSFS_SF_HEAD_BLOCK | TSFS_SF_TAIL_BLOCK | TSFS_SF_FINAL_BLOCK;
             hdb.next_block = 0;
             hdb.blocks_to_terminus = 0;
-            write_datablock(fs, &hdb);
+            write_datablock_at(fs, &hdb, curr);
         } else {
             count --;
             hdb.blocks_to_terminus = (u8)count;
-            write_datablock(fs, &hdb);
+            write_datablock_at(fs, &hdb, curr);
             prev = curr;
             curr = next;
-            next += bsize;
+            next = bsize;
             count --;
             for (int i = 0; i < count; i ++) {
                 mdb.prev_block = prev;
@@ -140,14 +148,14 @@ int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
                 hdb.disk_loc = curr;
                 prev = curr;
                 curr = next;
-                next += bsize;
-                write_datablock(fs, &mdb);
+                next = bsize;
+                write_datablock_at(fs, &mdb, curr);
             }
             tdb.prev_block = prev;
             tdb.next_block = 0;
             tdb.disk_loc = curr;
-            tdb.storage_flags = TSFS_SF_VALID | TSFS_SF_TAIL_BLOCK | TSFS_SF_FINAL_BLOCK;
-            write_datablock(fs, &mdb);
+            tdb.storage_flags = TSFS_SF_TAIL_BLOCK | TSFS_SF_FINAL_BLOCK;
+            write_datablock_at(fs, &mdb, curr);
         }
     }
     fsflush(fs);

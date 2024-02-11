@@ -1,0 +1,52 @@
+ROOT:
+<2  a> (breakver)
+<1  b> (partition_size)
+<8  c> (creation_time)
+<16 d> (version)
+<2  e> (block_size)
+<6  f> (top_dir)
+<4  g> (usedleft)
+<4  h> (usedright)
+<8  i> (checksum)
+
+total: 51
+
+DATA BLOCK:
+<2 j> (J, combined sf & len)
+!<1 a> (storage_flags)
+<1 b> (refcount)
+!<4 c> (disk_loc)
+<6 d> (next_block)
+<6 e> (prev_block)
+!<2 f> (data_length)
+<1 g> (blocks_to_terminus)
+<8 h> (metachecksum)
+!<8 i> (datachecksum)
+
+J [bits]:
+<a> (storage flags)
+<b> (data length (log 4096 = 12))
+<4 a><12 b>
+
+total: 24
+
+STRUCT NODE:
+<1 a> (storage_flags)
+!<2 b> (name_id)
+<6 c> (data_loc)
+!<4 d> (disk_loc)
+<6 e> (parent_loc)
+!<4 f> (blocks)
+<8 i> (size)
+<255 g> (name)
+<8 h> (checksum)
+
+total: 288
+
+STRUCT BLOCK:
+<1 a> (entrycount)
+<1 b> (flags)
+<6 d> (disk_loc)
+<8 e> (checksum)
+
+total: 16

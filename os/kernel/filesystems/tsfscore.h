@@ -18,19 +18,24 @@ void strcpy(char* dst, const char* src) {
 #include <string.h>
 #endif
 
+#include "../errno.h"
 /*
 available for external use
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
-FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u8 blocksize, s64 curr_time) {
+FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, u8 blocksize, s64 curr_time) {
+    FSRet rv = {.errno=EINVAL};
     if (blocksize < 10 || blocksize > BLK_SIZE_MAX) {
-        return 0;
+        return rv;
     }
+    if (p_size > 48) {
+        return rv;
+    }
+    rv.errno = 0;
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
-    fs -> partition_start = p_start;
     fdr->lseek(kfd, 0, SEEK_SET);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
@@ -39,22 +44,33 @@ FileSystem* createFS(struct FileDriver* fdr, int kfd, u64 p_start, u64 p_size, u
     rblock->block_size = 2<<(blocksize-1);
     rblock->partition_size = p_size;
     rblock->creation_time = *((u64*)(&curr_time));
-    rblock->top_dir = 0;
     // write_u16be(fs, VERNOBN);
     // write_u64be(fs, rblock->partition_size);
-    rblock->usedleft = 1;
-    rblock->usedright = (u32)(rblock->partition_size / rblock->block_size) - 1;
+    rblock->usedleft = 3;
+    rblock->usedright = (u32)((((u64)2)<<(rblock->partition_size-1)) / rblock->block_size) - 1;
     // fs->fdrive->write(fs->kfd, &rblock->system_size, 1);
     // write_u64be(fs, curr_time);
     // fs->fdrive->write(fs->kfd, rblock->version, 16);
     // write_u16be(fs, rblock->block_size);
     // write_u64be(fs, rblock->top_dir);
+    rblock->top_dir = (u64)(rblock->block_size);
     u64 checksum = hash_rootblock(rblock);
     // printf("CHECKSUM: %llx\n", checksum);
     rblock->checksum = checksum;
     write_rootblock(fs, rblock);
+    TSFSStructNode snode = {0};
+    snode.storage_flags = TSFS_KIND_DIR;
+    snode.name[0] = '/';
+    snode.parent_loc = (u64)(rblock->block_size * 2);
+    longseek(fs, rblock->top_dir, SEEK_SET);
+    write_structnode(fs, &snode);
+    TSFSStructBlock sblock = {0};
+    sblock.disk_loc = rblock->top_dir;
+    longseek(fs, snode.parent_loc, SEEK_SET);
+    write_structblock(fs, &sblock);
+    rv.retptr = fs;
     // write_u64be(fs, checksum);
-    return fs;
+    return rv;
 }
 
 void releaseFS(FileSystem* fs) {
@@ -75,46 +91,30 @@ available for external use
 ON ERROR:
 returns a filesystem object with a null rootblock or a rootblock with zero breakver
 */
-FileSystem* loadFS(struct FileDriver* fdr, int kfd, u64 p_start) {
+FSRet loadFS(struct FileDriver* fdr, int kfd) {
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
-    fs -> partition_start = p_start;
+    fs -> err = 0;
     fdr->lseek(kfd, 0, SEEK_SET);
-    // u16 breakvno = read_u16be(fs);
-    // if (breakvno != VERNOBN) {
-    //     return fs;
-    // }
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
-    // rblock->breakver = breakvno;
-    // dbp(fs, "part size");
-    // rblock->partition_size = read_u64be(fs);
-    // dbp(fs, "sys size");
-    // fs->fdrive->read(fs->kfd, &(rblock->system_size), 1);
-    // dbp(fs, "creat time");
-    // rblock->creation_time = read_u64be(fs);
-    // dbp(fs, "version");
-    // fs->fdrive->read(fs->kfd, &(rblock->version), 16);
-    // dbp(fs, "blok size");
-    // rblock->block_size = read_u16be(fs);
-    // dbp(fs, "top dir");
-    // rblock->top_dir = read_u64be(fs);
-    // dbp(fs, "checksum");
-    // rblock->checksum = read_u64be(fs);
-    // printf("OCHECKSUM: %llx\n", rblock->checksum);
+    FSRet rv = {.errno=EINVAL};
     read_rootblock(fs, rblock);
     if (rblock->breakver != VERNOBN) {
+        kernelWarnMsg("VERSION INCOMPAT");
         releaseFS(fs);
-        return 0;
+        return rv;
     }
     u64 comphash = hash_rootblock(rblock);
-    // printf("NCHECKSUM: %llx\n", comphash);
     if (comphash != rblock->checksum) {
+        kernelWarnMsg("DATA CORRUPT");
         releaseFS(fs);
-        return 0;
+        return rv;
     }
-    return fs;
+    rv.errno = 0;
+    rv.retptr = fs;
+    return rv;
 }
 
 int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
@@ -125,12 +125,11 @@ int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* dat
     u32 realoffset = position-data_loc.poff;
     seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
     size_t cpos = 0;
-    // while (data_loc.bloc.data_length - realoffset < size) {
-    //     //
-    // }
     if (size > 0) {
         write_buf(fs, data+cpos, size);
         longseek(fs, data_loc.bloc.disk_loc, SEEK_SET);
+        // loc_seek(fs, data_loc.bloc.disk_loc);
+        // block_seek(fs, (s32)data_loc.bloc.disk_loc, BSEEK_SET);
         data_loc.bloc.data_length += (u32)size;
         write_datablock(fs, &data_loc.bloc);
     }

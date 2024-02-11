@@ -106,6 +106,11 @@ present
 
 pygen-include -- will cause all lines until "pygen-end" to be interpreted as the arguments for "#include" directives, and
 these directives will be inserted into the generated file
+
+pygen-align -- "_: [align]" will cause the size to be immediately padded to the specified alignment (recommend use only at end of struct definition)
+
+pygen-over -- "_: [fieldname, ...] [size-type] [expression]
+[expression]: [code | name, ...] -> [name]: "`fieldname`", [code]: valid C code
 """
     helprwfmt = """
 pygen-mk-rw is very useful, but outwardly highly inflexible, only able to be used for one case
@@ -233,6 +238,8 @@ sizings: dict[str,int] = {
     "s16":2,
     "u32":4,
     "s32":4,
+    "u48":6,
+    "s48":6,
     "u64":8,
     "s64":8,
 }
@@ -240,7 +247,7 @@ keys = sizings.keys()
 
 GenFlags = tuple[bool, bool]
 
-def gen_rw_helpers(fmt: str, classname: str, name: str, rwname: str, fieldnames: list[str], fieldsizes: list[int], flags: GenFlags):
+def gen_rw_helpers(fmt: str, classname: str, name: str, rwname: str, fieldnames: list[str], fieldsizes: list[int], flags: GenFlags, overd: dict[str, int], overl: list[tuple[str, int, dict[str, str]]]):
     global secondarycontent
     global rwpre
     objname = helperfmts[fmt][0]
@@ -281,6 +288,28 @@ u64 {rwpre}hash_{rwname}({classname}* {rwname}) {{
 {spacetab}unsigned char* bufp = (unsigned char*)hbuf;"""
     checksumhandled = True
     hsize: int = 0
+    tmpno: int = 0
+    for odsc in overl:
+        odsc = list(odsc)
+        s1 = odsc[2].pop("write")
+        used = list(map(str.strip, odsc[0].split(",")))
+        for un in used:
+            s1 = s1.replace(f"`{un}`", f"{rwname}->{un}")
+        for s2 in odsc[2].keys():
+            odsc[2][s2] = odsc[2][s2].replace("`$TMP`", f"tmpval{tmpno}")
+        s = odsc[1]*8
+        if odsc[1] == 1:
+            rbuild += f"\n{spacetab}u8 tmpval{tmpno} = x[{cpos}];"
+            wbuild += f"\n{spacetab}x[{cpos}] = {s1};"
+            hbuild += f"\n{spacetab}hbuf[{cpos}] = {s1};"
+        else:
+            rbuild += f"\n{spacetab}u{s} tmpval{tmpno} = {mksbop(sbr, s)}(xp+{cpos});"
+            wbuild += f"\n{spacetab}{mksbop(sbw, s)}(xp+{cpos}, {s1});"
+            hbuild += f"\n{spacetab}{mksbop(sbw, s)}(bufp+{cpos}, {s1});"
+        for fn in odsc[2].keys():
+            rbuild += f"\n{spacetab}{rwname}->{fn} = {odsc[2][fn]};"
+        cpos += odsc[1]
+        tmpno += 1
     for i in range(len(fieldnames)):
         fn = fieldnames[i]
         fs = fieldsizes[i]
@@ -290,7 +319,10 @@ u64 {rwpre}hash_{rwname}({classname}* {rwname}) {{
             checksumhandled = False
             wbuild += f"\n{spacetab}{rwname}->{fn} = {hfunc}(xp, {cpos});"
             hsize = cpos
-        if fs < 0:
+        if fn == "-align":
+            cpos += fs
+            continue
+        elif fs < 0:
             fs = -fs
             wbuild += f"\n{spacetab}{sbc}(xp+{cpos}, {rwname}->{fn}, {fs});"
             rbuild += f"\n{spacetab}{sbc}({rwname}->{fn}, xp+{cpos}, {fs});"
@@ -331,6 +363,10 @@ def parsePygen(gens: list[str]):
     rwname: str = None
     gflags: list[bool] = [None] * 2
     fmt: str = "$default"
+    override: dict[str, int] = {}
+    overrideto: list[tuple[str, int, dict[str, str]]] = []
+    overkeys = override.keys()
+    sizesum = 0
     start = 0
     for i in range(l):
         line = gens[i].strip()
@@ -370,6 +406,21 @@ def parsePygen(gens: list[str]):
             comment = parts[1]
         elif parts[0] == "name":
             name = parts[1]
+        elif parts[0] == "pygen-over":
+            ix = parts[1][1:].split("] ", 1)
+            iy = ix[1].split(" ", 1)
+            sv = int(iy[0])
+            d: dict[str, str] = {}
+            i += 1
+            line = gens[i].strip()
+            while line != "}":
+                d[line.split(":", 1)[0]] = line.split(":", 1)[1].strip()
+                i += 1
+                line = gens[i].strip()
+            overrideto.append((ix[0], sv, d))
+            sizesum += sv
+            for n in ix[0].split(","):
+                override[n.strip()] = 0
         elif parts[0].startswith("pygen-force-"):
             opt = parts[0][12:]
             v = False if parts[1] == "false" else True
@@ -430,7 +481,6 @@ def parsePygen(gens: list[str]):
         raise SyntaxError("pygen helper format def not ended")
     if name == None:
         raise ValueError("UNNAMED PYGEN")
-    sizesum = 0
     fieldnames: list[str] = []
     fieldsizes: list[int] = []
     classname: str = None
@@ -470,8 +520,17 @@ def parsePygen(gens: list[str]):
         elif line[0] == "pygen-fake":
             sizesum += int(line[1])
             continue
+        elif line[0] == "pygen-align":
+            sa = (8 - (sizesum % 8))
+            sizesum += sa
+            fieldnames.append("-align")
+            fieldsizes.append(sa)
+            continue
         else:
             sv = sizings[line[0]]
+        if line[1] in overkeys:
+            override[line[1]] = sv
+            continue
         fieldnames.append(line[1])
         fieldsizes.append(sv)
         sizesum += abs(sv)
@@ -482,7 +541,7 @@ def parsePygen(gens: list[str]):
         for i in range(len(gflags)):
             if gflags[i] == None:
                 gflags[i] = helperfmts[fmt][i+7]
-        gen_rw_helpers(fmt, classname, name, rwname, fieldnames, fieldsizes, gflags)
+        gen_rw_helpers(fmt, classname, name, rwname, fieldnames, fieldsizes, gflags, override, overrideto)
 
 l = len(lines)
 for i in range(l):
