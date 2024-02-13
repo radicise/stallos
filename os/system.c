@@ -197,7 +197,6 @@ int kernelInfoMsg(const char* msg) {
 	w |= kernelMsg("\n");
 	return w ? (-1) : 0;
 }
-extern int runELF(void*, void*, int*);
 #define FAILMASK_SYSTEM 0x00010000
 extern void bus_out_long(unsigned long, unsigned long);
 extern void bus_out_u8(unsigned long, u8);
@@ -231,11 +230,11 @@ extern void timeIncrement(void);// Atomic, increment system time by 1 second
 extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 #include "kernel/threads.h"
+extern int runELF(void*, void*, struct Thread_state*);
 void irupt_handler_70h(struct Thread_state* state) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
-		kernelMsgCode("Time: ", timeFetch());
 	}
 	Thread_restore(state, 0x70);
 	return;
@@ -406,11 +405,17 @@ void systemEntry(void) {
 	initSystemCallInterface();
 	kernelMsg("done\n");
 	int retVal = 0;
-	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (int*) (((char*) &retVal) + RELOC));
+	struct Thread_state prgmState;
+	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&prgmState)) + RELOC));
+	/*
 	if (errVal) {
 		bugCheckNum(FAILMASK_SYSTEM | 0x0100 | (errVal & 0xff));
 	}
 	kernelMsgCode("Program exited with code ", retVal);
 	while (1) {
 	}
+	*/
+	Thread_run(&prgmState);
+	bugCheck();
+	return;
 }

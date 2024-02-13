@@ -58,7 +58,7 @@ build/kernel.o: build/kernel-comp.s
 build/irupts.o: sys32/irupts.s
 	${ASPRGM} ${ASFLAGS} -o build/irupts.o sys32/irupts.s
 
-build/kernel-comp.s: sys32.dhulb
+build/kernel-comp.s: sys32.dhulb sys32/kern32.dhulb sys32/elfExec.dhulb
 	dhulbpp - - < sys32.dhulb > build/kern32-comp.dhulb
 	dhulbc 32 -tNGTw < build/kern32-comp.dhulb > build/kernel-comp.s
 

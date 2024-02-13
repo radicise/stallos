@@ -25,4 +25,5 @@ struct Thread {
 	struct Thread_state state;
 };
 extern void Thread_restore(struct Thread_state*, long);// Does not return
+extern void Thread_run(struct Thread_state*);// Does not return
 #endif
