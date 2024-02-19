@@ -215,8 +215,8 @@ extern void bus_inBlock_long(u16, long*, unsigned long);
 extern void bus_inBlock_u32(u16, u32*, unsigned long);
 extern void bus_inBlock_u16(u16, u16*, unsigned long);
 extern void bus_inBlock_u8(u16, u8*, unsigned long);
-extern u32 readPhysical(u32);
-extern void writePhysical(u32, u32);
+extern unsigned long readLongPhysical(u32);
+extern void writeLongPhysical(u32, unsigned long);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
@@ -351,8 +351,8 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 #define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
-	mainTerm.pos = readPhysical(0x00000506) & 0xffff;
-	mainTerm.format = readPhysical(0x00000508) & 0x00ff;
+	mainTerm.pos = readLongPhysical(0x00000506) & 0xffff;
+	mainTerm.format = readLongPhysical(0x00000508) & 0x00ff;
 	/*
 	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
 		((struct VGACell*) i)->format = mainTerm.format;
@@ -410,7 +410,7 @@ void systemEntry(void) {
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
 	kernelMsg("done\n");
-	kernelMsg("Executing\n");
+	kernelMsg("Starting `init'\n");
 	Mutex_acquire(&Threads_threadManage);
 	struct Thread* th = alloc(sizeof(struct Thread));
 	PerThread_context = &(th->thread);

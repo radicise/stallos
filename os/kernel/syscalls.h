@@ -12,18 +12,18 @@
 #include "perThread.h"
 #include "Map.h"
 struct FileKey {
-	pid_t pid;
+	pid_t tgpid;
 	int fd;
 };
 int FileKeyComparator(uintptr a, uintptr b) {
 	struct FileKey* aF = (struct FileKey*) (((struct Map_pair*) a)->key);
 	struct FileKey* bF = (struct FileKey*) b;
-	return (aF->pid != bF->pid) || (aF->fd != bF->fd);
+	return (aF->tgpid != bF->tgpid) || (aF->fd != bF->fd);
 }
 struct Map* FileKeyKfdMap;
 int getDesc(pid_t pIdent, int fd) {
 	struct FileKey match;
-	match.pid = pIdent;
+	match.tgpid = pIdent;
 	match.fd = fd;
 	uintptr i = Map_findByCompare((uintptr) &match, FileKeyComparator, FileKeyKfdMap);
 	if (i == (uintptr) (-1)) {
@@ -63,31 +63,31 @@ void initSystemCallInterface(void) {
 	Map_add(5, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdd"
 	FileKeyKfdMap = Map_create();// Map, struct FileKey* "file key" -> int "kfd"
 	struct FileKey* k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 0;
 	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdin" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 1;
 	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdout" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 2;
 	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stderr" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 3;
 	Map_add((uintptr) k, 2, FileKeyKfdMap);// "ATA Drive 1" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 0x77777777;
+	k->tgpid = 1;
 	k->fd = 4;
 	Map_add((uintptr) k, 3, FileKeyKfdMap);// "ATA Drive 2" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 5;
 	Map_add((uintptr) k, 4, FileKeyKfdMap);// "ATA Drive 3" for the userspace boot process
 	k = alloc(sizeof(struct FileKey));
-	k->pid = 1;
+	k->tgpid = 1;
 	k->fd = 6;
 	Map_add((uintptr) k, 5, FileKeyKfdMap);// "ATA Drive 4" for the userspace boot process
 	return;
@@ -201,6 +201,24 @@ int stime(const time_t* valAddr) {
 	timeStore(*valAddr);
 	return 0;
 }
+uidnatural_t getuid(void) {
+	return uid32_to_uidnatural(ruid);
+}
+uid32_t getuid32(void) {
+	return ruid;
+}
+uidnatural_t geteuid(void) {
+	return uid32_to_uidnatural(euid);
+}
+uid32_t geteuid32(void) {
+	return euid;
+}
+pid_t getpid(void) {
+	return tgid;
+}
+pid_t gettid(void) {
+	return tid;
+}
 // TODO Implement all applicable system calls
 unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
 	errno = 0;
@@ -216,10 +234,22 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			return (unsigned long) time((time_t*) ((arg1 == 0) ? 0 : (arg1 + getMemOffset())));
 		case (19):
 			return (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
+		case (20):
+			return (unsigned long) getpid();
+		case (24):
+			return (unsigned long) getuid();
 		case (25):
 			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset()));
+		case (49):
+			return (unsigned long) geteuid();
 		case (140):// Prototype is sourced from man-pages lseek64(3)
 			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset()), (int) arg5);
+		case (199):
+			return (unsigned long) getuid32();
+		case (201):
+			return (unsigned long) geteuid32();
+		case (224):
+			return (unsigned long) gettid();
 		default:// TODO Do not allow the system to crash upon the provision of non-existent system call numbers
 			bugCheckNum(0xABADCA11);// Unrecognised / unimplemented system call ("A BAD CALL")
 			return 0;

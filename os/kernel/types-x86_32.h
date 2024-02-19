@@ -14,9 +14,16 @@ typedef long long time64_t;
 typedef long off_t;
 typedef long long loff_t;
 typedef unsigned short uid16_t;// For certain legacy architectures
-#define UID_OVERFLOW 65534
+typedef uid16_t uidnatural_t;
+uidnatural_t uidnatural_overflow = 65534;
 typedef unsigned int uid32_t;
 typedef unsigned short mode_t;
+uidnatural_t uid32_to_uidnatural(uid32_t val) {
+	if (val >= 65535) {
+		return uidnatural_overflow;
+	}
+	return (uidnatural_t) val;
+}
 /*
  *
  * Definition of CHAR_BIT

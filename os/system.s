@@ -68,16 +68,16 @@ popw %gs
 popw %fs
 popw %es
 iretl
-writePhysical:# void writePhysical(u32 byteAddr, u32 byte)
-.globl writePhysical
+writeLongPhysical:# void writePhysical(u32 addr, unsigned long dat)
+.globl writeLongPhysical
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
 movl 8(%esp),%ecx
 movl %ecx,%es:(%eax)
 ret
-readPhysical:# u32 readPhysical(u32 byteAddr)
-.globl readPhysical
+readLongPhysical:# unsigned long readPhysical(u32 addr)
+.globl readLongPhysical
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
