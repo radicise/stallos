@@ -11,24 +11,24 @@ LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
 build StallOS/stallos.bin: build/stall.bin
 	cp build/stall.bin StallOS/stallos.bin
 
-build/stall.bin: build/stall.elf build/kernel.bin build/prgm.elf build/shell.elf
+build/stall.bin: build/stall.elf build/kernel.bin build/prgm.elf build/init.elf
 	${OBJCOPYPRGM} --dump-section .text=build/stall.bin build/stall.elf /dev/null
 	dd if=build/kernel.bin of=build/stall.bin bs=512 skip=110 seek=48
 	dd if=build/prgm.elf of=build/stall.bin bs=512 seek=66
-	dd if=build/shell.elf of=build/stall.bin bs=512 seek=194
+	dd if=build/init.elf of=build/stall.bin bs=512 seek=194
 	dd if=/dev/zero of=build/stall.bin bs=512 count=1 seek=2879
 
 run: StallOS/stallos.bin
 	./run.sh
 
-build/shell.elf: build/shell-asm.elf build/shell-ul.elf
-	${LDPRGM} ${LDFLAGS} -o build/shell.elf build/shell-ul.elf build/shell-asm.elf -lgcc
+build/init.elf: build/init-asm.elf build/init-ul.elf
+	${LDPRGM} ${LDFLAGS} -o build/init.elf build/init-ul.elf build/init-asm.elf -lgcc
 
-build/shell-asm.elf: os/shell.s
-	${ASPRGM} ${ASFLAGS} -o build/shell-asm.elf os/shell.s
+build/init-asm.elf: os/init.s
+	${ASPRGM} ${ASFLAGS} -o build/init-asm.elf os/init.s
 
-build/shell-ul.elf: os/shell.c
-	${CCPRGM} ${CFLAGS} -o build/shell-ul.elf os/shell.c
+build/init-ul.elf: os/init.c
+	${CCPRGM} ${CFLAGS} -o build/init-ul.elf os/init.c
 
 build/prgm.elf: build/prgm-ul.elf build/prgm-asm.elf
 	${LDPRGM} ${LDFLAGS} -o build/prgm.elf build/prgm-ul.elf build/prgm-asm.elf -lgcc
