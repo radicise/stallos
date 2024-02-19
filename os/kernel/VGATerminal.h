@@ -2,6 +2,7 @@
 #define __KERNEL__VGATERMINAL_H__ 1
 #define FAILMASK_VGATERMINAL 0x00030000
 #include "types.h"
+#include "perThread.h"
 struct VGACell {
 	unsigned char text;
 	unsigned char format;
@@ -176,7 +177,8 @@ ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned
 }
 #include "types.h"
 #include "errno.h"
-#include "perProcess.h"
+#include "perThreadgroup.h"
+#include "perThread.h"
 ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
 	if (kfd != 1) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0100 | EBADF);

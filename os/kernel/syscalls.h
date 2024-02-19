@@ -8,7 +8,8 @@
 #include "errno.h"
 #include "types.h"
 #include "capabilities.h"
-#include "perProcess.h"
+#include "perThreadgroup.h"
+#include "perThread.h"
 #include "Map.h"
 struct FileKey {
 	pid_t pid;
@@ -45,8 +46,8 @@ struct FileDriver* resolveFileDriver(int kfd) {
 	}
 	return (struct FileDriver*) drvr;
 }
-unsigned int getMemOffset(pid_t pid) {
-	if (pid == ((pid_t) 1)) {
+unsigned int getMemOffset(void) {// TODO Utilise virtual memory pages
+	if (tid == ((pid_t) 1)) {// TODO Support for multiple userspace threads
 		return 0x800000 - RELOC;
 	}
 	bugCheck();
@@ -102,23 +103,31 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 	// TODO Remove entries from `kfdDriverMap' that are not held by other processes and are associated with the `kfd' values that were the values of key-value pairs removed from `FileKeyKfdMap'
 	return;
 }
-/*
- *
- * NOTES:
- *
- * On entry:
- * - Set `pid'
- *
- */
 int validateCap(int cap) {
 	return 1;// TODO Implement
+}
+/*
+ *
+ * System call interface
+ *
+ */
+void _exit(int status) {
+	bugCheck();// TODO Implement
+	// if this is the last thread of the thread group,
+		// reparent children
+		// send SIGCHLD to parent
+		// uhh
+	// uhh
+
+
+
 }
 ssize_t write(int fd, const void* buf, size_t count) {
 	if (fd < 0) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(pid, fd);
+	int kfd = getDesc(tgid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -134,7 +143,7 @@ ssize_t read(int fd, void* buf, size_t count) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(pid, fd);
+	int kfd = getDesc(tgid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -150,7 +159,7 @@ off_t lseek(int fd, off_t off, int how) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(pid, fd);
+	int kfd = getDesc(tgid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -166,7 +175,7 @@ int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {
 		errno = EBADF;
 		return -1;
 	}
-	int kfd = getDesc(pid, fd);
+	int kfd = getDesc(tgid, fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return -1;
@@ -192,22 +201,25 @@ int stime(const time_t* valAddr) {
 	timeStore(*valAddr);
 	return 0;
 }
-// TODO Implement all applicable syscalls
+// TODO Implement all applicable system calls
 unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls will have "nr" values allocated for them as needed
-	pid = (pid_t) 1;// TODO Allow multiple processes
+	errno = 0;
 	switch (nr) {// TODO Authenticate memory access
+		case (1):
+			_exit((int) arg1);
+			bugCheck();
 		case (3):
-			return (unsigned long) read((int) arg1, (void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
+			return (unsigned long) read((int) arg1, (void*) (arg2 + getMemOffset()), (size_t) arg3);
 		case (4):
-			return (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset(pid)), (size_t) arg3);
+			return (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset()), (size_t) arg3);
 		case (13):
-			return (unsigned long) time((time_t*) ((arg1 == 0) ? 0 : (arg1 + getMemOffset(pid))));
+			return (unsigned long) time((time_t*) ((arg1 == 0) ? 0 : (arg1 + getMemOffset())));
 		case (19):
 			return (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
 		case (25):
-			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset(pid)));
+			return (unsigned long) stime((const time_t*) (arg1 + getMemOffset()));
 		case (140):// Prototype is sourced from man-pages lseek64(3)
-			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset(pid)), (int) arg5);
+			return (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset()), (int) arg5);
 		default:// TODO Do not allow the system to crash upon the provision of non-existent system call numbers
 			bugCheckNum(0xABADCA11);// Unrecognised / unimplemented system call ("A BAD CALL")
 			return 0;

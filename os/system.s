@@ -47,9 +47,9 @@ pushl %edx
 pushl %ecx
 pushl %ebx
 cld
-movl %ebp,errno
 call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
-movl errno,%ebp
+movl PerThread_context,%ebp
+movl %ds:(%ebp),%ebp
 testl %ebp,%ebp
 jz irupt_80h__noError
 movl %ebp,%eax
@@ -73,17 +73,16 @@ writePhysical:# void writePhysical(u32 byteAddr, u32 byte)
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
-movb 8(%esp),%cl
-movb %cl,%es:(%eax)
+movl 8(%esp),%ecx
+movl %ecx,%es:(%eax)
 ret
 readPhysical:# u32 readPhysical(u32 byteAddr)
 .globl readPhysical
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
-movb %es:(%eax),%cl
-xorl %eax,%eax
-movb %cl,%al
+movl %es:(%eax),%ecx
+movl %ecx,%eax
 ret
 runELF:# int runELF(void* elfPhys, void* memAreaPhys, int* retVal)
 .globl runELF
@@ -434,6 +433,8 @@ pushl 0x08(%ebx)
 pushl 0x0c(%ebx)
 pushw 0x2a(%ebx)
 popw %ds
+pushw $0x00# Zeroing the stack
+popw %dx
 popl %edx
 popl %ecx
 popl %ebx

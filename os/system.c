@@ -230,6 +230,8 @@ extern void timeIncrement(void);// Atomic, increment system time by 1 second
 extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 #include "kernel/threads.h"
+#include "kernel/perThreadgroup.h"
+#include "kernel/perThread.h"
 extern int runELF(void*, void*, struct Thread_state*);
 void irupt_handler_70h(struct Thread_state* state) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
@@ -346,6 +348,7 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 	(*((unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
 	(*((unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
+#define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
 	mainTerm.pos = readPhysical(0x00000506) & 0xffff;
@@ -368,23 +371,23 @@ void systemEntry(void) {
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
 	kernelMsg("Setting interrupt handlers . . . ");
-	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);
-	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);
-	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);
-	substitute_irupt_address_vector(0x73, irupt_73h, 0x18);
-	substitute_irupt_address_vector(0x74, irupt_74h, 0x18);
-	substitute_irupt_address_vector(0x75, irupt_75h, 0x18);
-	substitute_irupt_address_vector(0x76, irupt_76h, 0x18);
-	substitute_irupt_address_vector(0x77, irupt_77h, 0x18);
-	substitute_irupt_address_vector(0x78, irupt_78h, 0x18);
-	substitute_irupt_address_vector(0x79, irupt_79h, 0x18);
-	substitute_irupt_address_vector(0x7a, irupt_7ah, 0x18);
-	substitute_irupt_address_vector(0x7b, irupt_7bh, 0x18);
-	substitute_irupt_address_vector(0x7c, irupt_7ch, 0x18);
-	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);
-	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);
-	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);
-	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
+	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x73, irupt_73h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x74, irupt_74h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x75, irupt_75h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x76, irupt_76h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x77, irupt_77h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x78, irupt_78h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x79, irupt_79h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7a, irupt_7ah, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7b, irupt_7bh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7c, irupt_7ch, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);// The system call interface is the only place where, during normal operation, the thread-specific and thread-determining data may be interacted with
 	kernelMsg("done\n");
 	kernelMsg("Redefining Intel 8253 / 8254 Programmable Interval Timer channel 0 interval . . . ");
 	bus_out_u8(0x0043, 0x34);
@@ -404,18 +407,32 @@ void systemEntry(void) {
 	kernelMsg("Initializing system call interface . . . ");
 	initSystemCallInterface();
 	kernelMsg("done\n");
-	int retVal = 0;
-	struct Thread_state prgmState;
-	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&prgmState)) + RELOC));
-	/*
-	if (errVal) {
-		bugCheckNum(FAILMASK_SYSTEM | 0x0100 | (errVal & 0xff));
+	kernelMsg("Initializing kernel thread management interface . . . ");
+	Threads_init();
+	kernelMsg("done\n");
+	kernelMsg("Executing\n");
+	Mutex_acquire(&Threads_threadManage);
+	struct Thread* th = alloc(sizeof(struct Thread));
+	PerThread_context = &(th->thread);
+	(th->group) = (PerThreadgroup_context = alloc(sizeof(struct PerThreadgroup)));
+	___nextTask___ = 1;// For consistency of the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process
+	Mutex_release(&Threads_threadManage);
+	currentThread = Threads_addThread(th);
+	Mutex_acquire(&Threads_threadManage);
+	tgid = currentThread;
+	tid = tgid;
+	ruid = 0;
+	euid = 0;
+	suid = 0;
+	fsuid = 0;
+	errno = 0;
+	___nextTask___ = PID_USERSTART;
+	Mutex_release(&Threads_threadManage);
+	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
+	if (errVal != 0) {
+		bugCheckNum(errVal | FAILMASK_ELFLOADER);
 	}
-	kernelMsgCode("Program exited with code ", retVal);
-	while (1) {
-	}
-	*/
-	Thread_run(&prgmState);
+	Thread_run(&(th->state));
 	bugCheck();
 	return;
 }

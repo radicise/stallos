@@ -12,7 +12,7 @@ void kmem_init(void) {
 	Mutex_initUnlocked(&kmem_access);
 	return;
 }
-void* alloc(size_t siz) {// Allocated memory is guaranteed to not be at NULL and to not be at (void*) (-1) and to not be at (uintptr*) (-1)
+void* alloc(size_t siz) {// Allocated memory is guaranteed to not be at NULL and to not be at (void*) (-1) and to not be at (uintptr*) (-1); avoidance of deadlock must be sure
 	if (siz == 0) {
 		return NULL;
 	}
