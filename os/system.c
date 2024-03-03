@@ -1,5 +1,12 @@
 #define RELOC 0x00040000
 #define __STALLOS__ 1
+#define LINUX_COMPAT_VERSION 0x20603904
+/*
+ *
+ * LINUX_COMPAT_VERSION=0xABBCCCDD for compatibility with version A.BB.CCC.DD
+ * Compatibility with Linux versions below 1.0 is not supported
+ *
+ */
 #include "kernel/types.h"
 unsigned long long PIT0Ticks = 0;
 extern void int_enable(void);
@@ -74,15 +81,82 @@ char hex[] = {0x30,
 	0x44,
 	0x45,
 	0x46};
-typedef unsigned char Mutex;
+#define FAILMASK_SYSTEM 0x00010000
+typedef unsigned char SimpleMutex;// Not reentrant
 typedef unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
 extern void AtomicULong_set(AtomicULong*, unsigned long);
-extern void Mutex_acquire(Mutex*);// Idempotent
-extern void Mutex_release(Mutex*);// Idempotent
-extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
-extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the thread attempting to acquire is not interrupted
-extern void Mutex_initUnlocked(Mutex*);
+long handlingIRQ = 0;
+pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Thread_run' or not during kernel-space operation
+extern void SimpleMutex_acquire(SimpleMutex*);
+extern void SimpleMutex_release(SimpleMutex*);
+extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
+extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
+extern void SimpleMutex_initUnlocked(SimpleMutex*);
+typedef struct {
+	SimpleMutex stateLock;
+	pid_t ownerThread;
+	unsigned long acquires;
+} Mutex;// Reentrant
+void Mutex_acquire(Mutex* mutex) {
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	while (1) {
+		SimpleMutex_acquire(&(mutex->stateLock));
+		if (mutex->acquires == 0) {
+			(mutex->ownerThread) = id;
+		}
+		else if ((mutex->ownerThread) != id) {
+			SimpleMutex_release(&(mutex->stateLock));
+			SimpleMutex_wait();
+			continue;
+		}
+		(mutex->acquires)++;
+		if ((mutex->acquires) == 0) {
+			bugCheckNum(0x0101 | FAILMASK_SYSTEM);
+		}
+		SimpleMutex_release(&(mutex->stateLock));
+		return;
+	}
+}
+void Mutex_release(Mutex* mutex) {	
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	SimpleMutex_acquire(&(mutex->stateLock));
+	if ((mutex->ownerThread) != id) {
+		bugCheckNum(0x0102 | FAILMASK_SYSTEM);
+	}
+	if ((mutex->acquires) == 0) {
+		bugCheckNum(0x0103 | FAILMASK_SYSTEM);
+	}
+	(mutex->acquires)--;
+	SimpleMutex_release(&(mutex->stateLock));
+}
+int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	SimpleMutex_acquire(&(mutex->stateLock));
+	if (mutex->acquires == 0) {
+		(mutex->ownerThread) = id;
+	}
+	else if ((mutex->ownerThread) != id) {
+		SimpleMutex_release(&(mutex->stateLock));
+		return 0;
+	}
+	(mutex->acquires)++;
+	if ((mutex->acquires) == 0) {
+		bugCheckNum(0x0104 | FAILMASK_SYSTEM);
+	}
+	SimpleMutex_release(&(mutex->stateLock));
+	return 1;
+}
+void Mutex_wait(void) {// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the thread attempting to acquire is not interrupted
+	SimpleMutex_wait();
+	return;
+}
+void Mutex_initUnlocked(Mutex* mutex) {
+	(mutex->ownerThread) = (pid_t) 0;
+	(mutex->acquires) = 0;
+	SimpleMutex_initUnlocked(&(mutex->stateLock));
+	return;
+}
 void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
 	if (dst < buf) {
@@ -155,9 +229,11 @@ int kernelMsg(const char* msg) {
 	return 0;
 }
 int kernelWarnMsg(const char* msg) {
-	kernelMsg("Warning: ");
-	kernelMsg(msg);
-	kernelMsg("\n");
+	int w = 0;
+	w |= kernelMsg("Warning: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
 }
 int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
@@ -174,6 +250,62 @@ int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	w |= kernelMsg(tx);
 	w |= kernelMsg("\n");
 	return w ? (-1) : 0;
+}
+int kernelMsgULong(unsigned long n) {
+	if (n == 0) {
+		return kernelMsg("0");
+	}
+	int count = 0;
+	unsigned long m = n;
+	while (m) {
+		m /= 10;
+		count++;
+	}
+	char buf[count + 1];
+	int i = count - 1;
+	while (1) {
+		buf[i] = 0x30 + (n % 10);
+		if (i == 0) {
+			break;
+		}
+		n /= 10;
+		i--;
+	}
+	return kernelMsg(buf);
+}
+int printKernelMemUsage(void) {
+	unsigned long long n = getMemUsage();
+	unsigned long b = n & 0x3ff;
+	n >>= 10;
+	unsigned long kib = n & 0x3ff;
+	n >>= 10;
+	unsigned long mib = n & 0x3ff;
+	n >>= 10;
+	unsigned long gib = n & 0x3ff;
+	unsigned long tib = n >> 10;
+	int g = tib ? 1 : (gib ? 2 : (mib ? 3 : (kib ? 4 : 5)));
+	int w = 0;
+	switch (g) {
+		case (1):
+			w |= kernelMsgULong(tib);
+			w |= kernelMsg("TiB+");
+		case (2):
+			w |= kernelMsgULong(gib);
+			w |= kernelMsg("GiB+");
+		case (3):
+			w |= kernelMsgULong(mib);
+			w |= kernelMsg("MiB+");
+		case (4):
+			w |= kernelMsgULong(kib);
+			w |= kernelMsg("KiB+");
+		case (5):
+			w |= kernelMsgULong(b);
+			w |= kernelMsg("B");
+			break;
+		default:
+			bugCheck();
+	}
+	return w;
 }
 int kernelMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
@@ -197,7 +329,6 @@ int kernelInfoMsg(const char* msg) {
 	w |= kernelMsg("\n");
 	return w ? (-1) : 0;
 }
-#define FAILMASK_SYSTEM 0x00010000
 extern void bus_out_long(unsigned long, unsigned long);
 extern void bus_out_u8(unsigned long, u8);
 extern void bus_out_u16(unsigned long, u16);
@@ -425,8 +556,9 @@ void systemEntry(void) {
 	euid = 0;
 	suid = 0;
 	fsuid = 0;
+	Mutex_initUnlocked(&(PerThread_context->dataLock));
 	errno = 0;
-	___nextTask___ = PID_USERSTART;
+	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
 	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
 	if (errVal != 0) {

@@ -3,10 +3,10 @@
 #include "types.h"
 #include "kmemman.h"
 #define SET_BS 16
-#define FAILMASK_SET 0x00080000
 struct Set {
 	struct Set_block* start;
 	long amnt;
+	Mutex lock;
 };
 struct Set_block {
 	uintptr used;
@@ -17,9 +17,11 @@ struct Set* Set_create(void) {
 	struct Set* la = alloc(sizeof(struct Set));
 	la->start = NULL;
 	la->amnt = 0;
+	Mutex_initUnlocked(&(la->lock));
 	return la;
 }
 void Set_destroy(struct Set* la) {
+	Mutex_acquire(&(la->lock));
 	struct Set_block* lb = la->start;
 	while (1) {
 		if (lb == NULL) {
@@ -32,10 +34,12 @@ void Set_destroy(struct Set* la) {
 	}
 }
 int Set_remove(uintptr dat, struct Set* ll) {// Success: 0; Not found: -1
+	Mutex_acquire(&(ll->lock));
 	struct Set_block* lb = ll->start;
 	struct Set_block* last = NULL;
 	while (1) {
 		if (lb == NULL) {
+			Mutex_release(&(ll->lock));
 			return (-1);
 		}
 		uintptr amnt = lb->used;
@@ -57,6 +61,7 @@ int Set_remove(uintptr dat, struct Set* ll) {// Success: 0; Not found: -1
 					}
 				}
 				ll->amnt--;
+				Mutex_release(&(ll->lock));
 				return 0;
 			}
 		}
@@ -65,15 +70,18 @@ int Set_remove(uintptr dat, struct Set* ll) {// Success: 0; Not found: -1
 	}
 }
 int Set_contains(uintptr dat, struct Set* ll) {// Contains given element: 1; Does not contain given element: 0
+	Mutex_acquire(&(ll->lock));
 	struct Set_block* lb = ll->start;
 	while (1) {
 		if (lb == NULL) {
+			Mutex_release(&(ll->lock));
 			return 0;
 		}
 		uintptr amnt = lb->used;
 		uintptr* data = lb->data;
 		for (int i = 0; i < amnt; i++) {
 			if (data[i] == dat) {
+				Mutex_release(&(ll->lock));
 				return 1;
 			}
 		}
@@ -81,7 +89,9 @@ int Set_contains(uintptr dat, struct Set* ll) {// Contains given element: 1; Doe
 	}
 }
 int Set_add(uintptr dat, struct Set* ll) {// Success: 0; Already exists: -1
+	Mutex_acquire(&(ll->lock));
 	if (Set_contains(dat, ll)) {
+		Mutex_release(&(ll->lock));
 		return (-1);
 	}
 	struct Set_block* lb = ll->start;
@@ -99,6 +109,7 @@ int Set_add(uintptr dat, struct Set* ll) {// Success: 0; Already exists: -1
 			}
 			lb->data[0] = dat;
 			ll->amnt++;
+			Mutex_release(&(ll->lock));
 			return 0;
 		}
 		uintptr amnt = lb->used;
@@ -106,6 +117,7 @@ int Set_add(uintptr dat, struct Set* ll) {// Success: 0; Already exists: -1
 			lb->data[amnt] = dat;
 			lb->used++;
 			ll->amnt++;
+			Mutex_release(&(ll->lock));
 			return 0;
 		}
 		last = lb;
@@ -113,16 +125,20 @@ int Set_add(uintptr dat, struct Set* ll) {// Success: 0; Already exists: -1
 	}
 }
 uintptr Set_containsByCompare(uintptr dat, int (*comparator)(uintptr, uintptr), struct Set* ll) {// Contains a match: The match; Does not contain a match: (uintptr) -1
+	Mutex_acquire(&(ll->lock));
 	struct Set_block* lb = ll->start;
 	while (1) {
 		if (lb == NULL) {
+			Mutex_release(&(ll->lock));
 			return (-1);
 		}
 		uintptr amnt = lb->used;
 		uintptr* data = lb->data;
 		for (int i = 0; i < amnt; i++) {// comparison is guaranteed to be in the order `comparator(<suspected match>, <provided value>)'
 			if (!(comparator(data[i], dat))) {// comparator(A, B) == 0: A matches with B according to the comparator; comparator(A, B) != 0: A does not match with B according to the comparator
-				return data[i];
+				uintptr retVal = data[i];
+				Mutex_release(&(ll->lock));
+				return retVal;
 			}
 		}
 		lb = (struct Set_block*) lb->next;

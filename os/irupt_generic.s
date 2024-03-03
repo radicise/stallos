@@ -48,6 +48,7 @@ pushw %fs
 pushw %gs
 xorl %ebp,%ebp
 cld
+movl $0x00000001,handlingIRQ
 .if (0xNUM == 0x70)
 pushl $(0x007fff00 - RELOC)
 .endif
@@ -55,6 +56,7 @@ call irupt_handler_NUMh
 .if (0xNUM == 0x70)
 addl $0x04,%esp
 .endif
+movl $0x00000000,handlingIRQ
 popw %gs
 popw %fs
 popw %es

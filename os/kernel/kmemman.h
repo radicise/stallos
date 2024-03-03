@@ -3,14 +3,22 @@
 #include "types.h"
 #define KMEM_ADDR 0x1800000
 #define KMEM_AMNT 0x1800000
+#define KMEM_AMNTMEMBITMAPBYTES (KMEM_AMNT / (KMEM_BS * CHAR_BIT))
+#define KMEM_AMNTMEMSPACES (KMEM_AMNT / KMEM_BS)
 #define KMEM_BS 16
-#define KMEM_DATSTART (KMEM_ADDR + (KMEM_AMNT / (KMEM_BS * CHAR_BIT)))
+#define KMEM_DATSTART (KMEM_ADDR + KMEM_AMNTMEMBITMAPBYTES)
 Mutex kmem_access;
 unsigned long long memAllocated = 0;
 void kmem_init(void) {
 	set((void*) (KMEM_ADDR - RELOC), 0x00, KMEM_DATSTART - KMEM_ADDR);
 	Mutex_initUnlocked(&kmem_access);
 	return;
+}
+unsigned long long getMemUsage(void) {
+	Mutex_acquire(&kmem_access);
+	unsigned long long n = memAllocated;
+	Mutex_release(&kmem_access);
+	return n;
 }
 void* alloc(size_t siz) {// Allocated memory is guaranteed to not be at NULL and to not be at (void*) (-1) and to not be at (uintptr*) (-1); avoidance of deadlock must be sure
 	if (siz == 0) {
@@ -21,7 +29,7 @@ void* alloc(size_t siz) {// Allocated memory is guaranteed to not be at NULL and
 	size_t a = siz;
 	Mutex_acquire(&kmem_access);
 	while (1) {
-		if (k == KMEM_AMNT) {
+		if (k == KMEM_AMNTMEMSPACES) {
 			Mutex_release(&kmem_access);
 			bugCheckNum(0xd00d25ad);// Out of heap memory
 		}

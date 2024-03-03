@@ -67,7 +67,6 @@ pid_t Threads_addThread(struct Thread* thread) {// `thread' and `thread->group' 
 	Mutex_release(&Threads_threadManage);
 	return n;
 }
-pid_t currentThread;
 int Threads_findNext(uintptr suspect, uintptr u) {// Threads_threadManage must have already been acquired and is NOT released
 	struct Map_pair* pair = (struct Map_pair*) suspect;
 	uintptr key = pair->key;

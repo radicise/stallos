@@ -261,41 +261,41 @@ nop
 nop
 cli
 ret
-Mutex_acquire:# void Mutex_acquire(Mutex* mutex)
-.globl Mutex_acquire
+SimpleMutex_acquire:# void SimpleMutex_acquire(SimpleMutex* mutex)
+.globl SimpleMutex_acquire
 movl 4(%esp),%edx
 xorb %al,%al
 incb %al
-Mutex_acquire__loop1:
+SimpleMutex_acquire__loop1:
 lock xchgb %al,(%edx)
 testb %al,%al
-jz Mutex_acquire__end
+jz SimpleMutex_acquire__end
 nop
-jmp Mutex_acquire__loop1
-Mutex_acquire__end:
+jmp SimpleMutex_acquire__loop1
+SimpleMutex_acquire__end:
 ret
-Mutex_release:# void Mutex_release(Mutex* mutex)
-.globl Mutex_release
+SimpleMutex_release:# void SimpleMutex_release(SimpleMutex* mutex)
+.globl SimpleMutex_release
 movl 4(%esp),%edx
 xorl %eax,%eax
 lock xchgb %al,(%edx)
 ret
-Mutex_tryAcquire:# int Mutex_tryAcquire(Mutex* mutex)
-.globl Mutex_tryAcquire
+SimpleMutex_tryAcquire:# int SimpleMutex_tryAcquire(SimpleMutex* mutex)
+.globl SimpleMutex_tryAcquire
 movl 4(%esp),%edx
 xorb %al,%al
 incb %al
 lock xchgb %al,(%edx)
 xorb $0x01,%al
 ret
-Mutex_initUnlocked:# void Mutex_initUnlocked(Mutex* mutex)
-.globl Mutex_initUnlocked
+SimpleMutex_initUnlocked:# void SimpleMutex_initUnlocked(SimpleMutex* mutex)
+.globl SimpleMutex_initUnlocked
 movl 4(%esp),%edx
 xorb %al,%al
 lock xchgb %al,(%edx)
 ret
-Mutex_wait:
-.globl Mutex_wait
+SimpleMutex_wait:
+.globl SimpleMutex_wait
 nop
 nop
 nop
@@ -373,6 +373,7 @@ call bugCheckNumWrapped
 ret
 Thread_restore:# void Thread_restore(struct Thread_state*, long)
 .globl Thread_restore# Only invoke this from interrupt handlers called because pf IRQ interrupts
+movl $0x00000000,handlingIRQ
 movl 4(%esp),%ebx
 movl 8(%esp),%eax
 movw 0x2c(%ebx),%dx
