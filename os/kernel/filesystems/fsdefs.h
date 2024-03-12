@@ -529,7 +529,7 @@ void tsfs_mk_ce_name(void* vb, char const* n, size_t nlen) {
 void tsfs_dummy_flush(FileSystem* fs) {}
 
 #ifndef fsflush
-#define fsflush(fs) fs->fdrive->fsync(fs->kfd);
+#define fsflush(fs) fs->fdrive->fync(fs->kfd);
 #endif
 
 #include "./diskmanip.h"
