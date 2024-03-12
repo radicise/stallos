@@ -1,6 +1,7 @@
 #ifndef __MAP_H__
 #define __MAP_H__ 1
 #include "Set.h"
+#define FAILMASK_MAP 0x000c0000
 struct Map {
 	struct Set* set;
 };
@@ -22,46 +23,61 @@ int Map_compareNotEqualRemove(uintptr pair, uintptr arb) {
 	return 1;
 }
 void Map_destroy(struct Map* map) {
+	Mutex_acquire(&(map->set->lock));
 	Set_containsByCompare(0, Map_compareNotEqualRemove, map->set);
 	Set_destroy(map->set);
 	dealloc(map, sizeof(struct Map));
 	return;
 }
 int Map_add(uintptr key, uintptr value, struct Map* map) {// Success: 0; Key is already mapped: -1
+	Mutex_acquire(&(map->set->lock));
 	if (Set_containsByCompare(key, Map_compare, map->set) != (uintptr) (-1)) {
+		Mutex_release(&(map->set->lock));
 		return (-1);
 	}
 	struct Map_pair* m = alloc(sizeof(struct Map_pair));
 	m->key = key;
 	m->value = value;
 	if (Set_add((uintptr) m, map->set)) {
-		return (-1);
+		bugCheckNum(0x0001 | FAILMASK_MAP);
 	}
+	Mutex_release(&(map->set->lock));
 	return 0;
 }
 uintptr Map_fetch(uintptr key, struct Map* map) {// Contains the specified key: The associated value; Does not contain the specified key: (uintptr) -1
+	Mutex_acquire(&(map->set->lock));
 	uintptr i = Set_containsByCompare(key, Map_compare, map->set);
 	if (i == (uintptr) (-1)) {
+		Mutex_release(&(map->set->lock));
 		return (uintptr) (-1);
 	}
-	return ((struct Map_pair*) i)->value;
+	uintptr retVal = ((struct Map_pair*) i)->value;
+	Mutex_release(&(map->set->lock));
+	return retVal;
 }
 uintptr Map_findByCompare(uintptr data, int (*comparator)(uintptr, uintptr), struct Map* map) {// Contains a match: The key of the match; Does not contain a match: (uintptr) (-1)
+	Mutex_acquire(&(map->set->lock));
 	uintptr i = Set_containsByCompare(data, comparator, map->set);// comparison is guaranteed to be in the order `comparator(<Map_pair*>, <provided value>)'; comparator(A, B) == 0: A and B match according to the comparator; comparator(A, B) != 0: A and B do not match according to the comparator
 	if (i == (uintptr) (-1)) {
+		Mutex_release(&(map->set->lock));
 		return (-1);
 	}
-	return ((struct Map_pair*) i)->key;
+	uintptr retVal = ((struct Map_pair*) i)->key;
+	Mutex_release(&(map->set->lock));
+	return retVal;
 }
 int Map_remove(uintptr key, struct Map* map) {// Success: 0; Key was not already present: -1
+	Mutex_acquire(&(map->set->lock));
 	uintptr i = Set_containsByCompare(key, Map_compare, map->set);
 	if (i == (uintptr) (-1)) {
+		Mutex_release(&(map->set->lock));
 		return (-1);
 	}
 	if (Set_remove(i, map->set)) {
-		return (-1);
+		bugCheckNum(0x0002 | FAILMASK_MAP);
 	}
 	dealloc((struct Map_pair*) i, sizeof(struct Map_pair));
+	Mutex_release(&(map->set->lock));
 	return 0;
 }
 #endif

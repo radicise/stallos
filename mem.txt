@@ -18,11 +18,12 @@ l	0x0510	Physical address of start of GDT
 w	0x0514	Bug check code
 
 l	0x0518	Physical address of beginning of main console # TODO implement
+64bit	0x07f0	GDT entry bitmap; the first bit is for the entry at offset 0x08, the second bit is for the entry at offset 0x10, &c.
 LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT
 LIDTd32	0x000073fa	LIDT descriptor data
-l	0x0007f7f4	Value of %esp during kernel entry
+STAKTOP	0x0007f7f4	Top-of-stack of the second-stage kernel during boot and when handling int $0x80 system calls
 l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
 l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes
-STAKTOP	0x00800000	Top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack
+STAKTOP	0x00800000	(Appriximate) top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack

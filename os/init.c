@@ -42,6 +42,14 @@ void printLine(void) {
 	return;
 }
 void _start() {
+	/*
+	unsigned long i = 0;
+	while (1) {
+		printLong(i);
+		printLine();
+		i++;
+	}
+	*/
 	time_t timeOld = time(NULL);
 	printLong(timeOld);
 	printLine();

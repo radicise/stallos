@@ -47,9 +47,9 @@ pushl %edx
 pushl %ecx
 pushl %ebx
 cld
-movl %ebp,errno
 call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
-movl errno,%ebp
+movl PerThread_context,%ebp
+movl %ds:(%ebp),%ebp
 testl %ebp,%ebp
 jz irupt_80h__noError
 movl %ebp,%eax
@@ -68,22 +68,21 @@ popw %gs
 popw %fs
 popw %es
 iretl
-writePhysical:# void writePhysical(u32 byteAddr, u32 byte)
-.globl writePhysical
+writeLongPhysical:# void writePhysical(u32 addr, unsigned long dat)
+.globl writeLongPhysical
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
-movb 8(%esp),%cl
-movb %cl,%es:(%eax)
+movl 8(%esp),%ecx
+movl %ecx,%es:(%eax)
 ret
-readPhysical:# u32 readPhysical(u32 byteAddr)
-.globl readPhysical
+readLongPhysical:# unsigned long readPhysical(u32 addr)
+.globl readLongPhysical
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
-movb %es:(%eax),%cl
-xorl %eax,%eax
-movb %cl,%al
+movl %es:(%eax),%ecx
+movl %ecx,%eax
 ret
 runELF:# int runELF(void* elfPhys, void* memAreaPhys, int* retVal)
 .globl runELF
@@ -262,41 +261,41 @@ nop
 nop
 cli
 ret
-Mutex_acquire:# void Mutex_acquire(Mutex* mutex)
-.globl Mutex_acquire
+SimpleMutex_acquire:# void SimpleMutex_acquire(SimpleMutex* mutex)
+.globl SimpleMutex_acquire
 movl 4(%esp),%edx
 xorb %al,%al
 incb %al
-Mutex_acquire__loop1:
+SimpleMutex_acquire__loop1:
 lock xchgb %al,(%edx)
 testb %al,%al
-jz Mutex_acquire__end
+jz SimpleMutex_acquire__end
 nop
-jmp Mutex_acquire__loop1
-Mutex_acquire__end:
+jmp SimpleMutex_acquire__loop1
+SimpleMutex_acquire__end:
 ret
-Mutex_release:# void Mutex_release(Mutex* mutex)
-.globl Mutex_release
+SimpleMutex_release:# void SimpleMutex_release(SimpleMutex* mutex)
+.globl SimpleMutex_release
 movl 4(%esp),%edx
 xorl %eax,%eax
 lock xchgb %al,(%edx)
 ret
-Mutex_tryAcquire:# int Mutex_tryAcquire(Mutex* mutex)
-.globl Mutex_tryAcquire
+SimpleMutex_tryAcquire:# int SimpleMutex_tryAcquire(SimpleMutex* mutex)
+.globl SimpleMutex_tryAcquire
 movl 4(%esp),%edx
 xorb %al,%al
 incb %al
 lock xchgb %al,(%edx)
 xorb $0x01,%al
 ret
-Mutex_initUnlocked:# void Mutex_initUnlocked(Mutex* mutex)
-.globl Mutex_initUnlocked
+SimpleMutex_initUnlocked:# void SimpleMutex_initUnlocked(SimpleMutex* mutex)
+.globl SimpleMutex_initUnlocked
 movl 4(%esp),%edx
 xorb %al,%al
 lock xchgb %al,(%edx)
 ret
-Mutex_wait:
-.globl Mutex_wait
+SimpleMutex_wait:
+.globl SimpleMutex_wait
 nop
 nop
 nop
@@ -326,16 +325,16 @@ nop
 ret
 timeIncrement:
 .globl timeIncrement
-lock incl currentTime
+lock incl ___currentTime___
 ret
 timeFetch:
 .globl timeFetch
-movl currentTime,%eax# TODO Ensure atomic memory reads
+movl ___currentTime___,%eax# TODO Ensure atomic memory reads
 ret
 timeStore:
 .globl timeStore
 movl 4(%esp),%eax
-movl %eax,currentTime# TODO Ensure atomic memory writes
+movl %eax,___currentTime___# TODO Ensure atomic memory writes
 ret
 AtomicULong_get:
 .globl AtomicULong_get
@@ -372,3 +371,73 @@ pushl %eax
 pushl %edx
 call bugCheckNumWrapped
 ret
+Thread_restore:# void Thread_restore(struct Thread_state*, long)
+.globl Thread_restore# Only invoke this from interrupt handlers called because pf IRQ interrupts
+movl $0x00000000,handlingIRQ
+movl 4(%esp),%ebx
+movl 8(%esp),%eax
+movw 0x2c(%ebx),%dx
+movw %dx,%ss
+movw 0x2e(%ebx),%dx
+movw %dx,%es
+movw 0x30(%ebx),%dx
+movw %dx,%fs
+movw 0x32(%ebx),%dx
+movw %dx,%gs
+movl 0x10(%ebx),%ebp
+movl 0x14(%ebx),%esp
+movl 0x18(%ebx),%esi
+movl 0x1c(%ebx),%edi
+pushl 0x24(%ebx)
+pushw $0x00
+pushw 0x28(%ebx)
+pushl 0x20(%ebx)
+pushl (%ebx)
+pushl 0x04(%ebx)
+pushl 0x08(%ebx)
+pushl 0x0c(%ebx)
+pushw 0x2a(%ebx)
+popw %ds
+popl %edx
+popl %ecx
+popl %ebx
+testb $0x08,%al
+movb $0x20,%al
+jz Thread_restore__1
+outb %al,$0xa0
+Thread_restore__1:
+outb %al,$0x20
+popl %eax
+iretl
+Thread_run:# void Thread_run(struct Thread_state*)
+.globl Thread_run# Do NOT invoke this from interrupt handlers called because of IRQ interrupts
+movl 4(%esp),%ebx
+movw 0x2c(%ebx),%dx
+movw %dx,%ss
+movw 0x2e(%ebx),%dx
+movw %dx,%es
+movw 0x30(%ebx),%dx
+movw %dx,%fs
+movw 0x32(%ebx),%dx
+movw %dx,%gs
+movl 0x10(%ebx),%ebp
+movl 0x14(%ebx),%esp
+movl 0x18(%ebx),%esi
+movl 0x1c(%ebx),%edi
+pushl 0x24(%ebx)
+pushw $0x00
+pushw 0x28(%ebx)
+pushl 0x20(%ebx)
+pushl (%ebx)
+pushl 0x04(%ebx)
+pushl 0x08(%ebx)
+pushl 0x0c(%ebx)
+pushw 0x2a(%ebx)
+popw %ds
+pushw $0x00# Zeroing the stack
+popw %dx
+popl %edx
+popl %ecx
+popl %ebx
+popl %eax
+iretl

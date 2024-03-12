@@ -1,5 +1,12 @@
 #define RELOC 0x00040000
 #define __STALLOS__ 1
+#define LINUX_COMPAT_VERSION 0x20603904
+/*
+ *
+ * LINUX_COMPAT_VERSION=0xABBCCCDD for compatibility with version A.BB.CCC.DD
+ * Compatibility with Linux versions below 1.0 is not supported
+ *
+ */
 #include "kernel/types.h"
 unsigned long long PIT0Ticks = 0;
 extern void int_enable(void);
@@ -74,15 +81,82 @@ char hex[] = {0x30,
 	0x44,
 	0x45,
 	0x46};
-typedef unsigned char Mutex;
+#define FAILMASK_SYSTEM 0x00010000
+typedef unsigned char SimpleMutex;// Not reentrant
 typedef unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
 extern void AtomicULong_set(AtomicULong*, unsigned long);
-extern void Mutex_acquire(Mutex*);// Idempotent
-extern void Mutex_release(Mutex*);// Idempotent
-extern int Mutex_tryAcquire(Mutex*);// Returns 1 if acquired, otherwise returns 0
-extern void Mutex_wait(void);// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the waiting thread is not interrupted
-extern void Mutex_initUnlocked(Mutex*);
+long handlingIRQ = 0;
+pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Thread_run' or not during kernel-space operation
+extern void SimpleMutex_acquire(SimpleMutex*);
+extern void SimpleMutex_release(SimpleMutex*);
+extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
+extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
+extern void SimpleMutex_initUnlocked(SimpleMutex*);
+typedef struct {
+	SimpleMutex stateLock;
+	pid_t ownerThread;
+	unsigned long acquires;
+} Mutex;// Reentrant
+void Mutex_acquire(Mutex* mutex) {
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	while (1) {
+		SimpleMutex_acquire(&(mutex->stateLock));
+		if (mutex->acquires == 0) {
+			(mutex->ownerThread) = id;
+		}
+		else if ((mutex->ownerThread) != id) {
+			SimpleMutex_release(&(mutex->stateLock));
+			SimpleMutex_wait();
+			continue;
+		}
+		(mutex->acquires)++;
+		if ((mutex->acquires) == 0) {
+			bugCheckNum(0x0101 | FAILMASK_SYSTEM);
+		}
+		SimpleMutex_release(&(mutex->stateLock));
+		return;
+	}
+}
+void Mutex_release(Mutex* mutex) {	
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	SimpleMutex_acquire(&(mutex->stateLock));
+	if ((mutex->ownerThread) != id) {
+		bugCheckNum(0x0102 | FAILMASK_SYSTEM);
+	}
+	if ((mutex->acquires) == 0) {
+		bugCheckNum(0x0103 | FAILMASK_SYSTEM);
+	}
+	(mutex->acquires)--;
+	SimpleMutex_release(&(mutex->stateLock));
+}
+int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0
+	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
+	SimpleMutex_acquire(&(mutex->stateLock));
+	if (mutex->acquires == 0) {
+		(mutex->ownerThread) = id;
+	}
+	else if ((mutex->ownerThread) != id) {
+		SimpleMutex_release(&(mutex->stateLock));
+		return 0;
+	}
+	(mutex->acquires)++;
+	if ((mutex->acquires) == 0) {
+		bugCheckNum(0x0104 | FAILMASK_SYSTEM);
+	}
+	SimpleMutex_release(&(mutex->stateLock));
+	return 1;
+}
+void Mutex_wait(void) {// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the thread attempting to acquire is not interrupted
+	SimpleMutex_wait();
+	return;
+}
+void Mutex_initUnlocked(Mutex* mutex) {
+	(mutex->ownerThread) = (pid_t) 0;
+	(mutex->acquires) = 0;
+	SimpleMutex_initUnlocked(&(mutex->stateLock));
+	return;
+}
 void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
 	if (dst < buf) {
@@ -149,19 +223,92 @@ size_t strlen(const char* str) {
 struct VGATerminal mainTerm;
 int kernelMsg(const char* msg) {
 	unsigned int len = strlen(msg);
-	if (len != VGATerminalWrite(&mainTerm, (unsigned char*) msg, len)) {
+	if (len != VGATerminal_write(1, msg, len)) {
 		return (-1);
 	}
 	return 0;
 }
 int kernelWarnMsg(const char* msg) {
-	kernelMsg("Warning: ");
-	kernelMsg(msg);
-	kernelMsg("\n");
+	int w = 0;
+	w |= kernelMsg("Warning: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
 }
 int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
 	w |= kernelMsg("Warning: ");
+	w |= kernelMsg(msg);
+	w |= kernelMsg("0x");
+	int n;
+	char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
+	tx[n] = 0x00;
+	while (n--) {
+		tx[n] = hex[code & 0x0f];
+		code >>= 4;
+	}
+	w |= kernelMsg(tx);
+	w |= kernelMsg("\n");
+	return w ? (-1) : 0;
+}
+int kernelMsgULong(unsigned long n) {
+	if (n == 0) {
+		return kernelMsg("0");
+	}
+	int count = 0;
+	unsigned long m = n;
+	while (m) {
+		m /= 10;
+		count++;
+	}
+	char buf[count + 1];
+	int i = count - 1;
+	while (1) {
+		buf[i] = 0x30 + (n % 10);
+		if (i == 0) {
+			break;
+		}
+		n /= 10;
+		i--;
+	}
+	return kernelMsg(buf);
+}
+int printKernelMemUsage(void) {
+	unsigned long long n = getMemUsage();
+	unsigned long b = n & 0x3ff;
+	n >>= 10;
+	unsigned long kib = n & 0x3ff;
+	n >>= 10;
+	unsigned long mib = n & 0x3ff;
+	n >>= 10;
+	unsigned long gib = n & 0x3ff;
+	unsigned long tib = n >> 10;
+	int g = tib ? 1 : (gib ? 2 : (mib ? 3 : (kib ? 4 : 5)));
+	int w = 0;
+	switch (g) {
+		case (1):
+			w |= kernelMsgULong(tib);
+			w |= kernelMsg("TiB+");
+		case (2):
+			w |= kernelMsgULong(gib);
+			w |= kernelMsg("GiB+");
+		case (3):
+			w |= kernelMsgULong(mib);
+			w |= kernelMsg("MiB+");
+		case (4):
+			w |= kernelMsgULong(kib);
+			w |= kernelMsg("KiB+");
+		case (5):
+			w |= kernelMsgULong(b);
+			w |= kernelMsg("B");
+			break;
+		default:
+			bugCheck();
+	}
+	return w;
+}
+int kernelMsgCode(const char* msg, unsigned long code) {
+	int w = 0;
 	w |= kernelMsg(msg);
 	w |= kernelMsg("0x");
 	int n;
@@ -182,8 +329,6 @@ int kernelInfoMsg(const char* msg) {
 	w |= kernelMsg("\n");
 	return w ? (-1) : 0;
 }
-extern int runELF(void*, void*, int*);
-#define FAILMASK_SYSTEM 0x00010000
 extern void bus_out_long(unsigned long, unsigned long);
 extern void bus_out_u8(unsigned long, u8);
 extern void bus_out_u16(unsigned long, u16);
@@ -201,8 +346,8 @@ extern void bus_inBlock_long(u16, long*, unsigned long);
 extern void bus_inBlock_u32(u16, u32*, unsigned long);
 extern void bus_inBlock_u16(u16, u16*, unsigned long);
 extern void bus_inBlock_u8(u16, u8*, unsigned long);
-extern u32 readPhysical(u32);
-extern void writePhysical(u32, u32);
+extern unsigned long readLongPhysical(u32);
+extern void writeLongPhysical(u32, unsigned long);
 #include "kernel/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
@@ -211,15 +356,20 @@ unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
 #define KBDBUFTERMCANON_SIZE 256
 unsigned char kbdBufTermCanon[KBDBUFTERMCANON_SIZE];
 struct Keyboard8042 kbdMain;
-time_t currentTime = 0;// Do NOT access directly except for within the prescribed methods of access
+time_t ___currentTime___ = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
 extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
-void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
+#include "kernel/threads.h"
+#include "kernel/perThreadgroup.h"
+#include "kernel/perThread.h"
+extern int runELF(void*, void*, struct Thread_state*);
+void irupt_handler_70h(struct Thread_state* state) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
 	}
+	Thread_restore(state, 0x70);
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
@@ -329,10 +479,11 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 	(*((unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
 	(*((unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
+#define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
-	mainTerm.pos = readPhysical(0x00000506) & 0xffff;
-	mainTerm.format = readPhysical(0x00000508) & 0x00ff;
+	mainTerm.pos = readLongPhysical(0x00000506) & 0xffff;
+	mainTerm.format = readLongPhysical(0x00000508) & 0x00ff;
 	/*
 	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
 		((struct VGACell*) i)->format = mainTerm.format;
@@ -343,7 +494,7 @@ void systemEntry(void) {
 	((struct VGACell*) (0x000b8000  + (mainTerm.pos << 1) - RELOC))->format ^= 0x77;
 	mainTerm.onlcr = 1;
 	AtomicULong_set(&(mainTerm.xon), 1);
-	AtomicULong_set(&(mainTerm.xctrl), 1);
+	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
 	kernelMsg("Stall Kernel v0.0.1.0-dev\n");
@@ -351,23 +502,23 @@ void systemEntry(void) {
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
 	kernelMsg("Setting interrupt handlers . . . ");
-	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);
-	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);
-	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);
-	substitute_irupt_address_vector(0x73, irupt_73h, 0x18);
-	substitute_irupt_address_vector(0x74, irupt_74h, 0x18);
-	substitute_irupt_address_vector(0x75, irupt_75h, 0x18);
-	substitute_irupt_address_vector(0x76, irupt_76h, 0x18);
-	substitute_irupt_address_vector(0x77, irupt_77h, 0x18);
-	substitute_irupt_address_vector(0x78, irupt_78h, 0x18);
-	substitute_irupt_address_vector(0x79, irupt_79h, 0x18);
-	substitute_irupt_address_vector(0x7a, irupt_7ah, 0x18);
-	substitute_irupt_address_vector(0x7b, irupt_7bh, 0x18);
-	substitute_irupt_address_vector(0x7c, irupt_7ch, 0x18);
-	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);
-	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);
-	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);
-	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);
+	substitute_irupt_address_vector(0x70, irupt_70h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x71, irupt_71h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x72, irupt_72h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x73, irupt_73h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x74, irupt_74h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x75, irupt_75h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x76, irupt_76h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x77, irupt_77h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x78, irupt_78h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x79, irupt_79h, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7a, irupt_7ah, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7b, irupt_7bh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7c, irupt_7ch, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7d, irupt_7dh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7e, irupt_7eh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x7f, irupt_7fh, 0x18);// Refer to the comment on the following line
+	substitute_irupt_address_vector(0x80, irupt_80h, 0x0018);// The system call interface is the only place where, during normal operation, the thread-specific and thread-determining data may be interacted with
 	kernelMsg("done\n");
 	kernelMsg("Redefining Intel 8253 / 8254 Programmable Interval Timer channel 0 interval . . . ");
 	bus_out_u8(0x0043, 0x34);
@@ -387,9 +538,33 @@ void systemEntry(void) {
 	kernelMsg("Initializing system call interface . . . ");
 	initSystemCallInterface();
 	kernelMsg("done\n");
-	int retVal = 0;
-	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, &retVal);
-	(*((unsigned char*) (0xb8000 - RELOC))) = errVal + 0x30;
-	while (1) {
+	kernelMsg("Initializing kernel thread management interface . . . ");
+	Threads_init();
+	kernelMsg("done\n");
+	kernelMsg("Starting `init'\n");
+	Mutex_acquire(&Threads_threadManage);
+	struct Thread* th = alloc(sizeof(struct Thread));
+	PerThread_context = &(th->thread);
+	(th->group) = (PerThreadgroup_context = alloc(sizeof(struct PerThreadgroup)));
+	___nextTask___ = 1;// For consistency of the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process
+	Mutex_release(&Threads_threadManage);
+	currentThread = Threads_addThread(th);
+	Mutex_acquire(&Threads_threadManage);
+	tgid = currentThread;
+	tid = tgid;
+	ruid = 0;
+	euid = 0;
+	suid = 0;
+	fsuid = 0;
+	Mutex_initUnlocked(&(PerThread_context->dataLock));
+	errno = 0;
+	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
+	Mutex_release(&Threads_threadManage);
+	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
+	if (errVal != 0) {
+		bugCheckNum(errVal | FAILMASK_ELFLOADER);
 	}
+	Thread_run(&(th->state));
+	bugCheck();
+	return;
 }

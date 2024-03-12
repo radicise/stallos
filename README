@@ -1,1 +1,1 @@
-Use the `kernel32' operation in the pre-kernel environemnt to boot the 32-bit kernel
+An operating system kernel designed to have a userspace API compatible with that of the Linux kernel

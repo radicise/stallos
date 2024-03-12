@@ -2,7 +2,8 @@
 #define __BLOCKCOMPAT_H__ 1
 #include "types.h"
 #include "FileDriver.h"
-#include "perProcess.h"
+#include "perThreadgroup.h"
+#include "perThread.h"
 struct BDSpec {
 	u8 bs;
 	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*);/* "block", "amnt", "src", "obj" */
