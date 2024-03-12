@@ -6,5 +6,6 @@ Doing so is undefined behavior
 - Tristan
 */
 #include "tsfscore.h"
+#include "tsfsmanage.h"
 #include "tsfsinterface.h"
 #endif

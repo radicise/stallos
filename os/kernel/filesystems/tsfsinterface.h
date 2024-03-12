@@ -3,4 +3,9 @@
 
 #include "fsdefs.h"
 
+typedef struct {
+    int tsfs_node_id;
+    unsigned long long cursor;
+} TSFS_FILE;
+
 #endif
