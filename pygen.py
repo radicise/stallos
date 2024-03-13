@@ -276,7 +276,7 @@ reads a [{classname}]
 */
 void {rwpre}read_{rwname}({objdats[0]}{objdats[1]}{classname}* {rwname}) {{
 {spacetab}unsigned char x[{name}];
-{spacetab}unsigned char* xp = (unsigned char*)x;
+{spacetab}unsigned char* xp = (unsigned char*)x;$$PYREPOS$$
 {spacetab}{readpre}read_buf({objdats[1]}xp, {name});"""
     hbuild = f"""
 /*
@@ -294,22 +294,27 @@ u64 {rwpre}hash_{rwname}({classname}* {rwname}) {{
         s1 = odsc[2].pop("write")
         used = list(map(str.strip, odsc[0].split(",")))
         for un in used:
+            if un == "-pyrepos":
+                rbuild = rbuild.replace("$$PYREPOS$$", f"\n{spacetab}u64 _pyrepos = tsfs_tell(obj);")
+                continue
             s1 = s1.replace(f"`{un}`", f"{rwname}->{un}")
         for s2 in odsc[2].keys():
             odsc[2][s2] = odsc[2][s2].replace("`$TMP`", f"tmpval{tmpno}")
         s = odsc[1]*8
-        if odsc[1] == 1:
-            rbuild += f"\n{spacetab}u8 tmpval{tmpno} = x[{cpos}];"
-            wbuild += f"\n{spacetab}x[{cpos}] = {s1};"
-            hbuild += f"\n{spacetab}hbuf[{cpos}] = {s1};"
-        else:
-            rbuild += f"\n{spacetab}u{s} tmpval{tmpno} = {mksbop(sbr, s)}(xp+{cpos});"
-            wbuild += f"\n{spacetab}{mksbop(sbw, s)}(xp+{cpos}, {s1});"
-            hbuild += f"\n{spacetab}{mksbop(sbw, s)}(bufp+{cpos}, {s1});"
+        if s > 0:
+            if odsc[1] == 1:
+                rbuild += f"\n{spacetab}u8 tmpval{tmpno} = x[{cpos}];"
+                wbuild += f"\n{spacetab}x[{cpos}] = {s1};"
+                hbuild += f"\n{spacetab}hbuf[{cpos}] = {s1};"
+            else:
+                rbuild += f"\n{spacetab}u{s} tmpval{tmpno} = {mksbop(sbr, s)}(xp+{cpos});"
+                wbuild += f"\n{spacetab}{mksbop(sbw, s)}(xp+{cpos}, {s1});"
+                hbuild += f"\n{spacetab}{mksbop(sbw, s)}(bufp+{cpos}, {s1});"
         for fn in odsc[2].keys():
             rbuild += f"\n{spacetab}{rwname}->{fn} = {odsc[2][fn]};"
         cpos += odsc[1]
         tmpno += 1
+    rbuild = rbuild.replace("$$PYREPOS$$", "")
     for i in range(len(fieldnames)):
         fn = fieldnames[i]
         fs = fieldsizes[i]
@@ -326,17 +331,20 @@ u64 {rwpre}hash_{rwname}({classname}* {rwname}) {{
             fs = -fs
             wbuild += f"\n{spacetab}{sbc}(xp+{cpos}, {rwname}->{fn}, {fs});"
             rbuild += f"\n{spacetab}{sbc}({rwname}->{fn}, xp+{cpos}, {fs});"
-            hbuild += f"\n{spacetab}{sbc}(bufp+{cpos}, {rwname}->{fn}, {fs});"
+            if checksumhandled:
+                hbuild += f"\n{spacetab}{sbc}(bufp+{cpos}, {rwname}->{fn}, {fs});"
         else:
             if fs == 1:
                 wbuild += f"\n{spacetab}x[{cpos}] = {rwname}->{fn};"
                 rbuild += f"\n{spacetab}{rwname}->{fn} = x[{cpos}];"
-                hbuild += f"\n{spacetab}hbuf[{cpos}] = {rwname}->{fn};"
+                if checksumhandled:
+                    hbuild += f"\n{spacetab}hbuf[{cpos}] = {rwname}->{fn};"
             else:
                 s = fs * 8
                 wbuild += f"\n{spacetab}{mksbop(sbw, s)}(xp+{cpos}, {rwname}->{fn});"
                 rbuild += f"\n{spacetab}{rwname}->{fn} = {mksbop(sbr, s)}(xp+{cpos});"
-                hbuild += f"\n{spacetab}{mksbop(sbw, s)}(bufp+{cpos}, {rwname}->{fn});"
+                if checksumhandled:
+                    hbuild += f"\n{spacetab}{mksbop(sbw, s)}(bufp+{cpos}, {rwname}->{fn});"
         cpos += fs
     wbuild += f"\n{spacetab}{writepre}write_buf({objdats[1]}xp, {name});"
     wbuild += "\n}"

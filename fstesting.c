@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #define __MOCKTEST
 #define TARGET_PLATFORM "ARM"
-#include "os/kernel/filesystems/tsfscore.h"
+#include "os/kernel/filesystems/tsfs.h"
 
 FILE* fp;
 
@@ -170,6 +170,91 @@ int fmt_test(struct FileDriver* fdrive, int fd, char f) {
     return 0;
 }
 
+int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
+    if (ce->flags != TSFS_CF_EXTT) {
+        u64 l = tsfs_tell(s);
+        loc_seek(s, ce->dloc);
+        // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
+        TSFSStructNode sn = {0};
+        read_structnode(s, &sn);
+        printf("@ %llu : %s\n", ce->dloc, sn.name);
+        loc_seek(s, l);
+    }
+    return 0;
+}
+
+int struct_test(struct FileDriver* fdrive, int fd, char f) {
+    regen_mock(fd);
+    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+    // TSFSStructBlock sb = {0};
+    longseek(s, s->rootblock->top_dir, SEEK_SET);
+    TSFSStructNode topdir = {0};
+    read_structnode(s, &topdir);
+    // u64 x = topdir.parent_loc;
+    // longseek(s, x, SEEK_SET);
+    // read_structblock(s, &sb);
+    TSFSStructBlock* sb = tsfs_load_block(s, topdir.parent_loc);
+    TSFSStructBlock* osb = sb;
+    printf("OPTR: %p\n", sb);
+    tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
+    TSFSStructBlock sb2 = {0};
+    tsfs_mk_dir(s, &topdir, "hi", &sb2);
+    tsfs_mk_dir(s, &topdir, "my", &sb2);
+    tsfs_mk_dir(s, &topdir, "guy", &sb2);
+    tsfs_mk_dir(s, &topdir, "bye", &sb2);
+    // loc_seek(s, topdir.parent_loc);
+    // read_structblock(s, &sb);
+    _DBG_print_block(sb);
+    printf("BEFORE DEL\n");
+    getchar();
+    // printf("BEFORE LOAD\n");
+    TSFSStructNode* sn = tsfs_load_node(s, sb2.disk_ref);
+    // printf("BEFORE RM\n");
+    tsfs_rmdir(s, sn);
+    // printf("AFTER RM\n");
+    fsflush(s);
+    getchar();
+    printf("SBPTRO = %p\nSBPTRC = %p\n", osb, sb);
+    _DBG_print_block(sb);
+    tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
+    tsfs_unload(s, sb);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
+int magic_test(struct FileDriver* fdrive, int kf, char flags) {
+    printf("MAGIC\n");
+    if (flags == 1) {
+        magic_smoke(FEWAND | FEALLOC);
+    } else if (flags == 2) {
+        puts("BEFORE");
+        FileSystem* s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+        puts("FS DONE");
+        TSFSStructBlock* blk1 = _tsmagic_block(s);
+        puts("BLK1 DONE");
+        TSFSStructBlock* blk2 = _tsmagic_block(s);
+        puts("BLK2 DONE");
+        TSFSStructNode* nod1 = _tsmagic_node(s);
+        puts("NOD1 DONE");
+        TSFSDataBlock* dat1 = _tsmagic_data(s);
+        puts("DAT1 DONE");
+        printf("%zu, %zu\n", blk2->magicno, *((size_t*)blk2));
+        printf("%zu, %zu\n", nod1->magicno, *((size_t*)nod1));
+        printf("%zu, %zu\n", dat1->magicno, *((size_t*)dat1));
+        puts("PRINT DONE");
+        _tsmagic_deblock(s, blk1);
+        puts("DEB1 DONE");
+        _tsmagic_deblock(s, blk2);
+        puts("DEB2 DONE");
+        _tsmagic_denode(s, nod1);
+        puts("DEN1 DONE");
+        _tsmagic_dedata(s, dat1);
+        puts("DED1 DONE");
+    }
+    return 0;
+}
+
 int harness(char flag, int(*tst)(struct FileDriver*, int, char)) {
     int retc = 0;
     int fd;
@@ -191,12 +276,24 @@ int harness(char flag, int(*tst)(struct FileDriver*, int, char)) {
     return retc;
 }
 
+int generic_test(char f1, char f2) {
+    switch (f1) {
+        case -1:
+            printf("%sRED\n%sGRN\n%sYEL%s\n", TSFS_ANSI_RED, TSFS_ANSI_GRN, TSFS_ANSI_YEL, TSFS_ANSI_NUN);
+            break;
+        default:
+            printf("BAD FLAG\n");
+            break;
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
     char flags[] = {0, 0};
     for (int i = 1; i < argc; i ++) {
         if (stringcmp(argv[i], "-regen")) {
             flags[1] = 1;
-        } else if (stringcmp(argv[i], "struct")) {
+        } else if (stringcmp(argv[i], "data")) {
             flags[0] = 1;
         } else if (stringcmp(argv[i], "manip")) {
             flags[0] = 2;
@@ -204,7 +301,21 @@ int main(int argc, char** argv) {
             flags[1] = 1;
         } else if (stringcmp(argv[i], "format")) {
             flags[0] = 3;
+        } else if (stringcmp(argv[i], "struct")) {
+            flags[0] = 4;
+        } else if (stringcmp(argv[i], "magic")) {
+            flags[0] = 5;
+        } else if (stringcmp(argv[i], "-smoke")) {
+            flags[1] = 1;
+        } else if (stringcmp(argv[i], "-no")) {
+            flags[1] = 2;
+        } else if (stringcmp(argv[i], "palette")) {
+            flags[0] = -1;
         }
+    }
+    if (flags[0] < 0) {
+        generic_test(flags[0], flags[1]);
+        return 0;
     }
     switch (flags[0]) {
         case 1:
@@ -215,6 +326,12 @@ int main(int argc, char** argv) {
             break;
         case 3:
             harness(flags[1], fmt_test);
+            break;
+        case 4:
+            harness(flags[1], struct_test);
+            break;
+        case 5:
+            harness(flags[1], magic_test);
             break;
         default:
             printf("bad args\n");
