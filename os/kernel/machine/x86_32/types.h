@@ -1,11 +1,12 @@
-#ifndef __TYPES_X86_32_H__
-#define __TYPES_X86_32_H__ 1
+#ifndef __MACHINE_X86_32_TYPES_H__
+#define __MACHINE_X86_32_TYPES_H__ 1
 /*
  *
  * Definitions for Linux kernel-userspace interface types as in 32-bit i386 Linux
  * Definitions: Linux '/arch/x86/include/uapi/asm/posix_types_32.h'
  *
  */
+#define NULL ((void*) 0)
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef int pid_t;

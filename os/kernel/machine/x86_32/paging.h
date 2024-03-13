@@ -1,6 +1,7 @@
 #ifndef __MACHINE_X86_32_PAGING_H__
 #define __MACHINE_X86_32_PAGING_H__ 1
 #define PAGE_SIZE 4096
+uintptr amntMem = 72 * 1024 * 1024;// The value of `amntMem' must be an integer multiple of the value of `PAGE_SIZE'
 #if KMEM_LB_BS != PAGE_SIZE
 #error "Incompatible large-block memory allocation block size"
 #endif
@@ -11,6 +12,8 @@
 #error "ERROR: NAMESPACE COLLISION"
 #endif
 #define NAMESPACE_PG 1
+extern void CR3Load(unsigned long);
+extern void WPPGSetup(void);
 typedef u32 PGDEnt;
 #define PG_P ((PGDEnt) (u32) 0x00000001)
 #define PG_RW ((PGDEnt) (u32) 0x00000002)
@@ -32,18 +35,18 @@ void PGDUnset(PGDEnt* valptr, PGDEnt cond) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
-unsigned long PGDRead(PGDent* valptr) {
+unsigned long PGDRead(PGDEnt* valptr) {
 	PGDEnt p = (PGDEnt) AtomicULong_get((AtomicULong*) valptr);
-	return ((u32 p) >> 9) & ((u32) 0x00000007);
+	return (((u32) p) >> 9) & ((u32) 0x00000007);
 }
-void PGDWrite(PGDent* valptr, unsigned long datt) {
+void PGDWrite(PGDEnt* valptr, unsigned long datt) {
 	if (((u32) datt) & ((u32) 0x00000007)) {
 		bugCheckNum(0x0001 | FAILMASK_PAGING);
 	}
 	PGDEnt p = (PGDEnt) AtomicULong_get((AtomicULong*) valptr);
 	p = (PGDEnt) ((((u32) p) & ((u32) 0xffffff1ff)) ^ (((u32) datt) << 9));
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
-	return
+	return;
 }
 void PGDSetAddr(PGDEnt* valptr, void* ptr) {
 	u32 b = (u32) (((uintptr) ptr) + ((uintptr) RELOC));
@@ -102,16 +105,19 @@ void MemSpace_destroy(struct MemSpace* ms) {
 	dealloc(ms, sizeof(struct MemSpace));
 	return;
 }
-int mapPage(uintptr vAddr, void* ptr, int userWritable, struct MemSpace* ms) {
+int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int privileged, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
 	u32 p = vAddr;
+	if (p & ((u32) 0x00000fff)) {
+		bugCheckNum(0x0004 | FAILMASK_PAGING);
+	}
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
 	if (!(PGDTest((ms->dir) + i, PG_P))) {
 		PGDEnt* tbl = alloc_lb();
 		initPageTable(tbl);
 		initEntry((ms->dir) + i, 1, 0, tbl);
-		initEntry(tbl + j, userWritable, 0, ptr);
+		initEntry(tbl + j, userWritable, privileged, ptr);
 		Mutex_release(&(ms->lock));
 		return 0;
 	}
@@ -120,13 +126,19 @@ int mapPage(uintptr vAddr, void* ptr, int userWritable, struct MemSpace* ms) {
 		Mutex_release(&(ms->lock));
 		return (-1);
 	}
-	initEntry(tbl + j, userWritable, 0, ptr);
+	initEntry(tbl + j, userWritable, privileged, ptr);
 	Mutex_release(&(ms->lock));
 	return 0;
+}
+int mapPage(uintptr vAddr, void* ptr, int userWritable, struct MemSpace* ms) {
+	return mapPageSpecificPrivilege(vAddr, ptr, userWritable, 0, ms);
 }
 int unmapPage(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
 	u32 p = vAddr;
+	if (p & ((u32) 0x00000fff)) {
+		bugCheckNum(0x0005 | FAILMASK_PAGING);
+	}
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
 	if (!(PGDTest((ms->dir) + i, PG_P))) {
@@ -188,8 +200,20 @@ void* pageMapping(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_release(&(ms->lock));
 	return b;
 }
-void initPaging(void) {// TODO WP bit
-	//TODO do
+// TODO TLB management
+struct MemSpace* MemSpace_kernel;
+void initPaging(void) {
+	MemSpace_kernel = MemSpace_create();
+	uintptr m = 0;
+	while (m < amntMem) {
+		if (mapPageSpecificPrivilege(m, (void*) (m - RELOC), 0, 1, MemSpace_kernel)) {
+			bugCheckNum(0x0003 | FAILMASK_PAGING);
+		}
+		m += PAGE_SIZE;
+	}
+	CR3Load(((u32) (MemSpace_kernel->dir)) + ((u32) RELOC));
+	WPPGSetup();
+	return;
 }
 #undef NAMESPACE_PG
 #endif

@@ -11,6 +11,8 @@
 #include "perThreadgroup.h"
 #include "perThread.h"
 #include "Map.h"
+#include "kmemman.h"
+#include "paging.h"
 struct FileKey {
 	pid_t tgpid;
 	int fd;
@@ -65,31 +67,32 @@ void initSystemCallInterface(void) {
 	struct FileKey* k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 0;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdin" for the userspace boot process
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdin" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 1;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdout" for the userspace boot process
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdout" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 2;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stderr" for the userspace boot process
+	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stderr" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 3;
-	Map_add((uintptr) k, 2, FileKeyKfdMap);// "ATA Drive 1" for the userspace boot process
+	Map_add((uintptr) k, 2, FileKeyKfdMap);// "ATA Drive 1" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 4;
-	Map_add((uintptr) k, 3, FileKeyKfdMap);// "ATA Drive 2" for the userspace boot process
+	Map_add((uintptr) k, 3, FileKeyKfdMap);// "ATA Drive 2" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 5;
-	Map_add((uintptr) k, 4, FileKeyKfdMap);// "ATA Drive 3" for the userspace boot process
+	Map_add((uintptr) k, 4, FileKeyKfdMap);// "ATA Drive 3" for `init'
 	k = alloc(sizeof(struct FileKey));
 	k->tgpid = 1;
 	k->fd = 6;
-	Map_add((uintptr) k, 5, FileKeyKfdMap);// "ATA Drive 4" for the userspace boot process
+	Map_add((uintptr) k, 5, FileKeyKfdMap);// "ATA Drive 4" for `init'
+	initPaging();
 	return;
 }
 void endingCleanup(void) {
@@ -257,7 +260,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			retVal = (unsigned long) geteuid();
 			break;
 #if LINUX_COMPAT_VERSION >= 0x10104600
-		case (140):// Prototype is sourced from man-pages lseek64(3)
+		case (140):// Prototype is sourced from Linux man-pages lseek64(3)
 			retVal = (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset()), (int) arg5);
 			break;
 #endif

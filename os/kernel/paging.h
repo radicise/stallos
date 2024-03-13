@@ -11,6 +11,7 @@
  * int pageExists(uintptr, struct MemSpace*);
  * void* pageMapping(uintptr, struct MemSpace*);
  * void initPaging(void);
+ * MemSpace* MemSpace_kernel;// This is initialised within initPaging
  *
  */
 #include "machine/x86_32/paging.h"

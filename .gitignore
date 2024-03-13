@@ -14,5 +14,5 @@ fstesting
 *.mock
 .vscode
 /build
-/StallOS
+/Stallos
 gensizes.h

@@ -1,4 +1,5 @@
 #define RELOC 0x00040000
+/* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
 #define __STALLOS__ 1
 #define LINUX_COMPAT_VERSION 0x20603904
 /*
@@ -273,7 +274,7 @@ int kernelMsgULong(unsigned long n) {
 	}
 	return kernelMsg(buf);
 }
-int printKernelMemUsage(void) {
+int printMemUsage(void) {
 	unsigned long long n = getMemUsage();
 	unsigned long b = n & 0x3ff;
 	n >>= 10;

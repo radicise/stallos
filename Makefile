@@ -8,8 +8,10 @@ CFLAGS ?= -std=c99 -Wpedantic -m32 -march=i386 -nostartfiles -nostdlib -nodefaul
 ASFLAGS ?= -march=i386
 LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
 
-build StallOS/stallos.bin: build/stall.bin
-	cp build/stall.bin StallOS/stallos.bin
+TARGETMACHINE ?= x86_32
+
+build Stallos/stallos.bin: build/stall.bin
+	cp build/stall.bin Stallos/stallos.bin
 
 build/stall.bin: build/stall.elf build/kernel.bin build/prgm.elf build/init.elf
 	${OBJCOPYPRGM} --dump-section .text=build/stall.bin build/stall.elf /dev/null
@@ -18,7 +20,7 @@ build/stall.bin: build/stall.elf build/kernel.bin build/prgm.elf build/init.elf
 	dd if=build/init.elf of=build/stall.bin bs=512 seek=194
 	dd if=/dev/zero of=build/stall.bin bs=512 count=1 seek=2879
 
-run: StallOS/stallos.bin
+run: Stallos/stallos.bin
 	./run.sh
 
 build/init.elf: build/init-asm.elf build/init-ul.elf
@@ -36,11 +38,12 @@ build/prgm.elf: build/prgm-ul.elf build/prgm-asm.elf
 build/prgm-asm.elf: build/system-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/prgm-asm.elf build/system-comp.s
 
-build/system-comp.s: os/system.s os/irupt_generic.s
+build/system-comp.s: os/system.s os/irupt_generic.s os/kernel/machine/${TARGETMACHINE}/*.s
 	cp os/system.s build/system-comp.s
 	awk '1{gsub(/NUM/, thenum, $$0);print($$0);}' thenum=70 os/irupt_generic.s thenum=71 os/irupt_generic.s thenum=72 os/irupt_generic.s thenum=73 os/irupt_generic.s thenum=74 os/irupt_generic.s thenum=75 os/irupt_generic.s thenum=76 os/irupt_generic.s thenum=77 os/irupt_generic.s thenum=78 os/irupt_generic.s thenum=79 os/irupt_generic.s thenum=7a os/irupt_generic.s thenum=7b os/irupt_generic.s thenum=7c os/irupt_generic.s thenum=7d os/irupt_generic.s thenum=7e os/irupt_generic.s thenum=7f os/irupt_generic.s >> build/system-comp.s
+	cat os/kernel/machine/${TARGETMACHINE}/*.s >> build/system-comp.s
 
-build/prgm-ul.elf: os/system.c os/kernel/*.h
+build/prgm-ul.elf: os/system.c os/kernel/*.h os/kernel/machine/*/*.h
 	${CCPRGM} ${CFLAGS} -o build/prgm-ul.elf os/system.c
 
 build/kernel.bin: build/kernel.o build/sysc.elf build/irupts.o
