@@ -3,6 +3,7 @@
 #include "types.h"
 struct PerThreadgroup {
 	pid_t tgid;
+	MemSpace* mem;
 };
 #include "threads.h"
 #define tgid (PerThreadgroup_context->tgid)

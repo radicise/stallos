@@ -441,3 +441,14 @@ popl %ecx
 popl %ebx
 popl %eax
 iretl
+strconcat:# const char* strconcat()
+.globl strconcat# Returns a const char* `a' that can deallocated with `dealloc(strlen(a) + 1)'
+pushl %ebp
+movl %esp,%ebp
+movl %esp,%eax
+addl $0x08,%eax
+pushl %eax
+call strct
+movl %ebp,%esp
+popl %ebp
+ret

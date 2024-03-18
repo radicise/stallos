@@ -83,10 +83,61 @@ char hex[] = {0x30,
 	0x45,
 	0x46};
 #define FAILMASK_SYSTEM 0x00010000
+int strcmp(const char* d, const char* g) {
+	if (!((*d) | (*g))) {
+		return 0;
+	}
+	while (1) {
+		if (!(*d)) {
+			if (!(*g)) {
+				if ((*d) == (*g)) {
+					return 0;
+				}
+				if ((*d) > (*g)) {
+					return 1;
+				}
+			}
+			return (-1);
+		}
+		if (!(*g)) {
+			return 1;
+		}
+		d++;
+		g++;
+	}
+}
 typedef unsigned char SimpleMutex;// Not reentrant
 typedef unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
 extern void AtomicULong_set(AtomicULong*, unsigned long);
+typedef struct {
+	long l;
+	Mutex lock;
+} AtomicLongF;
+long AtomicLongF_adjust(AtomicLongF* alf, long adj) {
+	Mutex_acquire(&(alf->lock));
+	long m = (alf->l);
+	(alf->l) += adj;
+	Mutex_release(&(alf->lock));
+	return m;
+}
+long AtomicLongF_get(AtomicLongF* alf) {
+	Mutex_acquire(&(alf->lock));
+	long m = (alf->l);
+	Mutex_release(&(alf->lock));
+	return m;
+}
+void AtomicLongF_set(AtomicLongF* alf, long val) {
+	Mutex_acquire(&(alf->lock));
+	(alf->l) = val;
+	Mutex_release(&(alf->lock));
+	return;
+}
+void AtomicLongF_init(AtomicLongF* alf, long val) {
+	(alf->l) = val;
+	Mutex_initUnlocked(&(alf->lock));
+	return;
+}
 long handlingIRQ = 0;
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Thread_run' or not during kernel-space operation
 extern void SimpleMutex_acquire(SimpleMutex*);
@@ -220,6 +271,26 @@ size_t strlen(const char* str) {
 	while (*(n++)) {
 	}
 	return n - str - 1;
+}
+const char* strct(const char** c) {// Does not check for string size overflow
+	int i = 0;
+	while (c[i] != NULL) {
+		i++;
+	}
+	size_t l[i];
+	size_t ll = 1;
+	for (int j = 0; j < i; j++) {
+		l[j] = strlen(c[j]);
+		ll += l[j];
+	}
+	char* s = alloc(ll);
+	char* m = s;
+	for (int j = 0; j < i; j++) {
+		cpy(m, c[j], ll[j]);
+		m += ll[j];
+	}
+	(*m) = 0x00;
+	return s;
 }
 struct VGATerminal mainTerm;
 int kernelMsg(const char* msg) {
@@ -498,7 +569,7 @@ void systemEntry(void) {
 	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
-	kernelMsg("Stall Kernel v0.0.1.0-dev\n");
+	kernelMsg("Stallos Kernel v0.0.1.1-dev\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
@@ -553,6 +624,7 @@ void systemEntry(void) {
 	Mutex_acquire(&Threads_threadManage);
 	tgid = currentThread;
 	tid = tgid;
+	(PerThreadgroup_context->mem) = MemSpace_kernel;// TODO Set up a different memory space for the process
 	ruid = 0;
 	euid = 0;
 	suid = 0;
