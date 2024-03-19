@@ -13,7 +13,7 @@ struct BDSpec {
 };
 struct BlockFile {
 	struct BDSpec* reliance;
-	loff_t pos;// in address units
+	volatile loff_t pos;// in address units
 	unsigned long long amnt;// in blocks
 	void* obj;
 };// TODO Utilise `loff_t' appropriately throughout the functions and structures instead of using `unsigned long long'

@@ -14,7 +14,7 @@ struct VGATerminal {
 	unsigned int pos;
 	unsigned int width;
 	unsigned int total;
-	struct VGACell* screen;
+	volatile struct VGACell* screen;
 	/* TTY Output Settings */
 	unsigned char onlcr;
 	AtomicULong xctrl;// Keep at 0 because of deadlocking when echoing is enabled

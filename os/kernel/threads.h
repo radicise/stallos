@@ -34,7 +34,7 @@ Mutex Threads_threadManage;
 struct Map* ___taskMap___;// Do NOT access directly except for within the prescribed interaction functions; pid_t -> struct Thread*
 int ___amntTasks___;// Do NOT access directly except for within the prescribed interaction functions
 pid_t ___nextTask___;// Do NOT access directly except for within the prescribed interaction functions
-pid_t pid_max = 32768;// Acquire Threads_threadManage while accessing
+volatile pid_t pid_max = 32768;// Acquire Threads_threadManage while accessing
 #define PID_USERSTART 300
 void Threads_init(void) {
 	Mutex_initUnlocked(&Threads_threadManage);
@@ -79,8 +79,8 @@ int Threads_findNext(uintptr suspect, uintptr u) {// Threads_threadManage must h
 }
 #include "perThreadgroup.h"
 #include "perThread.h"
-struct PerThreadgroup* PerThreadgroup_context;
-struct PerThread* PerThread_context;
+struct PerThreadgroup* volatile PerThreadgroup_context;
+struct PerThread* volatile PerThread_context;
 void Threads_nextThread(struct Thread_state* state, int interrupt, long irupt) {
 	Mutex_acquire(&Threads_threadManage);
 	uintptr st = Map_fetch((uintptr) currentThread, ___taskMap___);

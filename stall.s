@@ -44,7 +44,7 @@ _start:
     movw %es,%si
     addw $0x0020,%si
     movw %si,%es
-    cmpw $0x300,%ax
+    cmpw $0x242,%ax
     jnz kree
     # call _dishe
     # call test

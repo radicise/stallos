@@ -7,14 +7,14 @@
 struct Keyboard8042 {
 	size_t bufSize;
 	size_t bufTermSize;
-	unsigned char* buf;
-	size_t avail;
-	unsigned char* bufTerm;
-	size_t availTerm;
-	unsigned char* bufCanon;
-	size_t bufCanonSize;
-	size_t availCanon;
-	unsigned char canonLocked;
+	volatile unsigned char* buf;
+	volatile size_t avail;
+	volatile unsigned char* bufTerm;
+	volatile size_t availTerm;
+	volatile unsigned char* bufCanon;
+	volatile size_t bufCanonSize;
+	volatile size_t availCanon;
+	volatile unsigned char canonLocked;
 	Mutex bufLock;// Lock over reading and writing of `avail' and `availTerm' and `availCanon' and 	`canonLocked' and the data at `buf' and the data at `bufTerm' and the data at `bufCanon'
 	u8 ID;
 	unsigned char set;// 1: set 1; 2: set 2; 3: set 3

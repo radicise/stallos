@@ -17,40 +17,40 @@ extern void bugCheckNum(unsigned long);
 void bugMsg(uintptr addr) {
 	int_disable();
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
-		(*((unsigned short*) (i - RELOC))) = 0x4720;
+		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}
-	(*((unsigned short*) (0xb8000 - RELOC))) = 0x4746;
-	(*((unsigned short*) (0xb8002 - RELOC))) = 0x4741;
-	(*((unsigned short*) (0xb8004 - RELOC))) = 0x4754;
-	(*((unsigned short*) (0xb8006 - RELOC))) = 0x4741;
-	(*((unsigned short*) (0xb8008 - RELOC))) = 0x474c;
-	(*((unsigned short*) (0xb800a - RELOC))) = 0x4720;
-	(*((unsigned short*) (0xb800c - RELOC))) = 0x474b;
-	(*((unsigned short*) (0xb800e - RELOC))) = 0x4745;
-	(*((unsigned short*) (0xb8010 - RELOC))) = 0x4752;
-	(*((unsigned short*) (0xb8012 - RELOC))) = 0x474e;
-	(*((unsigned short*) (0xb8014 - RELOC))) = 0x4745;
-	(*((unsigned short*) (0xb8016 - RELOC))) = 0x474c;
-	(*((unsigned short*) (0xb8018 - RELOC))) = 0x4720;
-	(*((unsigned short*) (0xb801a - RELOC))) = 0x4745;
-	(*((unsigned short*) (0xb801c - RELOC))) = 0x4752;
-	(*((unsigned short*) (0xb801e - RELOC))) = 0x4752;
-	(*((unsigned short*) (0xb8020 - RELOC))) = 0x474f;
-	(*((unsigned short*) (0xb8022 - RELOC))) = 0x4752;
-	(*((unsigned short*) (0xb80a0 - RELOC))) = 0x4741;
-	(*((unsigned short*) (0xb80a2 - RELOC))) = 0x4774;
-	(*((unsigned short*) (0xb80a4 - RELOC))) = 0x4720;
-	(*((unsigned short*) (0xb80a6 - RELOC))) = 0x4761;
-	(*((unsigned short*) (0xb80a8 - RELOC))) = 0x4764;
-	(*((unsigned short*) (0xb80aa - RELOC))) = 0x4764;
-	(*((unsigned short*) (0xb80ac - RELOC))) = 0x4772;
-	(*((unsigned short*) (0xb80ae - RELOC))) = 0x4765;
-	(*((unsigned short*) (0xb80b0 - RELOC))) = 0x4773;
-	(*((unsigned short*) (0xb80b2 - RELOC))) = 0x4773;
-	(*((unsigned short*) (0xb80b4 - RELOC))) = 0x4720;
-	(*((unsigned short*) (0xb80b6 - RELOC))) = 0x4730;
-	(*((unsigned short*) (0xb80b8 - RELOC))) = 0x4778;
-	for (unsigned char* i = (void*) (0xb80b8 - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb80b8 - RELOC); i -= 2) {
+	(*((volatile unsigned short*) (0xb8000 - RELOC))) = 0x4746;
+	(*((volatile unsigned short*) (0xb8002 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb8004 - RELOC))) = 0x4754;
+	(*((volatile unsigned short*) (0xb8006 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb8008 - RELOC))) = 0x474c;
+	(*((volatile unsigned short*) (0xb800a - RELOC))) = 0x4720;
+	(*((volatile unsigned short*) (0xb800c - RELOC))) = 0x474b;
+	(*((volatile unsigned short*) (0xb800e - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb8010 - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb8012 - RELOC))) = 0x474e;
+	(*((volatile unsigned short*) (0xb8014 - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb8016 - RELOC))) = 0x474c;
+	(*((volatile unsigned short*) (0xb8018 - RELOC))) = 0x4720;
+	(*((volatile unsigned short*) (0xb801a - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb801c - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb801e - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb8020 - RELOC))) = 0x474f;
+	(*((volatile unsigned short*) (0xb8022 - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb80a0 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb80a2 - RELOC))) = 0x4774;
+	(*((volatile unsigned short*) (0xb80a4 - RELOC))) = 0x4720;
+	(*((volatile unsigned short*) (0xb80a6 - RELOC))) = 0x4761;
+	(*((volatile unsigned short*) (0xb80a8 - RELOC))) = 0x4764;
+	(*((volatile unsigned short*) (0xb80aa - RELOC))) = 0x4764;
+	(*((volatile unsigned short*) (0xb80ac - RELOC))) = 0x4772;
+	(*((volatile unsigned short*) (0xb80ae - RELOC))) = 0x4765;
+	(*((volatile unsigned short*) (0xb80b0 - RELOC))) = 0x4773;
+	(*((volatile unsigned short*) (0xb80b2 - RELOC))) = 0x4773;
+	(*((volatile unsigned short*) (0xb80b4 - RELOC))) = 0x4720;
+	(*((volatile unsigned short*) (0xb80b6 - RELOC))) = 0x4730;
+	(*((volatile unsigned short*) (0xb80b8 - RELOC))) = 0x4778;
+	for (volatile unsigned char* i = (void*) (0xb80b8 - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb80b8 - RELOC); i -= 2) {
 		if ((addr & 0x0f) < 10) {
 			*i = ((addr & 0x0f) + 0x30);
 		}
@@ -66,7 +66,7 @@ void bugCheckWrapped(uintptr addr) {// Fatal kernel errors
 	}
 	return;
 }
-char hex[] = {0x30,
+const char hex[] = {0x30,
 	0x31,
 	0x32,
 	0x33,
@@ -106,38 +106,10 @@ int strcmp(const char* d, const char* g) {
 		g++;
 	}
 }
-typedef unsigned char SimpleMutex;// Not reentrant
-typedef unsigned long AtomicULong;
+typedef volatile unsigned char SimpleMutex;// Not reentrant
+typedef volatile unsigned long AtomicULong;
 extern unsigned long AtomicULong_get(AtomicULong*);
 extern void AtomicULong_set(AtomicULong*, unsigned long);
-typedef struct {
-	long l;
-	Mutex lock;
-} AtomicLongF;
-long AtomicLongF_adjust(AtomicLongF* alf, long adj) {
-	Mutex_acquire(&(alf->lock));
-	long m = (alf->l);
-	(alf->l) += adj;
-	Mutex_release(&(alf->lock));
-	return m;
-}
-long AtomicLongF_get(AtomicLongF* alf) {
-	Mutex_acquire(&(alf->lock));
-	long m = (alf->l);
-	Mutex_release(&(alf->lock));
-	return m;
-}
-void AtomicLongF_set(AtomicLongF* alf, long val) {
-	Mutex_acquire(&(alf->lock));
-	(alf->l) = val;
-	Mutex_release(&(alf->lock));
-	return;
-}
-void AtomicLongF_init(AtomicLongF* alf, long val) {
-	(alf->l) = val;
-	Mutex_initUnlocked(&(alf->lock));
-	return;
-}
 long handlingIRQ = 0;
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Thread_run' or not during kernel-space operation
 extern void SimpleMutex_acquire(SimpleMutex*);
@@ -145,7 +117,7 @@ extern void SimpleMutex_release(SimpleMutex*);
 extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
 extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
 extern void SimpleMutex_initUnlocked(SimpleMutex*);
-typedef struct {
+typedef volatile struct {
 	SimpleMutex stateLock;
 	pid_t ownerThread;
 	unsigned long acquires;
@@ -209,6 +181,34 @@ void Mutex_initUnlocked(Mutex* mutex) {
 	SimpleMutex_initUnlocked(&(mutex->stateLock));
 	return;
 }
+typedef volatile struct {
+	long l;
+	Mutex lock;
+} AtomicLongF;
+long AtomicLongF_adjust(AtomicLongF* alf, long adj) {
+	Mutex_acquire(&(alf->lock));
+	long m = (alf->l);
+	(alf->l) += adj;
+	Mutex_release(&(alf->lock));
+	return m;
+}
+long AtomicLongF_get(AtomicLongF* alf) {
+	Mutex_acquire(&(alf->lock));
+	long m = (alf->l);
+	Mutex_release(&(alf->lock));
+	return m;
+}
+void AtomicLongF_set(AtomicLongF* alf, long val) {
+	Mutex_acquire(&(alf->lock));
+	(alf->l) = val;
+	Mutex_release(&(alf->lock));
+	return;
+}
+void AtomicLongF_init(AtomicLongF* alf, long val) {
+	(alf->l) = val;
+	Mutex_initUnlocked(&(alf->lock));
+	return;
+}
 void* move(void* dst, const void* buf, size_t count) {
 	void* m = dst;
 	if (dst < buf) {
@@ -229,8 +229,14 @@ void* move(void* dst, const void* buf, size_t count) {
 	}
 	return m;
 }
+void* memmove(void* dst, const void* buf, size_t count) {
+	return move(dst, buf, count);
+}
 void* cpy(void* dst, const void* src, size_t count) {
 	return move(dst, src, count);
+}
+void* memcpy(void* dst, const void* src, size_t count) {
+	return cpy(dst, src, count);
 }
 void* set(void* ptr, int val, size_t count) {
 	char* n = ptr;
@@ -241,16 +247,16 @@ void* set(void* ptr, int val, size_t count) {
 }
 void bugCheckNum_u32(u32 num, uintptr addr) {
 	bugMsg(addr);
-	(*((unsigned char*) (0xb8140 - RELOC))) = 0x49;
-	(*((unsigned char*) (0xb8142 - RELOC))) = 0x4e;
-	(*((unsigned char*) (0xb8144 - RELOC))) = 0x46;
-	(*((unsigned char*) (0xb8146 - RELOC))) = 0x4f;
-	(*((unsigned char*) (0xb8148 - RELOC))) = 0x3a;
-	(*((unsigned char*) (0xb814a - RELOC))) = 0x20;
-	(*((unsigned char*) (0xb814c - RELOC))) = 0x30;
-	(*((unsigned char*) (0xb814e - RELOC))) = 0x78;
-	unsigned char* place = (unsigned char*) (0xb814e - RELOC);
-	for (unsigned char* i = place + 16; i != place; i -= 2) {
+	(*((volatile unsigned char*) (0xb8140 - RELOC))) = 0x49;
+	(*((volatile unsigned char*) (0xb8142 - RELOC))) = 0x4e;
+	(*((volatile unsigned char*) (0xb8144 - RELOC))) = 0x46;
+	(*((volatile unsigned char*) (0xb8146 - RELOC))) = 0x4f;
+	(*((volatile unsigned char*) (0xb8148 - RELOC))) = 0x3a;
+	(*((volatile unsigned char*) (0xb814a - RELOC))) = 0x20;
+	(*((volatile unsigned char*) (0xb814c - RELOC))) = 0x30;
+	(*((volatile unsigned char*) (0xb814e - RELOC))) = 0x78;
+	volatile unsigned char* place = (volatile unsigned char*) (0xb814e - RELOC);
+	for (volatile unsigned char* i = place + 16; i != place; i -= 2) {
 		if ((num & 0x0f) < 10) {
 			*i = ((num & 0x0f) + 0x30);
 		}
@@ -286,8 +292,8 @@ const char* strct(const char** c) {// Does not check for string size overflow
 	char* s = alloc(ll);
 	char* m = s;
 	for (int j = 0; j < i; j++) {
-		cpy(m, c[j], ll[j]);
-		m += ll[j];
+		cpy(m, c[j], l[j]);
+		m += l[j];
 	}
 	(*m) = 0x00;
 	return s;
@@ -428,7 +434,7 @@ unsigned char kbdBufTerm[KBDBUFTERM_SIZE];
 #define KBDBUFTERMCANON_SIZE 256
 unsigned char kbdBufTermCanon[KBDBUFTERMCANON_SIZE];
 struct Keyboard8042 kbdMain;
-time_t ___currentTime___ = 0;// Do NOT access directly except for within the prescribed methods of access
+volatile const time_t ___currentTime___ = 0;// Do NOT access directly except for within the prescribed methods of access
 extern void timeIncrement(void);// Atomic, increment system time by 1 second
 extern time_t timeFetch(void);// Atomic, get system time (time in seconds)
 extern void timeStore(time_t);// Atomic, set system time (time in seconds)
@@ -547,9 +553,9 @@ extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
 void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void), unsigned short segSel) {
-	(*((unsigned short*) (0x7f800 - RELOC + (iruptNum * 8)))) = ((long) addr);
-	(*((unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
-	(*((unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
+	(*((volatile unsigned short*) (0x7f800 - RELOC + (iruptNum * 8)))) = ((long) addr);
+	(*((volatile unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
+	(*((volatile unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
 #define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
@@ -615,7 +621,7 @@ void systemEntry(void) {
 	kernelMsg("done\n");
 	kernelMsg("Starting `init'\n");
 	Mutex_acquire(&Threads_threadManage);
-	struct Thread* th = alloc(sizeof(struct Thread));
+	volatile struct Thread* th = alloc(sizeof(struct Thread));
 	PerThread_context = &(th->thread);
 	(th->group) = (PerThreadgroup_context = alloc(sizeof(struct PerThreadgroup)));
 	___nextTask___ = 1;// For consistency of the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process
@@ -633,7 +639,7 @@ void systemEntry(void) {
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
-	int errVal = runELF((void*) 0x00020000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
+	int errVal = runELF((void*) 0x00010000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
 	if (errVal != 0) {
 		bugCheckNum(errVal | FAILMASK_ELFLOADER);
 	}

@@ -4,14 +4,14 @@
 #include "kmemman.h"
 #define SET_BS 16
 struct Set {
-	struct Set_block* start;
-	long amnt;
+	volatile struct Set_block* start;
+	volatile long amnt;
 	Mutex lock;
 };
 struct Set_block {
-	uintptr used;
-	uintptr next;
-	uintptr data[SET_BS - 2];
+	volatile uintptr used;
+	volatile uintptr next;
+	volatile uintptr data[SET_BS - 2];
 };
 struct Set* Set_create(void) {
 	struct Set* la = alloc(sizeof(struct Set));

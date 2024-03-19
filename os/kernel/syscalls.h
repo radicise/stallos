@@ -17,13 +17,13 @@
 Mutex kfdgenLock;
 int kfdNext;
 int makeKfd(void) {// TODO Allocate and deallocate `kfd' values properly
-	Mutex_acquire(kfdgenLock);
+	Mutex_acquire(&kfdgenLock);
 	int k = kfdNext;
 	kfdNext++;
 	if (kfdNext < 1) {
 		bugCheckNum(0x0001 | FAILMASK_SYSCALLS);
 	}
-	Mutex_release(kfdgenLock);
+	Mutex_release(&kfdgenLock);
 	return k;
 }
 void removeKfd(int kfd) {// TODO Allocate and deallocate `kfd' values properly
@@ -79,7 +79,7 @@ struct FileDriver* resolveFileDriver(int kfd) {
 	return (struct FileDriver*) drvr;
 }
 void retDesc(int kfd) {
-	uintptr st = Map_fetch(i, KFDStatus);
+	uintptr st = Map_fetch(kfd, KFDStatus);
 	if (st == (uintptr) (-1)) {
 		bugCheckNum(0x0004 | FAILMASK_SYSCALLS);
 	}
@@ -98,6 +98,7 @@ void retDesc(int kfd) {
 			bugCheckNum(0x0007 | FAILMASK_SYSCALLS);
 		}
 	}
+	return;
 }
 unsigned int getMemOffset(void) {// TODO Utilise virtual memory pages properly
 	if (tid == ((pid_t) 1)) {// TODO Support for multiple userspace threads
@@ -266,9 +267,9 @@ int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {// Introduc
 		bugCheck();
 	}
 	errno = 0;
-	int res = driver->_llseek(kfd, offHi, offLo, res, how);
+	int result = driver->_llseek(kfd, offHi, offLo, res, how);
 	retDesc(kfd);
-	return res;
+	return result;
 }
 time_t time(time_t* resAddr) {
 	time_t n = timeFetch();
@@ -324,9 +325,8 @@ int open(char* path, int flg, mode_t mode) {// `path' is not of type `const char
 	// TODO URGENT Ensure that the area from `path' to (and including) the NUL terminator is readable by the userspace program and let `n' be the sum of the string length (not including the NUL terminator) and 1 and let `m' represent a copy of the string of the type `const char*' such that `m' can be deallocated with sizeof
 	// TODO URGENT Validate string length
 	size_t n = strlen(path) + 1;
-	m = alloc(n + 1);
+	const char* m = alloc(n + 1);
 	cpy(m, path, n + 1);
-	const char* m = path;
 	if (!(*m)) {
 		errno = ENOENT;
 		return (-1);// Linux seems to give `ENOENT' upon attempting to open "" with the raw system call, even if `O_CREAT' is specifid with `O_RDWR', at least in one instance with an "ext4" filesystem; TODO Check whether this should always happen

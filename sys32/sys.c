@@ -7,7 +7,7 @@ extern void irupt_hang(void);
 #define CHAR_BIT 8
 /* TODO Interrupt handler to fail the running program after divide-by zero exceptions &c */
 void set_irupt(void* base, unsigned int index, void(*func)(void), unsigned char trap, unsigned short seg) {
-	unsigned char* pos = ((unsigned char*) base) + (index * 8);
+	volatile unsigned char* pos = ((volatile unsigned char*) base) + (index * 8);
 	0[pos] = (unsigned char) (unsigned int) func;/* EIP byte 0 */
 	1[pos] = (unsigned char) (((unsigned int) func) >> 8);/* EIP byte 1 */
 	2[pos] = seg;
@@ -60,10 +60,10 @@ int executeSystem() {
 	while (1) {
 	}
 	*/
-	(*((void**) 0x7f7f8)) = (void*) farRunELF;
-	(*((int*) 0x7f7fc)) = 0x00000008;
+	(*((void* volatile*) 0x7f7f8)) = (void*) farRunELF;
+	(*((volatile int*) 0x7f7fc)) = 0x00000008;
 	struct Thread_state state;
-	int i = runELF((void*) 0x00010000, (void*) 0x00040000, &state);
+	int i = runELF((void*) 0x00020000, (void*) 0x00040000, &state);
 	if (i) {
 		return i;
 	}
@@ -101,8 +101,8 @@ unsigned long findSeg(void) {// Changes LGDT descriptor data, finds the offset f
 }
 unsigned long removeSeg(unsigned long seg) {//Changes the LGDT descriptor data; this does not invalidate the GDT entry; 0: Success; 1: Failure
 	seg += 8;
-	if ((seg + 16) == ((*((unsigned short*) GDTD)) + 9)) {
-		(*((unsigned short*) GDTD)) -= 0x10;
+	if ((seg + 16) == ((*((volatile unsigned short*) GDTD)) + 9)) {
+		(*((volatile unsigned short*) GDTD)) -= 0x10;
 	}
 	seg >>= 4;
 	int p = seg / CHAR_BIT;
