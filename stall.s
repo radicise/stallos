@@ -56,7 +56,7 @@ _start:
     movw $0x50,%ax
     movw %ax,%ds
     ljmpw $0x07c0,$0x0200
-_cahh: # TODO read and write files using numbers (terminal in / out will also have [a] number[s])
+_cahh:
     cmpw $0x01,%dx
     jz lad
     cmpw $0x02,%dx
@@ -148,7 +148,6 @@ _dishe:
 .set dist_twtyar, 256 - dist_twty
 .space dist_twtyar
 _diwr:
-    # TODO implement as an interrupt
     # doc:
     # %ax - Sector number (0-indexed)
     # %es:(%bx) - Storage address
@@ -467,7 +466,7 @@ _boot_kernel32:
     jnz a20_failure
     cmpb $0x01,%al
     jz a20_isset
-    movw $0x2401,%ax # TODO maybe wait for a20 for a bit? does the bios only return after it has been set fully?
+    movw $0x2401,%ax # TODO maybe wait for a20 for a bit? does the bios only return after it has been set "fully"?
     clc
     int $0x15
     jc a20_failure

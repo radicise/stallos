@@ -112,7 +112,7 @@ void initSystemCallInterface(void) {
 	kfdDriverMap = Map_create();// Map, int "kfd" -> struct FileDriver* "driver"
 	FSDriverMap = Map_create();// Map, const char* "Filesystem name" -> struct FSInterface* "Filesystem driver"; "Filesystem name" only ends with '/' if it is "/"
 	KFDStatus = Map_create();// Map, int "kfd" -> struct KFDInfo* "status"
-	Map_add(1, (uintptr) &FileDriver_VGATerminal, kfdDriverMap);// "/dev/console"
+	Map_add(1, (uintptr) &FileDriver_VGATerminal, kfdDriverMap);// "/dev/tty1"
 	Map_add(2, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hda"
 	Map_add(3, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdb"
 	Map_add(4, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdc"
@@ -193,6 +193,8 @@ int validateCap(int cap) {
 /*
  *
  * System call interface
+ *
+ * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t'
  *
  */
 ssize_t write(int fd, const void* buf, size_t count) {
@@ -390,9 +392,13 @@ void* mmap(void* addr, size_t len, int p, int flg, int fd, off_t off) {
 }
 
 
-
-
-
+#if __TESTING__ == 1
+unsigned long testcall(unsigned long val) {
+	printMemUsage();
+	kernelMsg("\n");
+	return 0;
+}
+#endif
 // TODO Implement all applicable system calls
 /*
  * System call appearance history sources:
@@ -454,6 +460,10 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		case (224):
 			retVal = (unsigned long) gettid();
 			break;
+#endif
+#if __TESTING__ == 1
+		case (1025):
+			retVal = (unsigned long) testcall(arg1);
 #endif
 		default:
 			errno = ENOSYS;

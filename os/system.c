@@ -1,6 +1,7 @@
+#define __STALLOS__ 1
+#define __TESTING__ 1
 #define RELOC 0x00040000
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
-#define __STALLOS__ 1
 #define LINUX_COMPAT_VERSION 0x20603904
 /*
  *
@@ -299,22 +300,29 @@ const char* strct(const char** c) {// Does not check for string size overflow
 	return s;
 }
 struct VGATerminal mainTerm;
+Mutex kmsg;
 int kernelMsg(const char* msg) {
 	unsigned int len = strlen(msg);
+	Mutex_acquire(&kmsg);// TODO initialise
 	if (len != VGATerminal_write(1, msg, len)) {
+		Mutex_release(&kmsg);
 		return (-1);
 	}
+	Mutex_release(&kmsg);
 	return 0;
 }
 int kernelWarnMsg(const char* msg) {
 	int w = 0;
+	Mutex_acquire(&kmsg);
 	w |= kernelMsg("Warning: ");
 	w |= kernelMsg(msg);
 	w |= kernelMsg("\n");
+	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
 int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
+	Mutex_acquire(&kmsg);
 	w |= kernelMsg("Warning: ");
 	w |= kernelMsg(msg);
 	w |= kernelMsg("0x");
@@ -327,6 +335,7 @@ int kernelWarnMsgCode(const char* msg, unsigned long code) {
 	}
 	w |= kernelMsg(tx);
 	w |= kernelMsg("\n");
+	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
 int kernelMsgULong(unsigned long n) {
@@ -340,6 +349,7 @@ int kernelMsgULong(unsigned long n) {
 		count++;
 	}
 	char buf[count + 1];
+	buf[count] = 0x00;
 	int i = count - 1;
 	while (1) {
 		buf[i] = 0x30 + (n % 10);
@@ -363,6 +373,7 @@ int printMemUsage(void) {
 	unsigned long tib = n >> 10;
 	int g = tib ? 1 : (gib ? 2 : (mib ? 3 : (kib ? 4 : 5)));
 	int w = 0;
+	Mutex_acquire(&kmsg);
 	switch (g) {
 		case (1):
 			w |= kernelMsgULong(tib);
@@ -383,10 +394,12 @@ int printMemUsage(void) {
 		default:
 			bugCheck();
 	}
+	Mutex_release(&kmsg);
 	return w;
 }
 int kernelMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
+	Mutex_acquire(&kmsg);
 	w |= kernelMsg(msg);
 	w |= kernelMsg("0x");
 	int n;
@@ -398,13 +411,16 @@ int kernelMsgCode(const char* msg, unsigned long code) {
 	}
 	w |= kernelMsg(tx);
 	w |= kernelMsg("\n");
+	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
 int kernelInfoMsg(const char* msg) {
 	int w = 0;
+	Mutex_acquire(&kmsg);
 	w |= kernelMsg("Info.: ");
 	w |= kernelMsg(msg);
 	w |= kernelMsg("\n");
+	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
 extern void bus_out_long(unsigned long, unsigned long);
@@ -533,7 +549,7 @@ void PICInit(unsigned char mOff, unsigned char sOff) {
 	bus_wait();
 }
 #include "kernel/ATA.h"
-#include "kernel/blockCompat.h"
+#include "kernel/blockdev.h"
 #include "kernel/syscalls.h"
 extern void irupt_70h(void);
 extern void irupt_71h(void);
@@ -559,6 +575,7 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 }
 #define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
+	Mutex_initUnlocked(&kmsg);
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
 	mainTerm.pos = readLongPhysical(0x00000506) & 0xffff;
 	mainTerm.format = readLongPhysical(0x00000508) & 0x00ff;

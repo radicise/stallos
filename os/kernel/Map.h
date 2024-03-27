@@ -55,6 +55,9 @@ uintptr Map_fetch(uintptr key, struct Map* map) {// Contains the specified key: 
 	Mutex_release(&(map->set->lock));
 	return retVal;
 }
+int Map_cmpStr(uintptr* suspect, uintptr str) {
+	return strcmp((const char*) (((struct Map_pair*) suspect)->key), (const char*) str);
+}
 uintptr Map_findByCompare(uintptr data, int (*comparator)(uintptr, uintptr), struct Map* map) {// Contains a match: The key of the match; Does not contain a match: (uintptr) (-1)
 	Mutex_acquire(&(map->set->lock));
 	uintptr i = Set_containsByCompare(data, comparator, map->set);// comparison is guaranteed to be in the order `comparator(<Map_pair*>, <provided value>)'; comparator(A, B) == 0: A and B match according to the comparator; comparator(A, B) != 0: A and B do not match according to the comparator

@@ -1,7 +1,7 @@
 #ifndef __ATA_H__
 #define __ATA_H__ 1
 #include "types.h"
-#include "blockCompat.h"
+#include "blockdev.h"
 #define FAILMASK_ATA 0x00040000
 #define ATA_SR_ERR 0x01
 #define ATA_SR_IDX 0x02
@@ -130,6 +130,27 @@ struct ATAFile ATA_0m;// hda
 struct ATAFile ATA_0s;// hdb
 struct ATAFile ATA_1m;// hdc
 struct ATAFile ATA_1s;// hdd
+struct BDSpec ATA_BlockFile = (struct BDSpec) {.bs = 9,
+	.writeBlock = ata_writeBlock,
+	.readBlock = ata_readBlock,
+	.readMax = 256,
+	.writeMax = 256};
+struct BlockFile ATA_0m_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
+	.pos = 0,
+	.amnt = 1024,// TODO Change
+	.obj = &ATA_0m};
+struct BlockFile ATA_0s_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
+	.pos = 0,
+	.amnt = 1024,// TODO Change
+	.obj = &ATA_0s};
+struct BlockFile ATA_1m_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
+	.pos = 0,
+	.amnt = 1024,// TODO Change
+	.obj = &ATA_1m,};
+struct BlockFile ATA_1s_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
+	.pos = 0,
+	.amnt = 1024,// TODO Change
+	.obj = &ATA_1s};
 void initATA(void) {
 	ATA_0.bus = 0x01f0;
 	ATA_1.bus = 0x0170;
@@ -147,28 +168,11 @@ void initATA(void) {
 	ATA_1m.slave = 0x00;
 	ATA_1s.ata = &ATA_1;
 	ATA_1s.slave = 0x01;
+	Mutex_initUnlocked(&(ATA_0m_file.lock));
+	Mutex_initUnlocked(&(ATA_0s_file.lock));
+	Mutex_initUnlocked(&(ATA_1m_file.lock));
+	Mutex_initUnlocked(&(ATA_1s_file.lock));
 }
-struct BDSpec ATA_BlockFile = (struct BDSpec) {9,
-	ata_writeBlock,
-	ata_readBlock,
-	256,
-	256};
-struct BlockFile ATA_0m_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_0m};
-struct BlockFile ATA_0s_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_0s};
-struct BlockFile ATA_1m_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_1m};
-struct BlockFile ATA_1s_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_1s};
 ssize_t ATA_write(int kfd, const void* dat, size_t len) {
 	switch (kfd) {
 		case (2):

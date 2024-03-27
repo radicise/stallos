@@ -1,3 +1,0 @@
-int _start(int argc, **u8 argv) {
-	return 0;
-}

@@ -1,3 +1,0 @@
-#define ENOTDIR 2
-#define ENOENT 3
-#define EIO 4

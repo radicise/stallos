@@ -8,6 +8,6 @@ struct FSReturn {// `errno' == 0: Success; `errno' != 0: Failure
 struct FSInterface {// Concurrency support is guaranteed
 	struct FSReturn (*FSInit)(struct FileDriver*, int, loff_t);// Initialises for the filesystem instance; Arguments: ("partition", "kfd", "size"); Return: "fs"
 	void (*FSClose)(void*);// Closes the filesystem instance, deallocates the filesystem instance, flushes data to underlying partition file; Arguments: ("fs"); Does not fail
-	struct FSReturn (*open)(const char*, int, mode_t, void*);// Opens the file at "fileName"; Arguments: ("fileName", "flags", "mode", "fs"); Returns: "return"
+	struct FSReturn (*open)(const char*, int, mode_t, void*);// Opens the file at "fileName"; Arguments: ("fileName", "flags", "mode", "fs"); Returns: "return"; the path passed is guaranteed to be relative to the mount point
 };
 #endif
