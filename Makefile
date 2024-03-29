@@ -4,11 +4,12 @@ LDPRGM ?= i686-linux-gnu-ld
 STRIPPRGM ?= i686-linux-gnu-strip
 OBJCOPYPRGM ?= i686-linux-gnu-objcopy
 
-CFLAGS ?= -O0 -std=c99 -Wpedantic -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c
+TARGETMACHINE ?= x86_32
+
+CFLAGS ?= -D TARGET=${TARGETMACHINE} -O0 -std=c99 -Wpedantic -m32 -march=i386 -nostartfiles -nostdlib -nodefaultlibs -static -c
 ASFLAGS ?= -march=i386
 LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
 
-TARGETMACHINE ?= x86_32
 
 build Stallos/stallos.bin: build/stall.bin
 	cp build/stall.bin Stallos/stallos.bin

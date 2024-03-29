@@ -1,3 +1,6 @@
+#ifndef TARGET
+#error "`TARGET' is not set"
+#endif
 #define __STALLOS__ 1
 #define __TESTING__ 1
 #define RELOC 0x00040000
@@ -272,7 +275,7 @@ void bugCheckNum_u32(u32 num, uintptr addr) {
 void bugCheckNumWrapped(unsigned long num, uintptr addr) {// Fatal kernel errors
 	bugCheckNum_u32(num, addr);
 }
-#include "kernel/VGATerminal.h"
+#include "kernel/driver/VGATerminal.h"
 size_t strlen(const char* str) {
 	const char* n = str;
 	while (*(n++)) {
@@ -299,6 +302,7 @@ const char* strct(const char** c) {// Does not check for string size overflow
 	(*m) = 0x00;
 	return s;
 }
+extern const char* strconcat();
 struct VGATerminal mainTerm;
 Mutex kmsg;
 int kernelMsg(const char* msg) {
@@ -361,8 +365,8 @@ int kernelMsgULong(unsigned long n) {
 	}
 	return kernelMsg(buf);
 }
-int printMemUsage(void) {
-	unsigned long long n = getMemUsage();
+#include "kernel/paging.h"
+int printMem(unsigned long long n) {
 	unsigned long b = n & 0x3ff;
 	n >>= 10;
 	unsigned long kib = n & 0x3ff;
@@ -372,21 +376,44 @@ int printMemUsage(void) {
 	unsigned long gib = n & 0x3ff;
 	unsigned long tib = n >> 10;
 	int g = tib ? 1 : (gib ? 2 : (mib ? 3 : (kib ? 4 : 5)));
+	int h = b ? 1 : (kib ? 2 : (mib ? 3 : (gib ? 4 : 5)));
 	int w = 0;
 	Mutex_acquire(&kmsg);
 	switch (g) {
 		case (1):
 			w |= kernelMsgULong(tib);
-			w |= kernelMsg("TiB+");
+			w |= kernelMsg("TiB");
+			if (h == 5) {
+				break;
+			}
+			w |= kernelMsg("+");
 		case (2):
-			w |= kernelMsgULong(gib);
-			w |= kernelMsg("GiB+");
+			if (gib) {
+				w |= kernelMsgULong(gib);
+				w |= kernelMsg("GiB");
+				if (h == 4) {
+					break;
+				}
+				w |= kernelMsg("+");
+			}
 		case (3):
-			w |= kernelMsgULong(mib);
-			w |= kernelMsg("MiB+");
+			if (mib) {
+				w |= kernelMsgULong(mib);
+				w |= kernelMsg("MiB");
+				if (h == 3) {
+					break;
+				}
+				w |= kernelMsg("+");
+			}
 		case (4):
-			w |= kernelMsgULong(kib);
-			w |= kernelMsg("KiB+");
+			if (kib) {
+				w |= kernelMsgULong(kib);
+				w |= kernelMsg("KiB");
+				if (h == 2) {
+					break;
+				}
+				w |= kernelMsg("+");
+			}
 		case (5):
 			w |= kernelMsgULong(b);
 			w |= kernelMsg("B");
@@ -396,6 +423,28 @@ int printMemUsage(void) {
 	}
 	Mutex_release(&kmsg);
 	return w;
+}
+int printMemUsage(void) {
+	Mutex_acquire(&kmsg);
+	printMem(getMemUsage());
+	kernelMsg(" of ");
+	printMem(amntMem);
+	Mutex_release(&kmsg);
+}
+int kernelMsgULong_hex(unsigned long code) {
+	int w = 0;
+	Mutex_acquire(&kmsg);
+	w |= kernelMsg("0x");
+	int n;
+	char tx[(n = (sizeof(unsigned long) * CHAR_BIT / 4)) + 1];
+	tx[n] = 0x00;
+	while (n--) {
+		tx[n] = hex[code & 0x0f];
+		code >>= 4;
+	}
+	w |= kernelMsg(tx);
+	Mutex_release(&kmsg);
+	return w ? (-1) : 0;
 }
 int kernelMsgCode(const char* msg, unsigned long code) {
 	int w = 0;
@@ -548,7 +597,7 @@ void PICInit(unsigned char mOff, unsigned char sOff) {
 	bus_out_u8(0x00a1, sOr);
 	bus_wait();
 }
-#include "kernel/ATA.h"
+#include "kernel/driver/ATA.h"
 #include "kernel/blockdev.h"
 #include "kernel/syscalls.h"
 extern void irupt_70h(void);

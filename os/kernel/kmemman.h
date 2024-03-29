@@ -10,7 +10,7 @@
 #define KMEM_AMNTMEMSPACES (KMEM_AMNT / KMEM_BS)
 #define KMEM_DATSTART (KMEM_ADDR + KMEM_AMNTMEMBITMAPBYTES + KMEM_BS - ((KMEM_ADDR + KMEM_AMNTMEMBITMAPBYTES - 1) % KMEM_BS) - 1)
 #define KMEM_LB_ADDR 0x3000000
-#define KMEM_LB_AMNT 0x1600000
+#define KMEM_LB_AMNT 0x0e00000
 #define KMEM_LB_BS 4096
 /* `KMEM_LB_AMNT' MUST be an integer multiple of `KMEM_LB_BS' */
 /* `KEMM_LB_ADDR' MUST be an integer multiple of `KMEM_LB_BS' */
@@ -29,8 +29,9 @@ void kmem_init(void) {
 	return;
 }
 unsigned long long getMemUsage(void) {
+	unsigned long long n = KMEM_LB_DATSTART - KMEM_AMNT;
 	Mutex_acquire(&kmem_access);
-	unsigned long long n = memAllocated;
+	n += memAllocated;
 	Mutex_release(&kmem_access);
 	Mutex_acquire(&kmem_lb_access);
 	n += memAllocated_lb;

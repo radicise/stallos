@@ -1,5 +1,5 @@
 #include "kernel/types.h"
-#define __TESTING__ 1
+#define __TESTING__ 0
 #if __TESTING__ == 1
 extern unsigned long testcall(unsigned long);
 #endif

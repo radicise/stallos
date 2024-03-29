@@ -1,7 +1,7 @@
 #ifndef __ATA_H__
 #define __ATA_H__ 1
-#include "types.h"
-#include "blockdev.h"
+#include "../types.h"
+#include "../blockdev.h"
 #define FAILMASK_ATA 0x00040000
 #define ATA_SR_ERR 0x01
 #define ATA_SR_IDX 0x02
@@ -130,27 +130,27 @@ struct ATAFile ATA_0m;// hda
 struct ATAFile ATA_0s;// hdb
 struct ATAFile ATA_1m;// hdc
 struct ATAFile ATA_1s;// hdd
-struct BDSpec ATA_BlockFile = (struct BDSpec) {.bs = 9,
-	.writeBlock = ata_writeBlock,
-	.readBlock = ata_readBlock,
-	.readMax = 256,
-	.writeMax = 256};
-struct BlockFile ATA_0m_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
-	.pos = 0,
-	.amnt = 1024,// TODO Change
-	.obj = &ATA_0m};
-struct BlockFile ATA_0s_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
-	.pos = 0,
-	.amnt = 1024,// TODO Change
-	.obj = &ATA_0s};
-struct BlockFile ATA_1m_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
-	.pos = 0,
-	.amnt = 1024,// TODO Change
-	.obj = &ATA_1m,};
-struct BlockFile ATA_1s_file = (struct BlockFile) {.reliance = &ATA_BlockFile,
-	.pos = 0,
-	.amnt = 1024,// TODO Change
-	.obj = &ATA_1s};
+struct BDSpec ATA_BlockFile = (struct BDSpec) {9,
+	ata_writeBlock,
+	ata_readBlock,
+	256,
+	256};
+struct BlockFile ATA_0m_file = (struct BlockFile) {&ATA_BlockFile,
+	0,
+	1024,// TODO Change
+	&ATA_0m};
+struct BlockFile ATA_0s_file = (struct BlockFile) {&ATA_BlockFile,
+	0,
+	1024,// TODO Change
+	&ATA_0s};
+struct BlockFile ATA_1m_file = (struct BlockFile) {&ATA_BlockFile,
+	0,
+	1024,// TODO Change
+	&ATA_1m,};
+struct BlockFile ATA_1s_file = (struct BlockFile) {&ATA_BlockFile,
+	0,
+	1024,// TODO Change
+	&ATA_1s};
 void initATA(void) {
 	ATA_0.bus = 0x01f0;
 	ATA_1.bus = 0x0170;
@@ -233,6 +233,54 @@ int ATA__llseek(int kfd, off_t offHi, off_t offLo, loff_t* res, int how) {
 	}
 	return 0;
 }
-#include "FileDriver.h"
-struct FileDriver FileDriver_ATA = (struct FileDriver) {ATA_write, ATA_read, ATA_lseek, ATA__llseek};
+int ATA_fsync(int kfd) {
+	switch (kfd) {
+		case (2):
+		case (3):
+		case (4):
+		case (5):
+			return 0;
+		default:
+			bugCheckNum(0x0500 | EBADF | FAILMASK_ATA);
+	}
+	return 0;
+}
+int ATA_fdatasync(int kfd) {
+	switch (kfd) {
+		case (2):
+		case (3):
+		case (4):
+		case (5):
+			return 0;
+		default:
+			bugCheckNum(0x0600 | EBADF | FAILMASK_ATA);
+	}
+	return 0;
+}
+int ATA_close(int kfd) {
+	switch (kfd) {
+		case (2):
+		case (3):
+		case (4):
+		case (5):
+			return 0;
+		default:
+			bugCheckNum(0x0700 | EBADF | FAILMASK_ATA);
+	}
+	return 0;
+}
+void ATA_closeFinal(int kfd) {
+	switch (kfd) {
+		case (2):
+		case (3):
+		case (4):
+		case (5):
+			return;
+		default:
+			bugCheckNum(0x0800 | EBADF | FAILMASK_ATA);
+	}
+	return;
+}
+#include "../FileDriver.h"
+struct FileDriver FileDriver_ATA = (struct FileDriver) {ATA_write, ATA_read, ATA_lseek, ATA__llseek, ATA_fsync, ATA_fdatasync, ATA_close, ATA_closeFinal};
 #endif

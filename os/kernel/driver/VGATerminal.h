@@ -1,8 +1,8 @@
 #ifndef __KERNEL__VGATERMINAL_H__
 #define __KERNEL__VGATERMINAL_H__ 1
 #define FAILMASK_VGATERMINAL 0x00030000
-#include "types.h"
-#include "perThread.h"
+#include "../types.h"
+#include "../perThread.h"
 struct VGACell {
 	unsigned char text;
 	unsigned char format;
@@ -175,10 +175,10 @@ ssize_t VGATerminalWrite(struct VGATerminal* term, unsigned char* data, unsigned
 	Mutex_release(&(term->accessLock));
 	return res;
 }
-#include "types.h"
-#include "errno.h"
-#include "perThreadgroup.h"
-#include "perThread.h"
+#include "../types.h"
+#include "../errno.h"
+#include "../perThreadgroup.h"
+#include "../perThread.h"
 ssize_t VGATerminal_write(int kfd, const void* data, size_t len) {
 	if (kfd != 1) {
 		bugCheckNum(FAILMASK_VGATERMINAL | 0x0100 | EBADF);
@@ -205,6 +205,6 @@ int VGATerminal__llseek(int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
 	errno = ESPIPE;
 	return (-1);
 }
-#include "FileDriver.h"
+#include "../FileDriver.h"
 struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write, VGATerminal_read, VGATerminal_lseek, VGATerminal__llseek};
 #endif
