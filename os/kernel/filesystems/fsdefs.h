@@ -34,6 +34,7 @@ void dalloc(void* p, size_t s) {
 #endif
 #include "../FileDriver.h"
 #include "../fsiface.h"
+typedef struct FSReturn FSRet;
 #include "./tsfserr.h"
 typedef struct FSReturn FSRet;
 #define u48 u64
@@ -573,7 +574,7 @@ void tsfs_mk_ce_name(void* vb, char const* n, size_t nlen) {
 void tsfs_dummy_flush(FileSystem* fs) {}
 
 #ifndef fsflush
-#define fsflush(fs) fs->fdrive->fync(fs->kfd);
+#define fsflush(fs) fs->fdrive->fsync(fs->kfd);
 #endif
 
 #include "./diskmanip.h"

@@ -24,14 +24,14 @@ DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, u8 blocksize, s64 curr_time) {
-    FSRet rv = {.errno=EINVAL};
+    FSRet rv = {.err=EINVAL};
     if (blocksize < 10 || blocksize > BLK_SIZE_MAX) {
         return rv;
     }
     if (p_size > 48) {
         return rv;
     }
-    rv.errno = 0;
+    rv.err = 0;
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
     printf("FS ALLOC, %p\n", fs);
     fs -> fdrive = fdr;
@@ -114,7 +114,7 @@ FSRet loadFS(struct FileDriver* fdr, int kfd) {
     fdr->lseek(kfd, 0, SEEK_SET);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
-    FSRet rv = {.errno=EINVAL};
+    FSRet rv = {.err=EINVAL};
     read_rootblock(fs, rblock);
     if (rblock->breakver != VERNOBN) {
         kernelWarnMsg("VERSION INCOMPAT");
@@ -127,7 +127,7 @@ FSRet loadFS(struct FileDriver* fdr, int kfd) {
         releaseFS(fs);
         return rv;
     }
-    rv.errno = 0;
+    rv.err = 0;
     rv.retptr = fs;
     return rv;
 }
