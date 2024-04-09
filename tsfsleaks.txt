@@ -1,0 +1,4 @@
+tsfs_load
+tsfs_unload,_tsmagic_force_release
+./os/kernel/filesystems/tsfs.h
+.*/filesystems

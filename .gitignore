@@ -16,3 +16,4 @@ fstesting
 /build
 /StallOS
 gensizes.h
+__pycache__
