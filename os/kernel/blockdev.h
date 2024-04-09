@@ -13,9 +13,10 @@ struct BDSpec {
 };
 struct BlockFile {
 	struct BDSpec* reliance;
-	loff_t pos;// in address units
+	volatile loff_t pos;// in address units
 	unsigned long long amnt;// in blocks
 	void* obj;
+	Mutex lock;
 };// TODO Utilise `loff_t' appropriately throughout the functions and structures instead of using `unsigned long long'
 ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*) = file->reliance->writeBlock;

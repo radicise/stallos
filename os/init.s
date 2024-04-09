@@ -35,3 +35,11 @@ movl $25,%eax
 int $0x80
 popl %ebx
 ret
+testcall:
+.globl testcall
+pushl %ebx
+movl 8(%esp),%ebx
+movl $0x401,%eax
+int $0x80
+popl %ebx
+ret

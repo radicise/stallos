@@ -1,4 +1,8 @@
 #include "kernel/types.h"
+#define __TESTING__ 0
+#if __TESTING__ == 1
+extern unsigned long testcall(unsigned long);
+#endif
 extern ssize_t write(int, const void*, size_t);
 extern ssize_t read(int, void*, size_t);
 extern time_t time(time_t*);
@@ -55,6 +59,9 @@ void _start() {
 	printLine();
 	time_t timeNow;
 	while (1) {
+#if __TESTING__ == 1
+		testcall(0);
+#endif
 		while ((timeNow = time(NULL)) == timeOld) {
 		}
 		printLong(timeNow);

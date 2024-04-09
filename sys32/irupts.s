@@ -11,7 +11,9 @@ incb %al
 jmp irupt_discall__loop1
 irupt_hang:
 .globl irupt_hang
-jmp irupt_hang
+cli
+irupt_hang__loop1:
+jmp irupt_hang__loop1
 bugCheck:
 .globl bugCheck
 movw $0x4720,%ax

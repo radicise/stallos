@@ -3,8 +3,8 @@
 // Do not use the length property of this string for finding the length of the comand line, use the variable named `commandlength'
 declstr commandline "                                                                                                                                                                                                                                                                "
 decl commandlength arg0
-declstr fail "failed to complete requested operation\n"
-declstr unknown "Unknown operation, valid commands are: kernel32, sys16\n"
+declstr fail "Failed to complete requested operation\n"
+declstr unknown "Unknown operation, valid commands are: kernel32\n"
 declstr disabled "The requested feature has been disabled\n"
 declstr sys16exit "returned: 0x"
 // Enters after the user enters a newline in the shell, this acts as the command-processing and executive part of the shell and then returns with lret
@@ -33,7 +33,8 @@ if theen
 	pushw %bx
 	subw $0x0c,%sp
 	movw $0x00,%bp
-	lcallw $0x07c0,$sys16
+	# lcallw $0x07c0,$sys16
+	xorw %ax,%ax
 	addw $0x0c,%sp
 	popw %bx
 	popw %ss
@@ -120,6 +121,7 @@ startraw
     jnz nei
     cmpw $0x0036,%es:0x04
     jnz nei
+    jmp nei
     movw $0x02,%ds:0x1e
     jmp afe
     nei:
