@@ -41,7 +41,7 @@ typedef struct FSReturn FSRet;
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 5
+#define VERNOBN 6
 
 /*
 PYGENSTART
@@ -142,6 +142,8 @@ typedef struct {
 
 // // is this block valid? (allows for fast delete by not overwriting data)
 // #define TSFS_SF_VALID 0b1
+// all data blocks have this set
+#define TSFS_SF_LIVE 0b1
 // what kind of thing is this? (file, directory, link, data)
 #define TSFS_SF_KIND  0b1110
 // is this block the head of a run of blocks storing data for the same owner?
@@ -168,10 +170,38 @@ typedef struct {
 typedef struct {
     /*
     PYGENSTART
+    comment: size of data header stored on disk
+    name: TSFSDATAHEADER_DSIZE
+    pygen-over: [-pyrepos, magicno, disk_loc, rc, id] 0 {
+    write: ()
+    disk_loc: (_pyrepos)
+    id: (3)
+    }
+    pygen-mk-rw: dataheader
+    */
+    size_t magicno;
+    u48   disk_loc;
+    u16   rc;
+    u8    id;
+    //
+    // number of hard links to this data
+    u16   refcount;
+    // disk location of the first data block
+    u48   head;
+    // blocks used by data
+    u32   blocks;
+    // size of data in bytes
+    u64   size;
+    u64   checksum;
+} TSFSDataHeader;
+
+typedef struct {
+    /*
+    PYGENSTART
     comment: size of data block data stored on disk
     name: TSFSDATABLOCK_DSIZE
     pygen-over: [-pyrepos, storage_flags, data_length, magicno, disk_loc, rc, id] 2 {
-    write: (`data_length` | ((u16)`storage_flags`)<<12)
+    write: (`data_length` | ((u16)`storage_flags`|1)<<12)
     data_length: (`$TMP`&0x0fff)
     storage_flags: (u8)(`$TMP`>>12)
     disk_loc: (_pyrepos)
@@ -186,8 +216,8 @@ typedef struct {
     //
     // flags on how the block is stored and its status
     u8    storage_flags;
-    // how many hard links refer to this
-    u8    refcount;
+    // // how many hard links refer to this
+    // u8    refcount;
     u48   next_block;
     u48   prev_block;
     // how much of this block actually contains data
@@ -219,10 +249,12 @@ typedef struct {
     //
     u8    storage_flags;
     u48   data_loc;
+    // location of the child table, name is shot because the child tables used to own the nodes
     u48   parent_loc;
+    // parent node
     u48   pnode;
-    u32   blocks; // number of blocks forming the data of this node
-    u64   size;
+    // u32   blocks; // number of blocks forming the data of this node
+    // u64   size;
     char  name[255];
     u64   checksum;
 } TSFSStructNode;
@@ -291,6 +323,18 @@ int bufcmp(void const* b1, void const* b2, int size) {
         if (*(a+i) != *(b+i)) {
             return 0;
         }
+    }
+    return 1;
+}
+
+int tsfs_cmp_name(void const* n1, void const* n2) {
+    u8* a = (u8*)n1;
+    u8* b = (u8*)n2;
+    for (int i = 0; i < 255; i ++) {
+        if (*(a+i) != *(b+i)) {
+            return 0;
+        }
+        if (*(a+i) == 0) break;
     }
     return 1;
 }

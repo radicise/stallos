@@ -15,10 +15,12 @@ whenever it feels like it
 #define TSFS_MAGIC_DATA 1
 #define TSFS_MAGIC_NODE 2
 #define TSFS_MAGIC_BLOC 3
+#define TSFS_MAGIC_HEAD 4
 
 #define SB TSFSStructBlock
 #define SN TSFSStructNode
 #define DB TSFSDataBlock
+#define DH TSFSDataHeader
 
 size_t _tsfs_magic_grabno(void* object) {
     return *((size_t*)object);
@@ -184,6 +186,17 @@ void _tsmagic_dedata(FileSystem* fs, DB* data) {
     deallocate(data, sizeof(DB));
 }
 
+DH* _tsmagic_head(FileSystem* fs) {
+    DH* head = allocate(sizeof(DH));
+    head->id = 3;
+    head->magicno = _tsmagic_get_slot(fs, head);
+    return head;
+}
+void _tsmagic_dehead(FileSystem* fs, DH* head) {
+    _tsmagic_rel_slot(fs, head->magicno);
+    deallocate(head, sizeof(DH));
+}
+
 /*
 check for interned object
 */
@@ -242,14 +255,20 @@ void* _tsfs_magic_loader(FileSystem* fs, u64 pos, void*(*_a)(FileSystem*), void(
     return ptr;
 }
 
+typedef void*(*TSFS_MAGIC_LOADER)(FileSystem*);
+typedef void(*TSFS_MAGIC_READER)(FileSystem*,void*);
+
 SB* tsfs_load_block(FileSystem* fs, u64 pos) {
-    return _tsfs_magic_loader(fs, pos, _tsmagic_block, read_structblock, TSFSSTRUCTBLOCK_DSIZE);
+    return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_block, (TSFS_MAGIC_READER)read_structblock, TSFSSTRUCTBLOCK_DSIZE);
 }
 SN* tsfs_load_node(FileSystem* fs, u64 pos) {
-    return _tsfs_magic_loader(fs, pos, _tsmagic_node, read_structnode, TSFSSTRUCTNODE_DSIZE);
+    return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_node, (TSFS_MAGIC_READER)read_structnode, TSFSSTRUCTNODE_DSIZE);
 }
 DB* tsfs_load_data(FileSystem* fs, u64 pos) {
-    return _tsfs_magic_loader(fs, pos, _tsmagic_data, read_datablock, TSFSDATABLOCK_DSIZE);
+    return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_data, (TSFS_MAGIC_READER)read_datablock, TSFSDATABLOCK_DSIZE);
+}
+DH* tsfs_load_head(FileSystem* fs, u64 pos) {
+    return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_head, (TSFS_MAGIC_READER)read_dataheader, TSFSDATAHEADER_DSIZE);
 }
 
 /*
@@ -263,6 +282,8 @@ void* tsfs_minterned_read(FileSystem* fs, int kind) {
             return tsfs_load_node(fs, 0);
         case TSFS_MAGIC_DATA:
             return tsfs_load_data(fs, 0);
+        case TSFS_MAGIC_HEAD:
+            return tsfs_load_head(fs, 0);
         default:
             break;
     }
@@ -273,5 +294,6 @@ void* tsfs_minterned_read(FileSystem* fs, int kind) {
 #undef SB
 #undef SN
 #undef DB
+#undef DH
 
 #endif

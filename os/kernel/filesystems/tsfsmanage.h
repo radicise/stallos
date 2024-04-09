@@ -5,13 +5,40 @@ everything to do with managing the file system
 */
 
 #include "./fsdefs.h"
+#include "./tsfscore.h"
+
+/*
+writes a valid dataheader to disk for the given structnode
+fails if the structnode already has data
+*/
+int _tsfs_make_data(FileSystem* fs, TSFSStructNode* sn) {
+    if (sn->data_loc != 0) {
+        return -1;
+    }
+    // magic_smoke(FEIMPL | FEDRIVE | FEDATA | FEOP);
+    u32 blkno = allocate_blocks(fs, 1, 2);
+    u64 absloc = ((u64)blkno) * ((u64)(fs->rootblock->block_size));
+    TSFSDataHeader dh = {.blocks=0,.head=absloc+((u64)(fs->rootblock->block_size)),.refcount=1,.size=0};
+    loc_seek(fs, absloc);
+    write_dataheader(fs, &dh);
+    seek(fs, -TSFSDATAHEADER_DSIZE, SEEK_CUR);
+    block_seek(fs, 1, 1);
+    TSFSDataBlock db = {.data_length=0,.next_block=0,.prev_block=absloc,.blocks_to_terminus=0,.storage_flags=TSFS_SF_FINAL_BLOCK};
+    write_datablock(fs, &db);
+    loc_seek(fs, sn->disk_loc);
+    sn->data_loc = absloc;
+    write_structnode(fs, sn);
+    return 0;
+}
 
 /*
 adds count new data blocks to the end of a file structure, returns zero on success
 */
 int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
-    u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
-    sn->blocks += count;
+    // u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
+    // sn->blocks += count;
+    u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, 0).disk_loc : 0;
+    // sn->blocks += count;
     longseek(fs, sn->data_loc, SEEK_SET);
     write_structnode(fs, sn);
     u32 fblock = allocate_blocks(fs, 1, count);
@@ -202,29 +229,25 @@ int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
 deletes a directory, which must be empty
 */
 int tsfs_rmdir(FileSystem* fs, TSFSStructNode* sn) {
-    // printf("BEFORE BLOCK LOAD\n");
-    TSFSStructBlock* sb = tsfs_get_ntob(fs, sn);
-    // printf("AFTER BLOCK LOAD\n");
-    u8 ec = sb->entrycount;
-    if (ec > 0) {
+    if (sn->storage_flags != TSFS_KIND_DIR) {
+        return ENOTDIR;
+    }
+    TSFSStructBlock* sb = tsfs_get_ntob(fs, sn); // get the struct block
+    if (sb->entrycount) { // check that the count is empty
         tsfs_unload(fs, sb);
-        // printf("AFTER BLOCK UNLOAD\n");
         return ENOTEMPTY;
     }
-    // printf("AFTER COUNT CHECK\n");
     _tsmagic_force_release(fs, sb);
-    // printf("AFTER FORCE REL\n");
     u32 blk = tsfs_loc_to_block(fs, sn->parent_loc);
-    dmanip_null(fs, blk, 1);
-    sn->parent_loc = 0;
-    // printf("BEFORE STRUCT FREE\n");
-    tsfs_free_structure(fs, blk);
-    // printf("AFTER STRUCT FREE\n");
-    _tsfs_delnode(fs, sn);
-    // printf("AFTER DELNODE\n");
+    sn->parent_loc = 0; // ensure the free function does not try to update the block's reference to its parent
+    tsfs_free_structure(fs, blk); // free the struct block
+    _tsfs_delnode(fs, sn); // get rid of the node
     return 0;
 }
 
+/*
+wrapper around [tsfs_exists] that accepts a name
+*/
 int tsfs_name_exists(FileSystem* fs, TSFSStructBlock* sb, char const* name) {
     char tn[9];
     tsfs_mk_ce_name(tn, name, strlen(name)+1);
@@ -259,6 +282,9 @@ int tsfs_add_sbce(FileSystem* fs, TSFSStructBlock* sb, TSFSSBChildEntry* ce) {
     return 0;
 }
 
+/*
+converts a storage flag to equivalent child-entry flag
+*/
 unsigned char tsfs_sf_to_cf(unsigned char sf) {
     unsigned char k = (sf & TSFS_SF_KIND) >> 1;
     switch (k) {
@@ -281,36 +307,147 @@ int tsfs_add_sn(FileSystem* fs, TSFSStructBlock* parent, TSFSStructNode* sn) {
 
 int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSStructBlock* nsb) {
     TSFSStructBlock* sb = tsfs_load_block(fs, parent->parent_loc); // parent block
-    _DBG_print_block(sb);
     char tname[9];
     tsfs_mk_ce_name(tname, name, strlen(name)+1);
     if (tsfs_exists(fs, sb, tname)) {
+        tsfs_unload(fs, sb);
         return EEXIST;
     }
     // addr of first allocated block
     u64 ac1 = ((u64)allocate_blocks(fs, 0, 2)) * ((u64)fs->rootblock->block_size);
-    // nsn->storage_flags = TSFS_KIND_DIR;
-    // nsn->parent_loc = ac1;
-    // nsn->disk_loc = ac1 + fs->rootblock->block_size;
-    // awrite_buf(nsn->name, name, strlen(name));
     TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+fs->rootblock->block_size,.pnode=parent->disk_loc};
     awrite_buf(sn.name, name, strlen(name));
     nsb->flags = TSFS_CF_DIRE;
     nsb->disk_ref = sn.disk_loc;
     nsb->disk_loc = ac1;
-    // TSFSStructBlock nsb = {.flags=TSFS_CF_DIRE, .disk_loc=nsn->disk_loc, .disk_pos=ac1+16};
     loc_seek(fs, ac1);
-    // write_structblock(fs, &nsb);
     write_structblock(fs, nsb);
-    // loc_seek(fs, nsb.disk_loc);
     loc_seek(fs, nsb->disk_ref);
     write_structnode(fs, &sn);
-    // fsflush(fs);
     tsfs_add_sn(fs, sb, &sn);
     tsfs_unload(fs, sb);
-    // write_structnode(fs, nsn);
-    // tsfs_add_sn(fs, &sb, nsn);
     return 0;
+}
+
+int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
+    TSFSStructBlock* sb = tsfs_load_block(fs, parent->parent_loc); // parent block
+    char tname[9];
+    tsfs_mk_ce_name(tname, name, strlen(name)+1);
+    if (tsfs_exists(fs, sb, tname)) {
+        tsfs_unload(fs, sb);
+        return EEXIST;
+    }
+    // addr of first allocated block
+    u64 ac1 = ((u64)allocate_blocks(fs, 0, 1)) * ((u64)fs->rootblock->block_size);
+    TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.data_loc=0};
+    awrite_buf(sn.name, name, strlen(name));
+    loc_seek(fs, ac1);
+    write_structnode(fs, &sn);
+    tsfs_add_sn(fs, sb, &sn);
+    tsfs_unload(fs, sb);
+    _tsfs_make_data(fs, &sn);
+    return 0;
+}
+
+int _tsfs_find_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
+    if (tsfs_cmp_cename(ce->name, data)) {
+        u64 cl = tsfs_tell(fs);
+        loc_seek(fs, ce->dloc);
+        TSFSStructNode sn;
+        read_structnode(fs, &sn);
+        loc_seek(fs, cl);
+        if (!tsfs_cmp_name(*((void**)(data+17)), sn.name)) {
+            return 0;
+        }
+        *((u64*)(data+9)) = ce->dloc;
+        return 1;
+    }
+    return 0;
+}
+
+/*
+resolves the location of [par]'s child with [name] on disk
+returns zero on failure
+*/
+u64 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
+    if (par->storage_flags & ~TSFS_KIND_DIR) {
+        return 0;
+    }
+    void* p = allocate(17+sizeof(size_t));
+    *((u64*)(p+9)) = 0;
+    tsfs_mk_ce_name(p, name, strlen(name)+1);
+    *((const void**)(p+17)) = name;
+    TSFSStructBlock sb;
+    loc_seek(fs, par->parent_loc);
+    read_structblock(fs, &sb);
+    tsfs_sbcs_foreach(fs, &sb, _tsfs_find_sbcsfe_do, p);
+    u64 r = *((u64*)(p+9));
+    deallocate(p, 17+sizeof(size_t));
+    return r;
+}
+
+/*
+sets [curr->disk_loc] to zero on failure
+*/
+void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, int cfs, int cfe) {
+    int cfl = cfe - cfs;
+    if (cfl < 3) { // handle special cases of: empty, '.', and '..'
+        if (cfl == 0) {
+            return;
+        }
+        if (path[cfs] == '.') {
+            if (cfl == 1) {
+                return;
+            }
+            if (path[cfs+1] == '.') {
+                if (curr->pnode == 0) {
+                    curr->disk_loc = 0;
+                    return;
+                }
+                loc_seek(fs, curr->pnode);
+                read_structnode(fs, curr);
+                return;
+            }
+        }
+    }
+    char* frag = allocate(cfl);
+    awrite_buf(frag, path+cfs, cfl);
+    u64 nl = tsfs_find(fs, curr, frag);
+    deallocate(frag, cfl);
+    if (nl == 0) {
+        curr->disk_loc = 0;
+        return;
+    }
+    loc_seek(fs, nl);
+    read_structnode(fs, curr);
+}
+
+/*
+resolves [path] to a disk location, returns zero on failure
+accepts only absolute paths
+returns zero on failure
+*/
+u64 tsfs_resolve_path(FileSystem* fs, const char* path) {
+    if (path[0] != '/') {
+        return 0;
+    }
+    TSFSStructNode curr;
+    loc_seek(fs, fs->rootblock->top_dir);
+    read_structnode(fs, &curr);
+    int i = 1;
+    int cfs = 1;
+    while (1) {
+        if (path[i] == '/' || path[i] == 0) {
+            _tsfs_respath_step(fs, &curr, path, cfs, i);
+            if (curr.disk_loc == 0) {
+                return 0;
+            }
+            cfs = i + 1;
+        }
+        if (path[i] == 0) break;
+        i ++;
+    }
+    return curr.disk_loc;
 }
 
 char tsfs_truncate_pfrag(char const* iname, char* oname) {

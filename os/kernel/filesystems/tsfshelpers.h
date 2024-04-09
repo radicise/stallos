@@ -7,8 +7,14 @@ struct PosDat {
 };
 
 TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockno) {
-    TSFSDataBlock databloc;
+    TSFSDataBlock databloc = {0};
     longseek(fs, sn->data_loc, SEEK_SET);
+    TSFSDataHeader dh;
+    read_dataheader(fs, &dh);
+    if (dh.blocks < blockno) {
+        return databloc;
+    }
+    longseek(fs, dh.head, SEEK_SET);
     // loc_seek(fs, sn->data_loc);
     read_datablock(fs, &databloc);
     u16 cblock = 0;
@@ -56,6 +62,7 @@ void write_datablock_at(FileSystem* fs, TSFSDataBlock* db, u64 dlock) {
 
 /*
 struct - node to block
+THE RETURNED RESOURCE MUST BE RELEASED WITH EITHER [tsfs_unload] OR [_tsmagic_force_release]
 */
 TSFSStructBlock* tsfs_get_ntob(FileSystem* fs, TSFSStructNode* sn) {
     return tsfs_load_block(fs, sn->parent_loc);
@@ -73,7 +80,7 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
     TSFSSBChildEntry ce = {0};
     for (int i = 0; i < sb->entrycount; i ++) {
         read_childentry(fs, &ce);
-        if (ce.flags == 1) {
+        if (ce.flags == TSFS_CF_EXTT) {
             printf("FE EXTT\n");
             TSFSStructBlock ssb = {0};
             loc_seek(fs, ce.dloc);
@@ -98,7 +105,7 @@ void __DBG_print_block(TSFSStructBlock* sb, long l, const char* f, const char* f
 }
 void __DBG_print_node(TSFSStructNode* sn, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("STRUCT NODE {\nDISK_LOC: 0x%llx,\nB_LOCK: 0x%llx,\nPNODE: 0x%llx,\nDATA_LOC: 0x%llx,\nFLAGS: %u,\nBLOCKS: %lu,\nSIZE: %llu,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->data_loc, sn->storage_flags, sn->blocks, sn->size, sn->name, sn->magicno, TSFS_ANSI_NUN);
+    printf("STRUCT NODE {\nDISK_LOC: 0x%llx,\nB_LOCK: 0x%llx,\nPNODE: 0x%llx,\nDATA_LOC: 0x%llx,\nFLAGS: %u,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->data_loc, sn->storage_flags, sn->name, sn->magicno, TSFS_ANSI_NUN);
 }
 void __DBG_print_cename(char const* name, long l, const char* f, const char* fid) {
     if (l) {
@@ -106,7 +113,7 @@ void __DBG_print_cename(char const* name, long l, const char* f, const char* fid
     }
     printf("0x%x%x%x%x%x%x%x%x%x", name[0], name[1], name[2], name[3], name[4], name[5], name[6], name[7], name[8]);
     if (l) {
-        printf("%s", TSFS_ANSI_NUN);
+        printf("%s\n", TSFS_ANSI_NUN);
     }
 }
 void __DBG_print_child(TSFSSBChildEntry* ce, long l, const char* f, const char* fid) {
@@ -115,8 +122,12 @@ void __DBG_print_child(TSFSSBChildEntry* ce, long l, const char* f, const char* 
     __DBG_print_cename(ce->name, 0, 0, 0);
     printf("\n}%s\n", TSFS_ANSI_NUN);
 }
+void __DBG_here(long l, const char* f, const char* fid) {
+    printf("%sHERE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_NUN);
+}
 #define _DBG_print_block(sb) __DBG_print_block(sb, __LINE__, __FILE__, __func__)
 #define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
 #define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)
 #define _DBG_print_child(ce) __DBG_print_child(ce, __LINE__, __FILE__, __func__)
+#define _DBG_here() __DBG_here(__LINE__, __FILE__, __func__)
 #endif

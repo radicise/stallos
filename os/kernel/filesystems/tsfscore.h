@@ -63,11 +63,11 @@ FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, u8 blocksize, s64 cur
     write_rootblock(fs, rblock);
     TSFSStructNode snode = {
         .storage_flags = TSFS_KIND_DIR,
-        .size = 0,
+        // .size = 0,
         .parent_loc = ((u64)(rblock->block_size)) + rblock->top_dir,
         .disk_loc = rblock->top_dir,
         .pnode = 0,
-        .blocks = 0,
+        // .blocks = 0,
         .data_loc = 0
     };
     snode.name[0] = '/';
@@ -278,38 +278,157 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
     return 0;
 }
 
-int data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
+/*
+gets the next data block, creating one if it does not exist
+[loc] is the location of the current data block, [pos] is the value of the current data block's
+next_block field
+[count] is a number that will be incremented if a new data block was created
+*/
+void getcreat_databloc(FileSystem* fs, u64 loc, u64 pos, TSFSDataBlock* db, int* count) {
+    // magic_smoke(FEIMPL | FEDRIVE | FEDATA | FEOP);
+    if (pos == 0) {
+        (*count) ++;
+        TSFSDataBlock odb = {0};
+        loc_seek(fs, loc);
+        read_datablock(fs, &odb);
+        u32 blk = allocate_blocks(fs, 1, 1);
+        u64 nloc = ((u64)blk) * ((u64)(fs->rootblock->block_size));
+        db->disk_loc = nloc;
+        db->data_length = 0;
+        db->blocks_to_terminus = 0;
+        db->next_block = 0;
+        db->prev_block = loc;
+        db->storage_flags = TSFS_SF_FINAL_BLOCK|TSFS_SF_LIVE;
+        odb.storage_flags &= ~TSFS_SF_FINAL_BLOCK;
+        odb.next_block = nloc;
+        seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+        write_datablock(fs, &odb);
+        loc_seek(fs, nloc);
+        write_datablock(fs, db);
+    } else {
+        loc_seek(fs, pos);
+        read_datablock(fs, db);
+    }
+}
+
+size_t data_write(FileSystem* fs, TSFSStructNode* sn, u32 position, const void* data, size_t size) {
+    size_t osize = size;
     struct PosDat data_loc = tsfs_traverse(fs, sn, position);
     if (data_loc.bloc.storage_flags == 0) {
-        return -1;
+        return 0;
     }
     u32 realoffset = position-data_loc.poff;
     seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
     size_t cpos = 0;
-    if (size > 0) {
-        write_buf(fs, data+cpos, size);
-        longseek(fs, data_loc.bloc.disk_loc, SEEK_SET);
-        // loc_seek(fs, data_loc.bloc.disk_loc);
-        // block_seek(fs, (s32)data_loc.bloc.disk_loc, BSEEK_SET);
-        data_loc.bloc.data_length += (u32)size;
+    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 fsize = bsize - TSFSDATABLOCK_DSIZE;
+    u32 left = fsize - realoffset;
+    u64 sinc = 0;
+    int binc = 0;
+    if (left >= size) {
+        write_buf(fs, data, size);
+        loc_seek(fs, data_loc.bloc.disk_loc);
+        size_t ns = size + realoffset;
+        data_loc.bloc.data_length = ns > data_loc.bloc.data_length ? ns : data_loc.bloc.data_length;
         write_datablock(fs, &data_loc.bloc);
+        sinc += size;
+        size = 0;
+    } else {
+        write_buf(fs, data, left);
+        loc_seek(fs, data_loc.bloc.disk_loc);
+        data_loc.bloc.data_length = fsize;
+        write_datablock(fs, &data_loc.bloc);
+        sinc += left;
+        size -= left;
+        cpos += left;
     }
-    return 0;
+    if (size > 0) {
+        TSFSDataBlock db = {0};
+        // loc_seek(fs, data_loc.bloc.next_block);
+        // read_datablock(fs, &db);
+        while (1) {
+            if (fsize > size) {
+                break;
+            }
+            getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
+            seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+            sinc += fsize - db.data_length;
+            db.data_length = fsize;
+            write_datablock(fs, &db);
+            write_buf(fs, data+cpos, fsize);
+            cpos += fsize;
+            size -= fsize;
+        }
+        if (size > 0) {
+            getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
+            seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+            sinc += fsize - db.data_length;
+            db.data_length = size > db.data_length ? size : db.data_length;
+            write_datablock(fs, &db);
+            write_buf(fs, data+cpos, size);
+            size = 0;
+        }
+    }
+    TSFSDataHeader dh;
+    loc_seek(fs, sn->data_loc);
+    read_dataheader(fs, &dh);
+    dh.size += sinc;
+    dh.blocks += binc;
+    seek(fs, -TSFSDATAHEADER_DSIZE, SEEK_CUR);
+    write_dataheader(fs, &dh);
+    return osize - size;
 }
 
 // TODO: make work with more than one data block
-int data_read(FileSystem* fs, TSFSStructNode* sn, u32 position, void* data, size_t size) {
+size_t data_read(FileSystem* fs, TSFSStructNode* sn, u32 position, void* data, size_t size) {
+    size_t osize = size;
     struct PosDat data_loc = tsfs_traverse(fs, sn, position);
     if (data_loc.bloc.storage_flags == 0) {
-        return -1;
+        return 0;
     }
     u32 realoffset = position - data_loc.poff;
+    if (realoffset >= data_loc.bloc.data_length) {
+        return 0;
+    }
     seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
     size_t cpos = 0;
-    if (size > 0) {
-        read_buf(fs, data+cpos, size);
+    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 left = data_loc.bloc.data_length - realoffset;
+    if (left >= size) {
+        read_buf(fs, data, size);
+        size = 0;
+    } else {
+        read_buf(fs, data, left);
+        cpos += left;
+        size -= left;
     }
-    return 0;
+    if (size > 0) {
+        TSFSDataBlock db = {0};
+        loc_seek(fs, data_loc.bloc.next_block);
+        read_datablock(fs, &db);
+        u32 rem = db.data_length;
+        while (1) {
+            if (size < rem || rem < size) {
+                break;
+            }
+            read_buf(fs, data+cpos, rem);
+            size -= rem;
+            cpos += rem;
+            loc_seek(fs, db.next_block);
+            read_datablock(fs, &db);
+            rem = db.data_length;
+        }
+        if (size > 0) {
+            if (size < rem) {
+                read_buf(fs, data+cpos, size);
+                size = 0;
+            } else {
+                read_buf(fs, data+cpos, rem);
+                size -= rem;
+            }
+        }
+    }
+    return osize - size;
 }
 
 #endif

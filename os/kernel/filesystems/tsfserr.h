@@ -27,12 +27,16 @@ int PUTS(const char* c) {while (*c){putchar((int)*c);c++;}return 0;}
 #define FEINVL 0x20
 #define FEARG 0x40
 #define FETEST 0x80
+#define FEIMPL 0x100
+#define FEDATA 0x200
+#define FEOP   0x400
 int magic_check(long code, long err) {
     // long x = code ^ err;
     // return ((code ^ x) == err);
     return (code & err) == err;
 }
-void magic_smoke(long ecode) {
+void _magic_smoke(long ecode, long line, const char* fin, const char* fun) {
+    printf("SOURCE {%ld} of {%s} {%s}\n", line, fin, fun);
     PUTS("THE FOLLOWING CAUSED THE MAGIC SMOKE TO ESCAPE:\n");
     printf("%lx -- ", ecode);
     if (magic_check(ecode, FETEST)) {
@@ -43,6 +47,12 @@ void magic_smoke(long ecode) {
     }
     if (magic_check(ecode, FEDRIVE)) {
         PUTS("DRIVE");
+    }
+    if (magic_check(ecode, FEDATA)) {
+        PUTS("DATA");
+    }
+    if (magic_check(ecode, FEOP)) {
+        PUTS("OPERATION");
     }
     if (magic_check(ecode, FEARG)) {
         PUTS("ARG");
@@ -62,10 +72,16 @@ void magic_smoke(long ecode) {
     if (magic_check(ecode, FEFULL)) {
         PUTS("FULL");
     }
+    if (magic_check(ecode, FEIMPL)) {
+        PUTS("UNIMPL");
+    }
     if (ecode < 0) {
         PUTS("WISP");
     }
     PUTS("\n");
     exit(ecode);
 }
+
+#define magic_smoke(code) _magic_smoke(code, __LINE__, __FILE__, __func__)
+
 #endif
