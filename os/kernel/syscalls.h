@@ -573,7 +573,7 @@ int validateCap(int cap) {
  *
  * System call interface
  *
- * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t'
+ * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t' (and `udev_old_t' under certain conditions of Linux version and Linux 'BITS_PER_LONG')
  *
  */
 ssize_t write(int fd, const void* buf, size_t count) {

@@ -2,7 +2,6 @@
 #error "`TARGET' is not set"
 #endif
 #define __STALLOS__ 1
-#define __TESTING__ 1
 #define RELOC 0x00040000
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
 #define LINUX_COMPAT_VERSION 0x20603904
