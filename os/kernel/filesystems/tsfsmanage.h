@@ -373,7 +373,7 @@ u64 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
     if (par->storage_flags & ~TSFS_KIND_DIR) {
         return 0;
     }
-    void* p = allocate(17+sizeof(void*));
+    void* p = allocate(9+sizeof(u64)+sizeof(void*));
     *((u64*)(p+9)) = 0;
     tsfs_mk_ce_name(p, name, strlen(name)+1);
     *((const void**)(p+17)) = name;
@@ -382,7 +382,7 @@ u64 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
     read_structblock(fs, &sb);
     tsfs_sbcs_foreach(fs, &sb, _tsfs_find_sbcsfe_do, p);
     u64 r = *((u64*)(p+9));
-    deallocate(p, 17+sizeof(void*));
+    deallocate(p, 9+sizeof(u64)+sizeof(void*));
     return r;
 }
 
