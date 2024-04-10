@@ -351,6 +351,7 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
 
 int _tsfs_find_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
     if (tsfs_cmp_cename(ce->name, data)) {
+        _DBG_print_child(ce);
         u64 cl = tsfs_tell(fs);
         loc_seek(fs, ce->dloc);
         TSFSStructNode sn;
