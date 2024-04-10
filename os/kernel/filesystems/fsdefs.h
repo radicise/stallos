@@ -20,7 +20,9 @@ typedef short s16;
 typedef long s32;
 typedef long long s64;
 typedef unsigned int uid32_t;
+#ifdef __ARM_ARCH
 typedef unsigned long long loff_t;
+#endif
 #define kernelWarnMsg(msg) ;
 #include <stdlib.h>
 #include <stdio.h>
