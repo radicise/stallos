@@ -14,6 +14,25 @@
 #include "kmemman.h"
 #include "paging.h"
 #define FAILMASK_SYSCALLS 0x000e0000
+struct kernel_utsname_oldold {
+	char os[9];
+	char node[9];
+	char osrelease[9];
+	char machine[9];
+};
+struct kernel_utsname_old {
+	char os[65];
+	char node[65];
+	char osrelease[65];
+	char machine[65];
+};
+struct kernel_utsname {
+	char os[65];
+	char node[65];
+	char osrelease[65];
+	char machine[65];
+	char domain[65];
+};
 #if __TESTING__ == 1
 /*
  *
@@ -24,7 +43,7 @@
 #if LINUX_COMPAT_VERSION < 0x20112100
 const char* callname[] = {"setup" /* 0 */,
 #elif LINUX_COMPAT_VERSION < 0x20505100
-const char* callname[] = {"NOCALL" /* 0 */,
+const char* callname[] = {"NOCALL" /* 0 */,// TODO Make sure that `setup' disappeared at the same time from all machines
 #else
 const char* callname[] = {"restart_syscall" /* 0 */,
 #endif

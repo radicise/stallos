@@ -1,8 +1,7 @@
 #ifndef __KBD8042_H__
 #define __KBD8042_H__ 1
-#include "types.h"
-#include "keysPC.h"
-#include "errno.h"
+#include "../types.h"
+#include "../errno.h"
 #define FAILMASK_KBD8042 0x00020000
 struct Keyboard8042 {
 	size_t bufSize;
@@ -851,6 +850,7 @@ ssize_t kbd8042_read(int kfd, void* dat, size_t len) {
 	}
 	return kbd8042_readGiven(dat, len, &kbdMain);
 }
+/*
 unsigned char kbdPS2_set1_0[] = {0x00,// Array: Non-prefixed
 	KEY_ESCAPE,
 	KEY_1,
@@ -1032,4 +1032,5 @@ unsigned char kbdPS2_set1_1[] = {0x00,// Array: 0xe0 prefix
 	KEY_PADO,
 	KEY_INSERT,
 	KEY_DELETE};
+*/
 #endif

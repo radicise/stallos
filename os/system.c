@@ -491,7 +491,7 @@ extern void bus_inBlock_u16(u16, u16*, unsigned long);
 extern void bus_inBlock_u8(u16, u8*, unsigned long);
 extern unsigned long readLongPhysical(u32);
 extern void writeLongPhysical(u32, unsigned long);
-#include "kernel/kbd8042.h"
+#include "kernel/driver/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
 #define KBDBUFTERM_SIZE 320
