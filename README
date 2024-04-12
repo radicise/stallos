@@ -1,1 +1,1 @@
-An operating system kernel designed to have a userspace API compatible with that of the Linux kernel
+An operating system kernel designed to (eventually) be a drop-in replacement for Linux 1.0.9
