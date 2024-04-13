@@ -7,7 +7,6 @@ const uintptr amntMem = 64 * 1024 * 1024;// The value of `amntMem' must be an in
 #error "Incompatible large-block memory allocation block size"
 #endif
 #include "../../types.h"
-#define FAILMASK_PAGING 0x000d0000
 #ifdef NAMESPACE_PG
 #error "ERROR: NAMESPACE COLLISION"
 #endif
@@ -200,7 +199,7 @@ void* pageMapping(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_release(&(ms->lock));
 	return b;
 }
-// TODO TLB management
+// TODO URGENT TLB management
 struct MemSpace* MemSpace_kernel;
 void initPaging(void) {
 	MemSpace_kernel = MemSpace_create();

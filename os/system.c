@@ -464,7 +464,7 @@ void systemEntry(void) {
 	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
-	kernelMsg("Stallos Kernel v0.0.1.1-dev\n");
+	kernelMsg("Stallos v0.0.1.2-dev\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");

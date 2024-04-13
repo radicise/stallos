@@ -807,6 +807,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		else {
 			kernelMsg(callname[nr]);
 		}
+		// TODO Note the call number if the call is a "NOCALL"
 		kernelMsg("(");
 		kernelMsgULong_hex(arg1);
 		kernelMsg(", ");

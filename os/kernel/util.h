@@ -31,8 +31,8 @@ int strcmp(const char* d, const char* g) {
 #else
 #error "Target is not supported"
 #endif
-extern unsigned long AtomicULong_get(AtomicULong*);
-extern void AtomicULong_set(AtomicULong*, unsigned long);
+extern unsigned long AtomicULong_get(AtomicULong*);// Performs a memory barrier after loading, before returning
+extern void AtomicULong_set(AtomicULong*, unsigned long);// Performs a memory barrier after storing, before returning
 extern void SimpleMutex_acquire(SimpleMutex*);
 extern void SimpleMutex_release(SimpleMutex*);
 extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
@@ -42,7 +42,7 @@ typedef volatile struct {
 	SimpleMutex stateLock;
 	pid_t ownerThread;
 	unsigned long acquires;
-} Mutex;// Reentrant
+} Mutex;// Reentrant, acquisition even if it is already acquired by the thread also acts as a memory fence for the thread
 void Mutex_acquire(Mutex* mutex) {
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	while (1) {
@@ -63,7 +63,7 @@ void Mutex_acquire(Mutex* mutex) {
 		return;
 	}
 }
-void Mutex_release(Mutex* mutex) {	
+void Mutex_release(Mutex* mutex) {// Acts as a memory barrier
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	SimpleMutex_acquire(&(mutex->stateLock));
 	if ((mutex->ownerThread) != id) {
@@ -75,7 +75,7 @@ void Mutex_release(Mutex* mutex) {
 	(mutex->acquires)--;
 	SimpleMutex_release(&(mutex->stateLock));
 }
-int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0
+int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0; acts as a memory barrier
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	SimpleMutex_acquire(&(mutex->stateLock));
 	if (mutex->acquires == 0) {
@@ -96,7 +96,7 @@ void Mutex_wait(void) {// Wastes enough time to let at least one other thread ac
 	SimpleMutex_wait();
 	return;
 }
-void Mutex_initUnlocked(Mutex* mutex) {
+void Mutex_initUnlocked(Mutex* mutex) {// Acts as a memory barrier
 	(mutex->ownerThread) = (pid_t) 0;
 	(mutex->acquires) = 0;
 	SimpleMutex_initUnlocked(&(mutex->stateLock));
@@ -106,26 +106,26 @@ typedef volatile struct {
 	long l;
 	Mutex lock;
 } AtomicLongF;
-long AtomicLongF_adjust(AtomicLongF* alf, long adj) {
+long AtomicLongF_adjust(AtomicLongF* alf, long adj) {// Performs a memory barrier after adjusting, before returning
 	Mutex_acquire(&(alf->lock));
 	long m = (alf->l);
 	(alf->l) += adj;
 	Mutex_release(&(alf->lock));
 	return m;
 }
-long AtomicLongF_get(AtomicLongF* alf) {
+long AtomicLongF_get(AtomicLongF* alf) {// Performs a memory barrier after loading, before returning
 	Mutex_acquire(&(alf->lock));
 	long m = (alf->l);
 	Mutex_release(&(alf->lock));
 	return m;
 }
-void AtomicLongF_set(AtomicLongF* alf, long val) {
+void AtomicLongF_set(AtomicLongF* alf, long val) {// Performs a memory barrier after storing, before returning
 	Mutex_acquire(&(alf->lock));
 	(alf->l) = val;
 	Mutex_release(&(alf->lock));
 	return;
 }
-void AtomicLongF_init(AtomicLongF* alf, long val) {
+void AtomicLongF_init(AtomicLongF* alf, long val) {// Performs a memory barrier before returning
 	(alf->l) = val;
 	Mutex_initUnlocked(&(alf->lock));
 	return;
@@ -166,21 +166,11 @@ void* set(void* ptr, int val, size_t count) {
 	}
 	return ptr;
 }
-extern void bus_out_long(unsigned long, unsigned long);
 extern void bus_out_u8(unsigned long, u8);
 extern void bus_out_u16(unsigned long, u16);
 extern void bus_out_u32(unsigned long, u32);
-extern long bus_in_long(unsigned long);
 extern u8 bus_in_u8(unsigned long);
 extern u16 bus_in_u16(unsigned long);
 extern u32 bus_in_u32(unsigned long);
 extern void bus_wait(void);
-extern void bus_outBlock_long(u16, const long*, unsigned long);
-extern void bus_outBlock_u32(u16, const u32*, unsigned long);
-extern void bus_outBlock_u16(u16, const u16*, unsigned long);
-extern void bus_outBlock_u8(u16, const u8*, unsigned long);
-extern void bus_inBlock_long(u16, long*, unsigned long);
-extern void bus_inBlock_u32(u16, u32*, unsigned long);
-extern void bus_inBlock_u16(u16, u16*, unsigned long);
-extern void bus_inBlock_u8(u16, u8*, unsigned long);
 #endif

@@ -14,6 +14,7 @@
  * MemSpace* MemSpace_kernel;// This is initialised within initPaging
  *
  */
+#define FAILMASK_PAGING 0x000d0000
 #ifndef TARGETNUM
 #error "`TARGETNUM' is not set"
 #endif

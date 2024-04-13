@@ -20,7 +20,7 @@ ret
 SimpleMutex_tryAcquire:# int SimpleMutex_tryAcquire(SimpleMutex* mutex)
 .globl SimpleMutex_tryAcquire
 movl 4(%esp),%edx
-xorb %al,%al
+xorb %eax,%eax
 incb %al
 lock xchgb %al,(%edx)
 xorb $0x01,%al
@@ -31,7 +31,7 @@ movl 4(%esp),%edx
 xorb %al,%al
 lock xchgb %al,(%edx)
 ret
-SimpleMutex_wait:
+SimpleMutex_wait:# TODO URGENT Account for differing CPU clock speeds
 .globl SimpleMutex_wait
 nop
 nop
@@ -63,13 +63,13 @@ ret
 AtomicULong_get:
 .globl AtomicULong_get
 movl 4(%esp),%eax
-movl (%eax),%eax# TODO URGENT Ensure atomic memory reads
+lock movl (%eax),%eax
 ret
 AtomicULong_set:
 .globl AtomicULong_set
 movl 4(%esp),%eax
 movl 8(%esp),%edx
-movl %edx,(%eax)# TODO URGENT Ensure atomic memory writes
+lock movl %edx,(%eax)
 ret
 AtomicULong_inc:
 .globl AtomicULong_inc
@@ -118,7 +118,7 @@ bus_in_u8:
 movw 4(%esp),%dx
 inb %dx,%al
 ret
-bus_wait:
+bus_wait:# TODO URGENT Is more waiting needed?
 .globl bus_wait
 nop
 nop
@@ -128,7 +128,7 @@ nop
 ret
 bus_outBlock_u32:
 .globl bus_outBlock_u32
-bus_outBlock_long:/* void bus_outBlock_long(u16, const long*, unsigned long) */
+bus_outBlock_long:/* void bus_outBlock_long(unsigned long, const long*, unsigned long) */
 .globl bus_outBlock_long
 movw 4(%esp),%dx
 movl 12(%esp),%ecx
@@ -157,7 +157,7 @@ popl %esi
 ret
 bus_inBlock_u32:
 .globl bus_inBlock_u32
-bus_inBlock_long:/* void bus_inBlock_long(u16, long*, unsigned long) */
+bus_inBlock_long:/* void bus_inBlock_long(unsigned long, long*, unsigned long) */
 .globl bus_inBlock_long
 movw 4(%esp),%dx
 movl 12(%esp),%ecx
