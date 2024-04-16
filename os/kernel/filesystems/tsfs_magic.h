@@ -52,7 +52,7 @@ size_t _tsfs_magic_copy(void** dst, void** src, size_t ds, size_t ss) {
 /*
 multiplies the size of the magic by 2^mult
 AUTOMATICALLY REORGANIZES
-CANNOT GO ABOUT [TSFSMAGICMAX]
+CANNOT GO ABOVE [TSFSMAGICMAX]
 */
 void _tsmagic_upsize(Magic* m, int mult) {
     size_t ns = m->csize * (size_t)(1<<mult);
@@ -89,8 +89,8 @@ void _tsmagic_desize(Magic* m, int mult) {
 }
 
 size_t _tsfs_magic_getsize(void* object) {
-    u8 id = *((u8*)(object)+sizeof(size_t)+sizeof(u64)+sizeof(u16));
-    return (id == 0) ? sizeof(TSFSStructNode) : ((id == 1) ? sizeof(TSFSStructBlock) : ((id == 2) ? sizeof(TSFSDataBlock) : 0));
+    u8 id = *((u8*)(object)+sizeof(size_t)+sizeof(u32)+sizeof(u16));
+    return (id == 0) ? sizeof(TSFSStructNode) : ((id == 1) ? sizeof(TSFSStructBlock) : ((id == 2) ? sizeof(TSFSDataBlock) : ((id == 3) ? sizeof(TSFSDataHeader) : 0)));
 }
 
 void tsmagic_make(FileSystem* fs) {
@@ -161,7 +161,7 @@ SB* _tsmagic_block(FileSystem* fs) {
 }
 void _tsmagic_deblock(FileSystem* fs, SB* blk) {
     _tsmagic_rel_slot(fs, blk->magicno);
-    deallocate(blk, sizeof(SB));
+    // deallocate(blk, sizeof(SB));
 }
 
 SN* _tsmagic_node(FileSystem* fs) {
@@ -172,7 +172,7 @@ SN* _tsmagic_node(FileSystem* fs) {
 }
 void _tsmagic_denode(FileSystem* fs, SN* node) {
     _tsmagic_rel_slot(fs, node->magicno);
-    deallocate(node, sizeof(SN));
+    // deallocate(node, sizeof(SN));
 }
 
 DB* _tsmagic_data(FileSystem* fs) {
@@ -183,7 +183,7 @@ DB* _tsmagic_data(FileSystem* fs) {
 }
 void _tsmagic_dedata(FileSystem* fs, DB* data) {
     _tsmagic_rel_slot(fs, data->magicno);
-    deallocate(data, sizeof(DB));
+    // deallocate(data, sizeof(DB));
 }
 
 DH* _tsmagic_head(FileSystem* fs) {
@@ -194,21 +194,21 @@ DH* _tsmagic_head(FileSystem* fs) {
 }
 void _tsmagic_dehead(FileSystem* fs, DH* head) {
     _tsmagic_rel_slot(fs, head->magicno);
-    deallocate(head, sizeof(DH));
+    // deallocate(head, sizeof(DH));
 }
 
 /*
 check for interned object
 */
-void* _tsm_cintern(Magic* m, u64 pos) {
+void* _tsm_cintern(Magic* m, u32 pos) {
     printf("CHECK FOR INTERN\n");
     size_t i = 0;
     while (i < m->umax) {
         void* ptr = m->ptr[i++];
         printf("INTERN PTR: %p\n", ptr);
         if (ptr == 0) continue;
-        u64 tp = *((u64*)(((char*)ptr)+sizeof(size_t)));
-        printf("INTERNCHECK: t:{%llx} == %llx?\n", tp, pos);
+        u32 tp = *((u32*)(((char*)ptr)+sizeof(size_t)));
+        printf("INTERNCHECK: t:{%lx} == %lx?\n", tp, pos);
         if (tp == pos) {
             return ptr;
         }
@@ -217,10 +217,10 @@ void* _tsm_cintern(Magic* m, u64 pos) {
 }
 
 void _tsm_rc_inc(void* object) {
-    (*((u16*)(((char*)object)+sizeof(size_t)+sizeof(u64)))) ++;
+    (*((u16*)(((char*)object)+sizeof(size_t)+sizeof(u32)))) ++;
 }
 int _tsm_rc_dec(void* object) {
-    return --*((u16*)(((char*)object)+sizeof(size_t)+sizeof(u64))) == 0;
+    return --*((u16*)(((char*)object)+sizeof(size_t)+sizeof(u32))) == 0;
 }
 
 /*
@@ -241,9 +241,10 @@ void tsfs_unload(FileSystem* fs, void* object) {
 /*
 does actual loading logic, other functions wrap for type & calling convenience
 */
-void* _tsfs_magic_loader(FileSystem* fs, u64 pos, void*(*_a)(FileSystem*), void(*_r)(FileSystem*,void*), u64 backup) {
+void* _tsfs_magic_loader(FileSystem* fs, u32 rpos, void*(*_a)(FileSystem*), void(*_r)(FileSystem*,void*), u64 backup) {
+    u64 pos = ((u64)rpos) * (u64)BLOCK_SIZE;
     pos = pos ? pos : tsfs_tell(fs);
-    void* ptr = _tsm_cintern(fs->magic, pos); // when pos == 0, pos = tsfs_tell(fs)
+    void* ptr = _tsm_cintern(fs->magic, tsfs_loc_to_block(pos)); // when pos == 0, pos = tsfs_tell(fs)
     if (ptr == 0) {
         longseek(fs, pos, SEEK_SET);
         ptr = _a(fs);
@@ -258,16 +259,16 @@ void* _tsfs_magic_loader(FileSystem* fs, u64 pos, void*(*_a)(FileSystem*), void(
 typedef void*(*TSFS_MAGIC_LOADER)(FileSystem*);
 typedef void(*TSFS_MAGIC_READER)(FileSystem*,void*);
 
-SB* tsfs_load_block(FileSystem* fs, u64 pos) {
+SB* tsfs_load_block(FileSystem* fs, u32 pos) {
     return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_block, (TSFS_MAGIC_READER)read_structblock, TSFSSTRUCTBLOCK_DSIZE);
 }
-SN* tsfs_load_node(FileSystem* fs, u64 pos) {
+SN* tsfs_load_node(FileSystem* fs, u32 pos) {
     return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_node, (TSFS_MAGIC_READER)read_structnode, TSFSSTRUCTNODE_DSIZE);
 }
-DB* tsfs_load_data(FileSystem* fs, u64 pos) {
+DB* tsfs_load_data(FileSystem* fs, u32 pos) {
     return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_data, (TSFS_MAGIC_READER)read_datablock, TSFSDATABLOCK_DSIZE);
 }
-DH* tsfs_load_head(FileSystem* fs, u64 pos) {
+DH* tsfs_load_head(FileSystem* fs, u32 pos) {
     return _tsfs_magic_loader(fs, pos, (TSFS_MAGIC_LOADER)_tsmagic_head, (TSFS_MAGIC_READER)read_dataheader, TSFSDATAHEADER_DSIZE);
 }
 

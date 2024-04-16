@@ -49,11 +49,11 @@ int fdrive__llseek(int _, off_t offhi, off_t offlo, loff_t* posptr, int whence) 
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
     if (ce->flags != TSFS_CF_EXTT) {
         u64 l = tsfs_tell(s);
-        loc_seek(s, ce->dloc);
+        block_seek(s, ce->dloc, BSEEK_SET);
         // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
         TSFSStructNode sn = {0};
         read_structnode(s, &sn);
-        printf("@ %llu : %s\n", ce->dloc, sn.name);
+        printf("@ %lu : %s\n", ce->dloc, sn.name);
         loc_seek(s, l);
     }
     return 0;
@@ -70,7 +70,7 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
     if (regen) {
         printf("REGEN\n");
         regen_mock(fd);
-        s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64) time(NULL)).retptr;
+        s = createFS(fdrive, 0, MDISK_SIZE, (s64) time(NULL)).retptr;
     }
     if (s == 0) {
         s = loadFS(fdrive, 0).retptr;
@@ -85,28 +85,35 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
         goto dealloc;
     }
     printf("psize (blocks): %lu\n", 2lu<<(s->rootblock->partition_size - 1));
-    printf("bsize: %d\n", s->rootblock->block_size);
+    printf("bsize: %d\n", BLOCK_SIZE);
     printf("creation time: %s", ctime((const time_t*)&(s->rootblock->creation_time)));
     TSFSStructNode sn;
-    u16 bsize = s->rootblock->block_size;
+    u16 bsize = BLOCK_SIZE;
     char nbuf[14];
     awrite_buf(nbuf, "/testfile.txt", 14);
     if (regen) {
-        longseek(s, s->rootblock->top_dir, SEEK_SET);
+        block_seek(s, s->rootblock->top_dir, BSEEK_SET);
         TSFSStructNode topdir = {0};
         read_structnode(s, &topdir);
+        _DBG_print_node(&topdir);
         tsfs_mk_file(s, &topdir, "testfile.txt");
         TSFSStructBlock* sb = tsfs_load_block(s, topdir.parent_loc);
+        _DBG_print_block(sb);
         tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
         tsfs_unload(s, sb);
-        u64 llc = tsfs_resolve_path(s, nbuf);
+        u32 llc = tsfs_resolve_path(s, nbuf);
+        printf("disk addr of file node: %lu\n", llc);
+        if (llc > 7) {
+            printf("BAD LLC\n");
+            goto dealloc;
+        }
         if (llc == 0) {
             printf("COULDN'T FIND FILE AGAIN\n");
             goto dealloc;
         }
-        loc_seek(s, llc);
+        block_seek(s, llc, BSEEK_SET);
         read_structnode(s, &sn);
-        _tsfs_make_data(s, &sn);
+        // _tsfs_make_data(s, &sn);
         printf("write data: ");
         char sequence[11];
         int c = 0;
@@ -131,12 +138,12 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
     } else {
         // longseek(s, (loff_t)(bsize*3), SEEK_SET);
         // read_structnode(s, &sn);
-        u64 llc = tsfs_resolve_path(s, nbuf);
+        u32 llc = tsfs_resolve_path(s, nbuf);
         if (llc == 0) {
             printf("COULDN'T FIND FILE AGAIN\n");
             goto dealloc;
         }
-        loc_seek(s, llc);
+        block_seek(s, llc, BSEEK_SET);
         read_structnode(s, &sn);
     }
     char x[11];
@@ -163,7 +170,7 @@ int manip_test(struct FileDriver* fdrive, int fd, char kind) {
     if (kind == 1) {
         regen_mock(fd);
         FileSystem* s = 0;
-        s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64) time(NULL)).retptr;
+        s = createFS(fdrive, 0, MDISK_SIZE, (s64) time(NULL)).retptr;
         dmanip_fill(s, 0, 2, 97);
         dmanip_null_shift_right(s, 0, 2, 2);
         fflush(fp);
@@ -190,16 +197,16 @@ int stringcmp(const char* s1, const char* s2) {
 
 int fmt_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
-    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, (s64)time(NULL)).retptr;
     releaseFS(s);
     return 0;
 }
 
 int struct_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
-    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+    FileSystem* s = createFS(fdrive, fd, MDISK_SIZE, (s64)time(NULL)).retptr;
     // TSFSStructBlock sb = {0};
-    longseek(s, s->rootblock->top_dir, SEEK_SET);
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
     TSFSStructNode topdir = {0};
     read_structnode(s, &topdir);
     // u64 x = topdir.parent_loc;
@@ -207,7 +214,7 @@ int struct_test(struct FileDriver* fdrive, int fd, char f) {
     // read_structblock(s, &sb);
     TSFSStructBlock* sb = tsfs_load_block(s, topdir.parent_loc);
     TSFSStructBlock* osb = sb;
-    printf("OPTR: %p\n", sb);
+    printf("OPTR: %p\n", (void*)sb);
     tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
     TSFSStructBlock sb2 = {0};
     tsfs_mk_dir(s, &topdir, "hi", &sb2);
@@ -215,6 +222,7 @@ int struct_test(struct FileDriver* fdrive, int fd, char f) {
     tsfs_mk_dir(s, &topdir, "guy", &sb2);
     tsfs_mk_dir(s, &topdir, "bye", &sb2);
     // loc_seek(s, topdir.parent_loc);
+    tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
     // read_structblock(s, &sb);
     _DBG_print_block(sb);
     printf("BEFORE DEL\n");
@@ -226,7 +234,7 @@ int struct_test(struct FileDriver* fdrive, int fd, char f) {
     // printf("AFTER RM\n");
     fsflush(s);
     getchar();
-    printf("SBPTRO = %p\nSBPTRC = %p\n", osb, sb);
+    printf("SBPTRO = %p\nSBPTRC = %p\n", (void*)osb, (void*)sb);
     _DBG_print_block(sb);
     tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
     tsfs_unload(s, sb);
@@ -241,7 +249,7 @@ int magic_test(struct FileDriver* fdrive, int kf, char flags) {
         magic_smoke(FEWAND | FEALLOC);
     } else if (flags == 2) {
         puts("BEFORE");
-        FileSystem* s = createFS(fdrive, 0, MDISK_SIZE, 10, (s64)time(NULL)).retptr;
+        FileSystem* s = createFS(fdrive, 0, MDISK_SIZE, (s64)time(NULL)).retptr;
         puts("FS DONE");
         TSFSStructBlock* blk1 = _tsmagic_block(s);
         puts("BLK1 DONE");

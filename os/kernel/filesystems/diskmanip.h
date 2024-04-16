@@ -40,7 +40,7 @@ void dmanip_debuf(u32 bsize) {
 fills the specified range of blocks (start (inclusive) to start + count (exclusive))
 */
 int dmanip_fill(FileSystem* fs, u32 start, u32 count, unsigned char value) {
-    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 bsize = BLOCK_SIZE;
     char f = dmanip_albuf(bsize);
     unsigned char* bigbuf = dman_buf;
     u32 bufsize = FS_DMANIP_MAX_RAM_BLKS * bsize;
@@ -76,7 +76,7 @@ int dmanip_shift_right(FileSystem* fs, u32 start, u32 count, u32 delta) {
     if (delta == 0) {
         return 0;
     }
-    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 bsize = BLOCK_SIZE;
     char f = dmanip_albuf(bsize);
     unsigned char* bigbuf = dman_buf;
     size_t bufsize = (bsize * FS_DMANIP_MAX_RAM_BLKS) / 8;
@@ -107,7 +107,7 @@ int dmanip_shift_left(FileSystem* fs, u32 start, u32 count, u32 delta) {
     if (delta == 0) {
         return 0;
     }
-    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 bsize = BLOCK_SIZE;
     char f = dmanip_albuf(bsize);
     size_t bufsize = (bsize * FS_DMANIP_MAX_RAM_BLKS) / 8;
     unsigned char* bigbuf = dman_buf;
@@ -134,7 +134,7 @@ int dmanip_shift_left(FileSystem* fs, u32 start, u32 count, u32 delta) {
 }
 
 int dmanip_null_shift_right(FileSystem* fs, u32 start, u32 count, u32 delta) {
-    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 bsize = BLOCK_SIZE;
     char f = dmanip_albuf(bsize);
     dmanip_shift_right(fs, start, count, delta);
     if (delta >= count) {
@@ -149,7 +149,7 @@ int dmanip_null_shift_right(FileSystem* fs, u32 start, u32 count, u32 delta) {
 }
 
 int dmanip_null_shift_left(FileSystem* fs, u32 start, u32 count, u32 delta) {
-    u32 bsize = (u32)(fs->rootblock->block_size);
+    u32 bsize = BLOCK_SIZE;
     char f = dmanip_albuf(bsize);
     dmanip_shift_left(fs, start, count, delta);
     if (delta >= count) {

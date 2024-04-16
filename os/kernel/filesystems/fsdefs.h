@@ -5,8 +5,6 @@
 #include "../types.h"
 extern void* alloc(size_t);
 extern void dealloc(void*, size_t);
-extern u64 compute_checksum(size_t*);
-extern u8 validate_checksum(size_t*, u64);
 #define allocate alloc
 #define deallocate dealloc
 #else
@@ -26,7 +24,16 @@ typedef unsigned long long loff_t;
 #define kernelWarnMsg(msg) ;
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+// #include <string.h>
+
+size_t strlen(const char* s) {
+    size_t c = 0;
+    while (*s) {
+        c ++;
+        s ++;
+    }
+    return c;
+}
 
 void dalloc(void* p, size_t s) {
     free(p);
@@ -34,17 +41,17 @@ void dalloc(void* p, size_t s) {
 #define allocate malloc
 #define deallocate dalloc
 #endif
+#include "./tsfsconst.h"
 #include "../FileDriver.h"
 #include "../fsiface.h"
 typedef struct FSReturn FSRet;
 #include "./tsfserr.h"
-typedef struct FSReturn FSRet;
 #define u48 u64
 // imagine there are '.'s between each digit
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 6
+#define VERNOBN 7
 
 /*
 PYGENSTART
@@ -77,7 +84,7 @@ pygen-macro
 
 // no blocks greater than 4094 bytes
 #define BLK_SIZE_MAX 12
-
+#define BLOCK_SIZE 1024
 
 
 u64 hashstr(void const* strp) {
@@ -125,6 +132,10 @@ u64   checksum;
 */
 typedef struct {
     /*
+    pygen-over: [block_size] 2 {
+        write: ((u16)`block_size`)
+        block_size: ((u64)`$TMP`)
+    }
     PYGENSTART
     comment: the size of root block data stored on disk
     name: TSFSROOTBLOCK_DSIZE
@@ -134,8 +145,8 @@ typedef struct {
     u8    partition_size;
     u64   creation_time;
     char  version[16];
-    u16   block_size;
-    u48   top_dir;
+    // u64   block_size;
+    u32   top_dir;
     // LH blocks used
     u32   usedleft;
     // RH blocks used
@@ -146,17 +157,23 @@ typedef struct {
 // // is this block valid? (allows for fast delete by not overwriting data)
 // #define TSFS_SF_VALID 0b1
 // all data blocks have this set
-#define TSFS_SF_LIVE 0b1
+// #define TSFS_SF_LIVE 0b1
+#define TSFS_SF_LIVE 1
 // what kind of thing is this? (file, directory, link, data)
-#define TSFS_SF_KIND  0b1110
+// #define TSFS_SF_KIND  0b1110
+#define TSFS_SF_KIND  12
 // is this block the head of a run of blocks storing data for the same owner?
-#define TSFS_SF_HEAD_BLOCK 0b10
+// #define TSFS_SF_HEAD_BLOCK 0b10
+#define TSFS_SF_HEAD_BLOCK 2
 // is this block the tail of a run of blocks storing data for the same owner?
-#define TSFS_SF_TAIL_BLOCK 0b0100
+// #define TSFS_SF_TAIL_BLOCK 0b0100
+#define TSFS_SF_TAIL_BLOCK 4
 // does this block contain a checksum for its data?
-#define TSFS_SF_CHECKSUM 0b1
+// #define TSFS_SF_CHECKSUM 0b1
+#define TSFS_SF_CHECKSUM 1
 // is this block the last one belonging to a file?
-#define TSFS_SF_FINAL_BLOCK 0b1000
+// #define TSFS_SF_FINAL_BLOCK 0b1000
+#define TSFS_SF_FINAL_BLOCK 8
 // IF HEAD & FINAL & !TAIL THEN FIRST
 
 #define TSFS_KIND_DATA 0
@@ -172,6 +189,22 @@ typedef struct {
 
 typedef struct {
     /*
+    c - create
+    m - modify
+    a - access
+    s - secs
+    n - nsec
+    */
+    s64 cs;
+    s64 cn;
+    s64 ms;
+    s64 mn;
+    s64 as;
+    s64 an;
+} TIMES;
+
+typedef struct {
+    /*
     PYGENSTART
     comment: size of data header stored on disk
     name: TSFSDATAHEADER_DSIZE
@@ -183,20 +216,44 @@ typedef struct {
     pygen-mk-rw: dataheader
     */
     size_t magicno;
-    u48   disk_loc;
+    u32   disk_loc;
     u16   rc;
     u8    id;
     //
     // number of hard links to this data
     u16   refcount;
     // disk location of the first data block
-    u48   head;
+    u32   head;
     // blocks used by data
     u32   blocks;
     // size of data in bytes
     u64   size;
+    // permissions and other metadata
+    // permissions
+    u16   perms;
+    // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
+    u64   times[6];
     u64   checksum;
 } TSFSDataHeader;
+
+void get_dhtimes(TSFSDataHeader* dh, TIMES* times) {
+    s64* timelist = (s64*)(dh->times);
+    times->cs = timelist[0];
+    times->cn = timelist[1];
+    times->ms = timelist[2];
+    times->mn = timelist[3];
+    times->as = timelist[4];
+    times->an = timelist[5];
+}
+void set_dhtimes(TSFSDataHeader* dh, TIMES* times) {
+    s64* timelist = (s64*)(dh->times);
+    timelist[0] = times->cs;
+    timelist[1] = times->cn;
+    timelist[2] = times->ms;
+    timelist[3] = times->mn;
+    timelist[4] = times->as;
+    timelist[5] = times->an;
+}
 
 typedef struct {
     /*
@@ -213,7 +270,7 @@ typedef struct {
     pygen-mk-rw: datablock
     */
     size_t magicno;
-    u48   disk_loc;
+    u32   disk_loc;
     u16   rc;
     u8    id;
     //
@@ -221,8 +278,8 @@ typedef struct {
     u8    storage_flags;
     // // how many hard links refer to this
     // u8    refcount;
-    u48   next_block;
-    u48   prev_block;
+    u32   next_block;
+    u32   prev_block;
     // how much of this block actually contains data
     u16   data_length;
     // CAN ONLY BE NON-ZERO FOR THE FIRST BLOCK OF A CONTIGUOUS GROUP
@@ -246,16 +303,16 @@ typedef struct {
     pygen-mk-rw: structnode
     */
     size_t magicno;
-    u48   disk_loc;
+    u32   disk_loc;
     u16   rc;
     u8    id;
     //
     u8    storage_flags;
-    u48   data_loc;
+    u32   data_loc;
     // location of the child table, name is shot because the child tables used to own the nodes
-    u48   parent_loc;
+    u32   parent_loc;
     // parent node
-    u48   pnode;
+    u32   pnode;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
     char  name[255];
@@ -278,13 +335,13 @@ typedef struct {
     pygen-mk-rw: structblock
     */
     size_t magicno;
-    u48   disk_loc;
+    u32   disk_loc;
     u16   rc;
     u8    id;
     //
     u8    entrycount;
     u8    flags;
-    u48   disk_ref;
+    u32   disk_ref;
     u64   checksum;
 } TSFSStructBlock;
 
@@ -314,7 +371,7 @@ handy way to represent a struct block child entry
 */
 typedef struct {
     char  name[9];
-    u48   dloc;
+    u32   dloc;
     u8    flags;
 } TSFSSBChildEntry;
 
@@ -353,130 +410,8 @@ int tsfs_cmp_ce(TSFSSBChildEntry* ce1, TSFSSBChildEntry* ce2) {
     return bufcmp(ce1->name, ce2->name, 9);
 }
 
-void awriteu64be(unsigned char* buf, u64 n) {
-    buf[0] = (unsigned char)((n>>56)&0xff);
-    buf[1] = (unsigned char)((n>>48)&0xff);
-    buf[2] = (unsigned char)((n>>40)&0xff);
-    buf[3] = (unsigned char)((n>>32)&0xff);
-    buf[4] = (unsigned char)((n>>24)&0xff);
-    buf[5] = (unsigned char)((n>>16)&0xff);
-    buf[6] = (unsigned char)((n>>8)&0xff);
-    buf[7] = (unsigned char)(n&0xff);
-}
-void awriteu48be(unsigned char* buf, u48 n) {
-    buf[0] = (unsigned char)((n>>40)&0xff);
-    buf[1] = (unsigned char)((n>>32)&0xff);
-    buf[2] = (unsigned char)((n>>24)&0xff);
-    buf[3] = (unsigned char)((n>>16)&0xff);
-    buf[4] = (unsigned char)((n>>8)&0xff);
-    buf[5] = (unsigned char)(n&0xff);
-}
-void awriteu32be(unsigned char* buf, u32 n) {
-    buf[0] = (unsigned char)((n>>24)&0xff);
-    buf[1] = (unsigned char)((n>>16)&0xff);
-    buf[2] = (unsigned char)((n>>8)&0xff);
-    buf[3] = (unsigned char)(n&0xff);
-}
-void awriteu16be(unsigned char* buf, u16 n) {
-    buf[0] = (unsigned char)((n>>8)&0xff);
-    buf[1] = (unsigned char)(n&0xff);
-}
+#include "./tsfsrw.h"
 
-u64 areadu64be(unsigned char* buf) {
-    return
-    (((u64)(buf[0])) << 56) |
-    (((u64)(buf[1])) << 48) |
-    (((u64)(buf[2])) << 40) |
-    (((u64)(buf[3])) << 32) |
-    (((u64)(buf[4])) << 24) |
-    (((u64)(buf[5])) << 16) |
-    (((u64)(buf[6])) << 8) |
-    ((u64)(buf[7]));
-}
-u48 areadu48be(unsigned char* buf) {
-    return
-    (((u64)(buf[0])) << 40) |
-    (((u64)(buf[1])) << 32) |
-    (((u64)(buf[2])) << 24) |
-    (((u64)(buf[3])) << 16) |
-    (((u64)(buf[4])) << 8) |
-    ((u64)(buf[5]));
-}
-u32 areadu32be(unsigned char* buf) {
-    return
-    (((u32)buf[0]) << 24) |
-    (((u32)buf[1]) << 16) |
-    (((u32)buf[2]) << 8) |
-    ((u32)buf[3]);
-}
-u16 areadu16be(unsigned char* buf) {
-    return ((u16)buf[0])<<8 | (u16)buf[1];
-}
-
-void awrite_buf(void* dstp, void const* srcp, size_t size) {
-    u8* dst = (u8*)dstp;
-    u8* src = (u8*)srcp;
-    for (int i = 0; i < size; i ++) {
-        *(dst+i) = *(src+i);
-    }
-}
-
-void write_u64be(FileSystem* fs, u64 n) {
-    unsigned char ptr[8];
-    awriteu64be(ptr, n);
-    if ((fs->fdrive->write)(fs->kfd,ptr,8)) fs->err = 1;
-}
-void write_u48be(FileSystem* fs, u48 n) {
-    unsigned char ptr[6];
-    awriteu48be(ptr, n);
-    if ((fs->fdrive->write)(fs->kfd,ptr,6)) fs->err = 1;
-}
-void write_u32be(FileSystem* fs, u32 n) {
-    unsigned char ptr[4];
-    awriteu32be(ptr, n);
-    if ((fs->fdrive->write)(fs->kfd,ptr,4)) fs->err = 1;
-}
-void write_u16be(FileSystem* fs, u16 n) {
-    unsigned char ptr[2];
-    awriteu16be(ptr, n);
-    if ((fs->fdrive->write)(fs->kfd,ptr,2)) fs->err = 1;
-}
-void write_u8(FileSystem* fs, u8 n) {
-    if ((fs->fdrive->write)(fs->kfd,&n,1)) fs->err = 1;
-}
-void write_buf(FileSystem* fs, const void* buf, size_t size) {
-    if ((fs->fdrive->write)(fs->kfd,buf,size)) fs->err = 1;
-}
-
-u64 read_u64be(FileSystem* fs) {
-    unsigned char ptr[8];
-    if ((fs->fdrive->read)(fs->kfd,ptr,8)) fs->err = 1;
-    return areadu64be(ptr);
-}
-u48 read_u48be(FileSystem* fs) {
-    unsigned char ptr[6];
-    if ((fs->fdrive->read)(fs->kfd,ptr,6)) fs->err = 1;
-    return areadu48be(ptr);
-}
-u32 read_u32be(FileSystem* fs) {
-    unsigned char ptr[4];
-    if ((fs->fdrive->read)(fs->kfd,ptr,4)) fs->err = 1;
-    return areadu32be(ptr);
-}
-u16 read_u16be(FileSystem* fs) {
-    unsigned char ptr[2];
-    if ((fs->fdrive->read)(fs->kfd,ptr,2)) fs->err = 1;
-    return areadu16be(ptr);
-}
-u8 read_u8(FileSystem* fs) {
-    u8 n = 0;
-    if ((fs->fdrive->read)(fs->kfd,&n,1)) fs->err = 1;
-    return n;
-}
-
-void read_buf(FileSystem* fs, void* buf, size_t size) {
-    if ((fs->fdrive->read)(fs->kfd,buf,size)) fs->err = 1;
-}
 u64 tsfs_tell(FileSystem* fs) {
     loff_t x = 0;
     fs->fdrive->_llseek(fs->kfd, 0, 0, &x, SEEK_CUR);
@@ -509,8 +444,8 @@ int seek(FileSystem* fs, off_t offset, int whence) {
     return fs->fdrive->lseek(fs->kfd, offset, whence);
 }
 
-u32 tsfs_loc_to_block(FileSystem* fs, u64 loc) {
-    return (u32)(loc/((u64)(fs->rootblock->block_size)));
+u32 tsfs_loc_to_block(u64 loc) {
+    return (u32)(loc/BLOCK_SIZE);
 }
 
 /*
@@ -519,14 +454,13 @@ if abs is zero, offset is absolute, otherwise relative
 negative absolute seeking is invalid
 */
 int block_seek(FileSystem* fs, s32 offset, char abs) {
-    u16 bs = fs->rootblock->block_size;
     if (abs) {
-        return fs->fdrive->lseek(fs->kfd, (off_t)(((s32)bs) * offset), SEEK_CUR);
+        return fs->fdrive->lseek(fs->kfd, (off_t)(((s32)BLOCK_SIZE) * offset), SEEK_CUR);
     }
     if (offset < 0) {
         return -1;
     }
-    loff_t ac = ((u64)bs) * ((u64)offset);
+    loff_t ac = ((u64)BLOCK_SIZE) * (u64)(*((u32*)&offset));
     loff_t x = 0;
     return fs->fdrive->_llseek(fs->kfd, ac>>32, ac&0xffffffff, &x, SEEK_SET);
 }
@@ -538,19 +472,19 @@ int loc_seek(FileSystem* fs, u48 loc) {
 }
 
 void read_childentry(FileSystem* fs, TSFSSBChildEntry* ce) {
-    unsigned char b[16];
-    read_buf(fs, b, 16);
+    unsigned char b[14];
+    read_buf(fs, b, 14);
     awrite_buf(ce->name, b, 9);
     ce->flags = b[9];
-    ce->dloc = areadu48be(b+10);
+    ce->dloc = areadu32be(b+10);
 }
 void write_childentry(FileSystem* fs, TSFSSBChildEntry* ce) {
-    unsigned char b[16];
+    unsigned char b[14];
     unsigned char* bp = (unsigned char*)b;
     awrite_buf(bp, ce->name, 9);
     b[9] = ce->flags;
-    awriteu48be(bp+10, ce->dloc);
-    write_buf(fs, bp, 16);
+    awriteu32be(bp+10, ce->dloc);
+    write_buf(fs, bp, 14);
 }
 
 /*

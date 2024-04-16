@@ -1,5 +1,5 @@
 #!/bin/sh
-gcc fstesting.c -o fstesting
+gcc fstesting.c -Wpedantic -o fstesting
 if [ $? == 0 ]
 then
 ./fstesting $@

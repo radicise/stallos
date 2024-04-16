@@ -219,7 +219,7 @@ rwpre: str = ""
 
 helperfmts: dict[str,tuple[str, str, str, str, str, str, str, bool, bool]] = {}
 
-footer: str = "\n#endif"
+footer: str = "\n#endif\n"
 
 lines: list[str] = None
 
@@ -295,7 +295,7 @@ u64 {rwpre}hash_{rwname}({classname}* {rwname}) {{
         used = list(map(str.strip, odsc[0].split(",")))
         for un in used:
             if un == "-pyrepos":
-                rbuild = rbuild.replace("$$PYREPOS$$", f"\n{spacetab}u64 _pyrepos = tsfs_tell(obj);")
+                rbuild = rbuild.replace("$$PYREPOS$$", f"\n{spacetab}u32 _pyrepos = (u32)(tsfs_tell(obj)/BLOCK_SIZE);")
                 continue
             s1 = s1.replace(f"`{un}`", f"{rwname}->{un}")
         for s2 in odsc[2].keys():
