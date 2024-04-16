@@ -14,5 +14,13 @@
  * MemSpace* MemSpace_kernel;// This is initialised within initPaging
  *
  */
+#define FAILMASK_PAGING 0x000d0000
+#ifndef TARGETNUM
+#error "`TARGETNUM' is not set"
+#endif
+#if TARGETNUM == 1
 #include "machine/x86_32/paging.h"
+#else
+#error "Target is not supported"
+#endif
 #endif

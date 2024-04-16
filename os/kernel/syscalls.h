@@ -573,7 +573,7 @@ int validateCap(int cap) {
  *
  * System call interface
  *
- * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t'
+ * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t' (and `udev_old_t' under certain conditions of Linux version and Linux 'BITS_PER_LONG')
  *
  */
 ssize_t write(int fd, const void* buf, size_t count) {
@@ -807,6 +807,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		else {
 			kernelMsg(callname[nr]);
 		}
+		// TODO Note the call number if the call is a "NOCALL"
 		kernelMsg("(");
 		kernelMsgULong_hex(arg1);
 		kernelMsg(", ");
