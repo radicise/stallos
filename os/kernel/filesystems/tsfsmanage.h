@@ -420,7 +420,7 @@ void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, 
     awrite_buf(frag, path+cfs, cfl);
     frag[cfl] = 0;
     u32 nl = tsfs_find(fs, curr, frag);
-    deallocate(frag, cfl);
+    deallocate(frag, cfl+1);
     if (nl == 0) {
         curr->disk_loc = 0;
         return;
