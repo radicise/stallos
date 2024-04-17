@@ -452,6 +452,7 @@ _boot_kernel32:
     cli
     jmp afdis
     a20_enable:
+    /*
     movw $0x2403,%ax
     clc
     int $0x15
@@ -473,8 +474,75 @@ _boot_kernel32:
     testb %ah,%ah
     jnz a20_failure
     a20_isset:
+    */
     jmp disint
     afdis:
+    call k8042_awaitCmd
+    movb $0xad,%al
+    outb %al,$0x64
+    call k8042_awaitCmd
+    movb $0xa7,%al# TODO Will this be ignored if there is only one PS/2 port supported?
+    outb %al,$0x64
+    call k8042_awaitCmd
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    call k8042_clear# TODO Was enough waiting time given?
+    movb $0xd0,%al
+    outb %al,$0x64
+    call k8042_awaitDat
+    inb $0x60,%al
+    testb $0x02,%al
+    jnz a20_finished
+    orb $0x02,%al
+    call k8042_awaitCmd
+    xchgb %al,%ah
+    movb $0xd1,%al
+    outb %al,$0x64
+    call k8042_awaitCmd
+    xchgb %al,%ah
+    outb %al,$0x60
+    call k8042_awaitCmd
+    movb $0xae,%al
+    outb %al,$0x64
+    call k8042_awaitCmd
+    movb $0xa8,%al# TODO Will this be ignored if there is only one PS/2 port supported?
+    outb %al,$0x64
+    jmp a20_finished
+    k8042_clear:
+    pushw %ax
+    k8042_clear_1:
+    inb $0x64,%al
+    testb $0x01,%al
+    jz k8042_cleared
+    inb $0x60,%al
+    jmp k8042_clear_1
+    k8042_cleared:
+    popw %ax
+    ret
+    k8042_awaitCmd:
+    pushw %ax
+    k8042_awaitCmd_1:
+    inb $0x64,%al
+    testb $0x02,%al
+    jnz k8042_awaitCmd_1
+    popw %ax
+    ret
+    k8042_awaitDat:
+    pushw %ax
+    k8042_awaitDat_1:
+    inb $0x64,%al
+    testb $0x01,%al
+    jz k8042_awaitDat_1
+    popw %ax
+    ret
+    a20_finished:
+    call k8042_awaitCmd
     movw $0x00,%ax
     movw %ax,%ss
     movw $0x818,%sp

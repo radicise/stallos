@@ -11,10 +11,10 @@ struct PerThread {// TODO Make a system for threads to change the properties of 
 	int errno;// This MUST be the first member (in order of member declaration) of `struct PerThread'; this may not be accessed in the kernel by any thread other than the one handling a system call of the thread specified by this structure
 	pid_t tid;// Does not change
 	Mutex dataLock;// TODO Must be acquired when any of the following fields are being modified or read; this must be acquired when the reference `fsinfo' is had
-	volatile uid32_t ruid;
-	volatile uid32_t euid;
-	volatile uid32_t suid;
-	volatile uid32_t fsuid;
+	volatile kuid_t ruid;
+	volatile kuid_t euid;
+	volatile kuid_t suid;
+	volatile kuid_t fsuid;
 	volatile u64 cap_effective;// TODO Initialise
 	volatile u64 cap_permitted;// TODO Initialise
 	volatile u64 cap_inheritable;// TODO Initialise

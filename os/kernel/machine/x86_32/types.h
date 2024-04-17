@@ -35,18 +35,12 @@ typedef long off_t;
 typedef long long loff_t;
 typedef unsigned short uid16_t;// For certain legacy architectures
 typedef uid16_t uidnatural_t;
-uidnatural_t uidnatural_overflow = 65534;
-typedef unsigned int uid32_t;
+typedef unsigned int ___uid32_t___;
+typedef ___uid32_t___ kuid_t;
 typedef unsigned int mode_t;
 typedef u32 kdev_t;
 typedef u16 udev_old_t;
 typedef u32 udev_new_t;
-uidnatural_t uid32_to_uidnatural(uid32_t val) {
-	if (val >= 65535) {
-		return uidnatural_overflow;
-	}
-	return (uidnatural_t) val;
-}
 /*
  *
  * Other

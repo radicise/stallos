@@ -20,7 +20,7 @@ ret
 SimpleMutex_tryAcquire:# int SimpleMutex_tryAcquire(SimpleMutex* mutex)
 .globl SimpleMutex_tryAcquire
 movl 4(%esp),%edx
-xorb %eax,%eax
+xorl %eax,%eax
 incb %al
 lock xchgb %al,(%edx)
 xorb $0x01,%al
@@ -63,13 +63,13 @@ ret
 AtomicULong_get:
 .globl AtomicULong_get
 movl 4(%esp),%eax
-lock movl (%eax),%eax
+movl (%eax),%eax# TODO URGENT Support processors that aren't Intel486-or-post-Intel486 Intel processors
 ret
 AtomicULong_set:
 .globl AtomicULong_set
 movl 4(%esp),%eax
 movl 8(%esp),%edx
-lock movl %edx,(%eax)
+movl %edx,(%eax)# TODO URGENT Support processors that aren't Intel486-or-post-Intel486 Intel processors
 ret
 AtomicULong_inc:
 .globl AtomicULong_inc

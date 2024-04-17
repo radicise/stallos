@@ -417,6 +417,9 @@ int FileKeyComparator(uintptr a, uintptr b) {
 	struct FileKey* bF = (struct FileKey*) b;
 	return (aF->tgpid != bF->tgpid) || (aF->fd != bF->fd);
 }
+int FileValueComparator(uintptr a, uintptr b) {
+	return !((((struct Map_pair*) a)->value) == b);
+}
 struct Map* FileKeyKfdMap;
 struct KFDInfo {
 	Mutex dataLock;
@@ -462,8 +465,18 @@ void retDesc(int kfd) {
 	if (st == (uintptr) (-1)) {
 		bugCheckNum(0x0004 | FAILMASK_SYSCALLS);
 	}
+	Mutex_acquire(&(FileKeyKfdMap->set->lock));
 	long r = AtomicLongF_adjust(&(((struct KFDInfo*) st)->refs), (-1));
 	if (!r) {
+		uintptr i = Map_findByCompare(kfd, FileValueComparator, FileKeyKfdMap);
+		if (i == (uintptr) (-1)) {
+			bugCheckNum(0x0008 | FAILMASK_SYSCALLS);
+		}
+		if (Map_remove(i, FileKeyKfdMap)) {
+			bugCheckNum(0x0009 | FAILMASK_SYSCALLS);
+		}
+		dealloc((void*) i, sizeof(struct FileKey));
+		Mutex_release(&(FileKeyKfdMap->set->lock));
 		struct FileDriver* fdrvr = resolveFileDriver(kfd);
 		if (fdrvr == NULL) {
 			bugCheckNum(0x0005 | FAILMASK_SYSCALLS);
@@ -476,6 +489,10 @@ void retDesc(int kfd) {
 		if (Map_remove(kfd, KFDStatus)) {
 			bugCheckNum(0x0007 | FAILMASK_SYSCALLS);
 		}
+		removeKfd(kfd);
+	}
+	else {
+		Mutex_release(&(FileKeyKfdMap->set->lock));
 	}
 	return;
 }
@@ -566,9 +583,7 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 	// TODO Remove entries from `kfdDriverMap' that are not held by other processes and are associated with the `kfd' values that were the values of key-value pairs removed from `FileKeyKfdMap'
 	return;
 }
-int validateCap(int cap) {
-	return 1;// TODO Implement
-}
+#include "std.h"
 /*
  *
  * System call interface
@@ -581,7 +596,7 @@ ssize_t write(int fd, const void* buf, size_t count) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(tgid, fd);
+	int kfd = getDesc(fetch_tgid(), fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return (-1);
@@ -600,7 +615,7 @@ ssize_t read(int fd, void* buf, size_t count) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(tgid, fd);
+	int kfd = getDesc(fetch_tgid(), fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return (-1);
@@ -619,7 +634,7 @@ off_t lseek(int fd, off_t off, int how) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(tgid, fd);
+	int kfd = getDesc(fetch_tgid(), fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return (-1);
@@ -638,7 +653,7 @@ int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {// Introduc
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(tgid, fd);
+	int kfd = getDesc(fetch_tgid(), fd);
 	if (kfd == (-1)) {
 		errno = EBADF;// File descriptor <fd> is not opened for the process
 		return (-1);
@@ -660,7 +675,7 @@ time_t time(time_t* resAddr) {
 	return n;
 }
 int stime(const time_t* valAddr) {
-	if (!(validateCap(CAP_SYS_TIME))) {
+	if (!(have_cap(CAP_SYS_TIME))) {
 		errno = EPERM;
 		return (-1);
 	}
@@ -668,31 +683,19 @@ int stime(const time_t* valAddr) {
 	return 0;
 }
 uidnatural_t getuid(void) {
-	lockThreadInfo();
-	uid32_t uid = ruid;
-	unlockThreadInfo();
-	return uid32_to_uidnatural(uid);
+	return kuid_to_uidnatural(fetch_ruid());
 }
-uid32_t getuid32(void) {// Introduced in Linux 2.3.39
-	lockThreadInfo();
-	uid32_t uid = ruid;
-	unlockThreadInfo();
-	return uid;
+kuid_t getuid32(void) {// Introduced in Linux 2.3.39
+	return fetch_ruid();
 }
 uidnatural_t geteuid(void) {
-	lockThreadInfo();
-	uid32_t uid = euid;
-	unlockThreadInfo();
-	return uid32_to_uidnatural(uid);
+	return kuid_to_uidnatural(fetch_euid());
 }
-uid32_t geteuid32(void) {// Introduced in Linux 2.3.39
-	lockThreadInfo();
-	uid32_t uid = euid;
-	unlockThreadInfo();
-	return uid;
+kuid_t geteuid32(void) {// Introduced in Linux 2.3.39
+	return fetch_euid();
 }
 pid_t getpid(void) {
-	return tgid;
+	return fetch_tgid();
 }
 pid_t gettid(void) {// Introduced in Linux 2.4.11
 	return tid;
@@ -746,7 +749,7 @@ int open(char* path, int flg, mode_t mode) {// `path' is not of type `const char
 	// TODO [FINISH]
 	bugCheck();
 	return 0;
-
+	// TODO retDesc the kfd after it is opened
 
 }
 

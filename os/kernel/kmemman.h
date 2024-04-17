@@ -17,6 +17,7 @@
 #define KMEM_LB_AMNTMEMBITMAPBYTES (KMEM_LB_AMNT / (KMEM_LB_BS * CHAR_BIT))
 #define KMEM_LB_AMNTMEMSPACES (KMEM_LB_AMNT / KMEM_LB_BS)
 #define KMEM_LB_DATSTART (KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES + KMEM_LB_BS - ((KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES - 1) % KMEM_LB_BS) - 1)
+#include "util.h"
 Mutex kmem_access;
 Mutex kmem_lb_access;
 volatile unsigned long long memAllocated = 0;

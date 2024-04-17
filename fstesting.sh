@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 gcc fstesting.c -Wpedantic -o fstesting
 if [ $? == 0 ]
 then

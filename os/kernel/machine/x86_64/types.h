@@ -32,15 +32,13 @@ typedef long time_t;
 typedef long long time64_t;
 typedef long off_t;
 typedef long long loff_t;
-typedef unsigned int uid32_t;
-typedef uid32_t uidnatural_t;
+typedef unsigned int ___uid32_t___;
+typedef ___uid32_t___ uidnatural_t;
+typedef ___uid32_t___ kuid_t;
 typedef unsigned int mode_t;
 typedef u32 kdev_t;
 typedef u16 udev_old_t;
 typedef u32 udev_new_t;
-uidnatural_t uid32_to_uidnatural(uid32_t val) {
-	return val;
-}
 /*
  *
  * Other
