@@ -1,6 +1,9 @@
 #ifndef __TSFSTYPES_H__
 #define __TSFSTYPES_H__ 1
 #ifndef __MOCKTEST
+#ifndef TARGETNUM
+#define TARGETNUM 2
+#endif
 #include "../types.h"
 #else
 #define u32 unsigned long
@@ -18,8 +21,8 @@ typedef unsigned long fsblkcnt_t;
 typedef unsigned long fsfilcnt_t;
 typedef s16 blksize_t;
 typedef s32 blkcnt_t;
-#define uid_t uid32_t
-#define gid_t uid32_t
+#define uid_t kuid_t
+#define gid_t kuid_t
 struct statfs {
     __fsword_t f_type;    /* Type of filesystem (see below) */
     __fsword_t f_bsize;   /* Optimal transfer block size */
