@@ -17,7 +17,7 @@ lock xchgb %al,(%rdi)
 ret
 SimpleMutex_tryAcquire:# int SimpleMutex_tryAcquire(SimpleMutex* mutex)
 .globl SimpleMutex_tryAcquire
-xorb %rax,%rax
+xorq %rax,%rax
 incb %al
 lock xchgb %al,(%rdi)
 xorb $0x01,%al
@@ -58,11 +58,11 @@ nop
 ret
 AtomicULong_get:
 .globl AtomicULong_get
-lock movq (%rdi),%rax
+movq (%rdi),%rax# TODO URGENT Support processors that aren't Pentium-or-post-Pentium Intel processors
 ret
 AtomicULong_set:
 .globl AtomicULong_set
-lock movq %rsi,(%rdi)
+movq %rsi,(%rdi)# TODO URGENT Support processors that aren't Pentium-or-post-Pentium Intel processors
 ret
 AtomicULong_inc:
 .globl AtomicULong_inc

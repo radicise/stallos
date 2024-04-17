@@ -1,5 +1,6 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__ 1
+#include "types.h"
 int strcmp(const char* d, const char* g) {
 	if (!((*d) | (*g))) {
 		return 0;
@@ -37,7 +38,7 @@ extern void SimpleMutex_acquire(SimpleMutex*);
 extern void SimpleMutex_release(SimpleMutex*);
 extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
 extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
-extern void SimpleMutex_initUnlocked(SimpleMutex*);
+extern void SimpleMutex_initUnlocked(SimpleMutex*);// Performs a memory barrier
 typedef volatile struct {
 	SimpleMutex stateLock;
 	pid_t ownerThread;

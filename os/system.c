@@ -147,7 +147,7 @@ struct VGATerminal mainTerm;
 Mutex kmsg;
 int kernelMsg(const char* msg) {
 	unsigned int len = strlen(msg);
-	Mutex_acquire(&kmsg);// TODO initialise
+	Mutex_acquire(&kmsg);
 	if (len != VGATerminal_write(1, msg, len)) {
 		Mutex_release(&kmsg);
 		return (-1);
