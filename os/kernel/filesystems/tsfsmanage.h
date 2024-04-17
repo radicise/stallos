@@ -441,6 +441,7 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
     int cfs = 1;
     while (1) {
         if (path[i] == '/' || path[i] == 0) {
+            _DBG_print_node(&curr);
             _tsfs_respath_step(fs, &curr, path, cfs, i);
             if (curr.disk_loc == 0) {
                 return 0;
@@ -450,6 +451,7 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
         if (path[i] == 0) break;
         i ++;
     }
+    _DBG_print_node(&curr);
     return curr.disk_loc;
 }
 

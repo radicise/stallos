@@ -95,6 +95,7 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
     TSFSSBChildEntry ce = {0};
     for (int i = 0; i < sb->entrycount; i ++) {
         read_childentry(fs, &ce);
+        _DBG_print_child(&ce);
         if (ce.flags == TSFS_CF_EXTT) {
             printf("FE EXTT\n");
             TSFSStructBlock ssb = {0};
