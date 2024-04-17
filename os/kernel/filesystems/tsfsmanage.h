@@ -379,7 +379,8 @@ u32 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
     }
     void* p = allocate(9+sizeof(u32)+sizeof(void*));
     *((u32*)(((char*)p)+9)) = 0;
-    tsfs_mk_ce_name(p, name, strlen(name));
+    printf("NAME: %s\n", name);
+    tsfs_mk_ce_name(p, name, strlen(name)+1);
     _DBG_print_cename(p);
     *((const void**)(((char*)p)+13)) = name;
     TSFSStructBlock sb;
