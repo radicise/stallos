@@ -2,6 +2,9 @@
 #define __FSDEFS_H__ 1
 
 #ifndef __MOCKTEST
+#ifndef TARGETNUM
+#define TARGETNUM 2
+#endif
 #include "../types.h"
 extern void* alloc(size_t);
 extern void dealloc(void*, size_t);
@@ -25,6 +28,8 @@ typedef unsigned long long loff_t;
 #include <stdlib.h>
 #include <stdio.h>
 // #include <string.h>
+
+// #error "reminder, use double indirection for inode tables"
 
 size_t strlen(const char* s) {
     size_t c = 0;
@@ -220,7 +225,7 @@ typedef struct {
     u16   rc;
     u8    id;
     //
-    // number of hard links to this data
+    // number of hard links to this data, max is 0x7fff, or 32767
     u16   refcount;
     // disk location of the first data block
     u32   head;
@@ -516,5 +521,6 @@ void tsfs_dummy_flush(FileSystem* fs) {}
 #include "./diskmanip.h"
 #include "./tsfs_magic.h"
 #include "./tsfshelpers.h"
+#include "./itable.h"
 
 #endif
