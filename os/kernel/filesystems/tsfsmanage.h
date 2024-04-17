@@ -416,8 +416,9 @@ void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, 
             }
         }
     }
-    char* frag = allocate(cfl);
+    char* frag = allocate(cfl+1);
     awrite_buf(frag, path+cfs, cfl);
+    frag[cfl] = 0;
     u32 nl = tsfs_find(fs, curr, frag);
     deallocate(frag, cfl);
     if (nl == 0) {
