@@ -4,7 +4,7 @@
 #include "Threadstate.h"
 #include "../../perThread.h"
 #include "../../perThreadgroup.h"
-#include "../../Map.h"
+#include "../../obj/Map.h"
 struct Map* ___taskMap___;// Do NOT access directly except for within the prescribed interaction functions; pid_t -> struct Thread*
 int ___amntTasks___;// Do NOT access directly except for within the prescribed interaction functions
 pid_t ___nextTask___;// Do NOT access directly except for within the prescribed interaction functions

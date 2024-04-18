@@ -10,7 +10,7 @@
 #include "capabilities.h"
 #include "perThreadgroup.h"
 #include "perThread.h"
-#include "Map.h"
+#include "obj/Map.h"
 #include "kmemman.h"
 #include "paging.h"
 #define FAILMASK_SYSCALLS 0x000e0000

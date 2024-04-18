@@ -1,0 +1,5 @@
+GCC Options For Compiling the Stallos Kernel:
+	-D TARGET=${TARGETMACHINE} -D TARGETNUM=${TARGETNUM} -D __TESTING__=0 -O0 -std=c99 -Wpedantic -nostartfiles -nostdlib -nodefaultlibs -static -c
+Additional Options For Specific Platforms:
+	On x86_32:
+		-march=i386 -mabi=sysv

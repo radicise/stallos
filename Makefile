@@ -7,7 +7,7 @@ OBJCOPYPRGM ?= i686-linux-gnu-objcopy
 TARGETMACHINE ?= x86_32
 TARGETNUM ?= 1
 
-CFLAGS ?= -D TARGET=${TARGETMACHINE} -D TARGETNUM=${TARGETNUM} -D __TESTING__=1 -O0 -std=c99 -Wpedantic -m32 -march=i386 -mabi=sysv -nostartfiles -nostdlib -nodefaultlibs -static -c
+CFLAGS ?= -D TARGET=${TARGETMACHINE} -D TARGETNUM=${TARGETNUM} -D __TESTING__=1 -O0 -std=c99 -Wpedantic -march=i386 -mabi=sysv -nostartfiles -nostdlib -nodefaultlibs -static -c
 ASFLAGS ?= -march=i386
 LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
 

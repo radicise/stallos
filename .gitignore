@@ -17,3 +17,4 @@ gensizes.h
 __pycache__
 local
 fstestinggcc
+*.gch

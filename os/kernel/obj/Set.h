@@ -1,7 +1,7 @@
 #ifndef __SET_H__
 #define __SET_H__1
-#include "types.h"
-#include "kmemman.h"
+#include "../types.h"
+#include "../kmemman.h"
 #define SET_BS 16
 struct Set {
 	volatile struct Set_block* start;
