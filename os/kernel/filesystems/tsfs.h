@@ -5,6 +5,7 @@ Anything not explicitly marked as something for use outside of the file system c
 Doing so is undefined behavior
 - Tristan
 */
+#define __STALLOS__
 #include "tsfscore.h"
 #include "tsfsmanage.h"
 #include "tsfsinterface.h"
