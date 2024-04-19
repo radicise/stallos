@@ -45,8 +45,12 @@ FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, s64 curr_time) {
     rblock->creation_time = *((u64*)(&curr_time));
     // write_u16be(fs, VERNOBN);
     // write_u64be(fs, rblock->partition_size);
-    rblock->usedleft = 3;
-    rblock->usedright = (u32)((((u64)2)<<(rblock->partition_size-1)) / BLOCK_SIZE) - 1;
+    rblock->usedleft = 7;
+    u32 tblocks = (u32)((((u64)2)<<(rblock->partition_size-1)) / BLOCK_SIZE);
+    rblock->usedright = tblocks - 1;
+    u32 center = tblocks/2;
+    rblock->usedhalfleft = center;
+    rblock->usedhalfright = center;
     // fs->fdrive->write(fs->kfd, &rblock->system_size, 1);
     // write_u64be(fs, curr_time);
     // fs->fdrive->write(fs->kfd, rblock->version, 16);
@@ -132,18 +136,37 @@ FSRet loadFS(struct FileDriver* fdr, int kfd) {
 allocates count contiguous blocks and returns the block number of the first one (left to right)
 returns zero if unable to allocate the requested blocks
 
-area is boolean and designates which way to search for available blocks, zero is start to end, one is end to start
+area is ternary and designates which way to search for available blocks, zero is start to end, one is end to start,
+and 2 is balanced centered
+NOTE: when area is 2, count is irrelevant, and exactly one block is allocated
 */
 u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
     u32 ul = fs->rootblock->usedleft;
     u32 ur = fs->rootblock->usedright;
-    if (area) {
+    u32 uhl = fs->rootblock->usedhalfleft;
+    u32 uhr = fs->rootblock->usedhalfright;
+    if (area == 1) {
+        if (count >= ur) return 0;
         ur -= count;
-        if (ur < ul) { // ensure no overwrite
+        if (ur < uhr) { // ensure no overwrite
             return 0;
         }
         fs->rootblock->usedright = ur;
         return ur;
+    }
+    if (area == 2) {
+        u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+        if ((center-uhl) - (uhr-center) == 0) {
+            u32 o = uhl;
+            uhl -= 1;
+            if (uhl < ul) return 0;
+            fs->rootblock->usedhalfleft = uhl;
+            return o;
+        }
+        uhr += 1;
+        if (uhr >= ur) return 0;
+        fs->rootblock->usedhalfright = uhr;
+        return uhr;
     }
     ul += count;
     if (ul > ur) { // ensure no overwrite
@@ -151,6 +174,10 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
     }
     fs->rootblock->usedleft = ul;
     return ul - count;
+}
+
+int tsfs_free_centered(FileSystem* fs, u32 block_no) {
+    return -1;
 }
 
 int _tsfs_free_struct_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
@@ -195,7 +222,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     // TSFSStructNode snode = {0};
     TSFSStructBlock* blockptr = 0;
     TSFSStructNode* nodeptr = 0;
-    block_seek(fs, (s32)ul, 0);
+    block_seek(fs, (s32)ul, BSEEK_SET);
     // read_structblock(fs, &sblock);
     blockptr = tsfs_load_block(fs, 0);
     printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
@@ -236,7 +263,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
             seek(fs, -14, SEEK_CUR);
             write_structblock(fs, blockptr);
         }
-        block_seek(fs, (s32)block_no, 0);
+        block_seek(fs, (s32)block_no, BSEEK_SET);
         write_structnode(fs, nodeptr);
         nodeptr->disk_loc = block_no;
         // TSFSStructNode pnode = {0};

@@ -85,9 +85,22 @@ u32 _search_l2_table(FileSystem* fs, u32 dl, char flags, u32 val) {
     return ITABLE_FAILURE;
 }
 
-u32 _create_l2_table(FileSystem* fs, u8 pindex, char initone, u32 initval) {
-    //
-    return 0;
+u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
+    u32 r = allocate_blocks(fs, 2, 1);
+    block_seek(fs, r, BSEEK_SET);
+    write_u32be(fs, 0xff0101 + (u32)pindex);
+    write_u32be(fs, ploc);
+    write_u32be(fs, initval);
+    return r;
+}
+
+u32 _create_l1_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
+    u32 r = allocate_blocks(fs, 2, 1);
+    block_seek(fs, r, BSEEK_SET);
+    write_u32be(fs, 0xff0001 + (u32)pindex);
+    write_u32be(fs, ploc);
+    write_u32be(fs, _create_l2_table(fs, r, 0, initval));
+    return r;
 }
 
 u32 _search_l1_table(FileSystem* fs, u32 dl, char flags, u32 val) {
@@ -104,7 +117,7 @@ u32 _search_l1_table(FileSystem* fs, u32 dl, char flags, u32 val) {
             if (!create) continue;
             // create new entry
             seek(fs, -4, SEEK_CUR);
-            write_u32be(fs, _create_l2_table(fs, (u8)i, 1, val));
+            write_u32be(fs, _create_l2_table(fs, dl, (u8)i, val));
             block_seek(fs, dl, BSEEK_SET);
             dat += 256;
             write_u32be(fs, dat);
@@ -127,15 +140,19 @@ see ITABLE key specs for details on the return value
 */
 u32 aquire_itable_slot(FileSystem* fs, u32 value) {
     block_seek(fs, 1, BSEEK_SET);
-    for (int i = 0; i < 256; i ++) {
-        u32 daddr = read_u32be(fs);
-        if (daddr == 0) {
-            // create new entry
-            return ITABLE_CREATED | (((u32)i)<<16);
-        } else {
-            u32 res = _search_l1_table(fs, daddr, ITABLE_FWRITE | ITABLE_FCREATE, value);
-            if (res & (ITABLE_FOUND | ITABLE_CREATED)) {
-                return ITABLE_FOUND | (((u32)i)<<16) | (res&0xffff);
+    for (u32 j = 1; j < 5; j ++) {
+        for (int i = 0; i < 256; i ++) {
+            u32 daddr = read_u32be(fs);
+            if (daddr == 0) {
+                // create new entry
+                seek(fs, -4, SEEK_CUR);
+                write_u32be(fs, _create_l1_table(fs, j, (u8)i, value));
+                return ITABLE_CREATED | (((u32)i)<<16);
+            } else {
+                u32 res = _search_l1_table(fs, daddr, ITABLE_FWRITE | ITABLE_FCREATE, value);
+                if (res & (ITABLE_FOUND | ITABLE_CREATED)) {
+                    return ITABLE_FOUND | (((u32)i)<<16) | (res&0xffff);
+                }
             }
         }
     }

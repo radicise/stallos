@@ -52,6 +52,7 @@ void dalloc(void* p, size_t s) {
 #ifndef SEEK_CUR
 #define SEEK_SET 0
 #define SEEK_CUR 1
+#define SEEK_END 2
 #endif
 #include "./tsfsconst.h"
 #include "../FileDriver.h"
@@ -163,6 +164,8 @@ typedef struct {
     u32   usedleft;
     // RH blocks used
     u32   usedright;
+    u32   usedhalfleft;
+    u32   usedhalfright;
     u64   checksum;
 } TSFSRootBlock;
 
