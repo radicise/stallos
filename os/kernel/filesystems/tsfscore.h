@@ -6,7 +6,6 @@
 // #include <string.h>
 // #undef __MOCKTEST
 #ifndef __MOCKTEST
-#define printf(...)
 void strcpy(char* dst, const char* src) {
     while (src && dst) {
         *dst = *src;

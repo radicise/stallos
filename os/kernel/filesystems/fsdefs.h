@@ -54,7 +54,7 @@ void dalloc(void* p, size_t s) {
 #define SEEK_CUR 1
 #define SEEK_END 2
 #endif
-#include "./tsfsconst.h"
+// #include "./tsfsconst.h"
 #include "../FileDriver.h"
 #include "../fsiface.h"
 typedef struct FSReturn FSRet;

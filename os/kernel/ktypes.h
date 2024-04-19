@@ -15,4 +15,9 @@
 #else
 #error "Target is not supported"
 #endif
+typedef volatile struct {
+	_kernel_SimpleMutex stateLock;
+	_kernel_pid_t ownerThread;
+	unsigned long acquires;
+} _kernel_Mutex;
 #endif
