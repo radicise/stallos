@@ -6,8 +6,8 @@
 #include "perThread.h"
 struct BDSpec {
 	u8 bs;
-	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*);/* "block", "amnt", "src", "obj" */
 	int (*readBlock)(unsigned long long, unsigned long long, void*, void*);/* "block", "amnt", "dest", "obj" */
+	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*);/* "block", "amnt", "src", "obj" */
 	unsigned long long readMax;
 	unsigned long long writeMax;
 };
@@ -18,7 +18,7 @@ struct BlockFile {
 	void* obj;
 	Mutex lock;
 };// TODO Utilise `loff_t' appropriately throughout the functions and structures instead of using `unsigned long long'
-ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
+ssize_t Block_base_write(const void* data, size_t count, struct BlockFile* file) {
 	int (*writeBlock)(unsigned long long, unsigned long long, const void*, void*) = file->reliance->writeBlock;
 	int (*readBlock)(unsigned long long, unsigned long long, void*, void*) = file->reliance->readBlock;
 	u8 bs = file->reliance->bs;
@@ -84,7 +84,13 @@ ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
 	file->pos += oCount;
 	return oCount;
 }
-ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
+ssize_t Block_write(const void* data, size_t count, struct BlockFile* file) {
+	Mutex_acquire(&(file->lock));
+	ssize_t rs = Block_base_write(data, count, file);
+	Mutex_release(&(file->lock));
+	return rs;
+}
+ssize_t Block_base_read(void* data, size_t count, struct BlockFile* file) {
 	int (*readBlock)(unsigned long long, unsigned long long, void*, void*) = file->reliance->readBlock;
 	u8 bs = file->reliance->bs;
 	unsigned long long readMax = file->reliance->readMax;
@@ -144,7 +150,13 @@ ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
 	file->pos += oCount;
 	return oCount;
 }
-int Block__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* file) {
+ssize_t Block_read(void* data, size_t count, struct BlockFile* file) {
+	Mutex_acquire(&(file->lock));
+	ssize_t rs = Block_base_read(data, count, file);
+	Mutex_release(&(file->lock));
+	return rs;
+}
+int Block_base__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* file) {
 	loff_t rel = (((loff_t) hi) << (sizeof(off_t) * CHAR_BIT)) | ((loff_t) lo);
 	loff_t max = file->amnt << file->reliance->bs;
 	switch (how) {
@@ -182,7 +194,13 @@ int Block__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* fi
 			return (-1);
 	}
 }
-off_t Block_lseek(off_t off, int how, struct BlockFile* file) {
+int Block__llseek(off_t hi, off_t lo, loff_t* res, int how, struct BlockFile* file) {
+	Mutex_acquire(&(file->lock));
+	int rs = Block_base__llseek(hi, lo, res, how, file);
+	Mutex_release(&(file->lock));
+	return rs;
+}
+off_t Block_base_lseek(off_t off, int how, struct BlockFile* file) {
 	unsigned long long pos = file->pos;
 	loff_t res;
 	if (Block__llseek((off < 0) ? (-1) : 0, off, &res, how, file)) {
@@ -194,5 +212,11 @@ off_t Block_lseek(off_t off, int how, struct BlockFile* file) {
 		return (-1);
 	}
 	return res;
+}
+off_t Block_lseek(off_t off, int how, struct BlockFile* file) {
+	Mutex_acquire(&(file->lock));
+	off_t rs = Block_base_lseek(off, how, file);
+	Mutex_release(&(file->lock));
+	return rs;
 }
 #endif

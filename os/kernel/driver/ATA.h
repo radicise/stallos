@@ -130,49 +130,13 @@ struct ATAFile ATA_0m;// hda
 struct ATAFile ATA_0s;// hdb
 struct ATAFile ATA_1m;// hdc
 struct ATAFile ATA_1s;// hdd
-struct BDSpec ATA_BlockFile = (struct BDSpec) {9,
-	ata_writeBlock,
-	ata_readBlock,
-	256,
-	256};
-struct BlockFile ATA_0m_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_0m};
-struct BlockFile ATA_0s_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_0s};
-struct BlockFile ATA_1m_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_1m,};
-struct BlockFile ATA_1s_file = (struct BlockFile) {&ATA_BlockFile,
-	0,
-	1024,// TODO Change
-	&ATA_1s};
-void initATA(void) {
-	ATA_0.bus = 0x01f0;
-	ATA_1.bus = 0x0170;
-	ATA_0.slaveLastUsed = 0x00;
-	ATA_1.slaveLastUsed = 0x00;
-	ATA_0.notUsed = 0x01;
-	ATA_1.notUsed = 0x01;
-	Mutex_initUnlocked(&(ATA_0.inUse));
-	Mutex_initUnlocked(&(ATA_1.inUse));
-	ATA_0m.ata = &ATA_0;
-	ATA_0m.slave = 0x00;
-	ATA_0s.ata = &ATA_0;
-	ATA_0s.slave = 0x01;
-	ATA_1m.ata = &ATA_1;
-	ATA_1m.slave = 0x00;
-	ATA_1s.ata = &ATA_1;
-	ATA_1s.slave = 0x01;
-	Mutex_initUnlocked(&(ATA_0m_file.lock));
-	Mutex_initUnlocked(&(ATA_0s_file.lock));
-	Mutex_initUnlocked(&(ATA_1m_file.lock));
-	Mutex_initUnlocked(&(ATA_1s_file.lock));
-}
+struct BDSpec ATA_BlockFile;
+struct BlockFile ATA_0m_file;
+struct BlockFile ATA_0s_file;
+struct BlockFile ATA_1m_file;
+struct BlockFile ATA_1s_file;
+#include "../FileDriver.h"
+struct FileDriver FileDriver_ATA;
 ssize_t ATA_write(int kfd, const void* dat, size_t len) {
 	switch (kfd) {
 		case (2):
@@ -257,7 +221,7 @@ int ATA_fdatasync(int kfd) {
 	}
 	return 0;
 }
-int ATA_close(int kfd) {
+int ATA_close(int kfd) {// TODO Change
 	switch (kfd) {
 		case (2):
 		case (3):
@@ -269,7 +233,7 @@ int ATA_close(int kfd) {
 	}
 	return 0;
 }
-void ATA_closeFinal(int kfd) {
+void ATA_closeFinal(int kfd) {// TODO Change, possibly
 	switch (kfd) {
 		case (2):
 		case (3):
@@ -281,6 +245,55 @@ void ATA_closeFinal(int kfd) {
 	}
 	return;
 }
-#include "../FileDriver.h"
-struct FileDriver FileDriver_ATA = (struct FileDriver) {ATA_write, ATA_read, ATA_lseek, ATA__llseek, ATA_fsync, ATA_fdatasync, ATA_close, ATA_closeFinal};
+void initATA(void) {
+	ATA_0.bus = 0x01f0;
+	ATA_1.bus = 0x0170;
+	ATA_0.slaveLastUsed = 0x00;
+	ATA_1.slaveLastUsed = 0x00;
+	ATA_0.notUsed = 0x01;
+	ATA_1.notUsed = 0x01;
+	Mutex_initUnlocked(&(ATA_0.inUse));
+	Mutex_initUnlocked(&(ATA_1.inUse));
+	ATA_0m.ata = &ATA_0;
+	ATA_0m.slave = 0x00;
+	ATA_0s.ata = &ATA_0;
+	ATA_0s.slave = 0x01;
+	ATA_1m.ata = &ATA_1;
+	ATA_1m.slave = 0x00;
+	ATA_1s.ata = &ATA_1;
+	ATA_1s.slave = 0x01;
+	ATA_BlockFile.bs = 9;
+	ATA_BlockFile.readBlock = ata_readBlock,
+	ATA_BlockFile.writeBlock = ata_writeBlock,
+	ATA_BlockFile.readMax = 256;
+	ATA_BlockFile.writeMax = 256;
+	ATA_0m_file.reliance = &ATA_BlockFile;
+	ATA_0m_file.pos = 0;
+	ATA_0m_file.amnt = 1024;// TODO Change
+	ATA_0m_file.obj = &ATA_0m;
+	ATA_0s_file.reliance = &ATA_BlockFile;
+	ATA_0s_file.pos = 0;
+	ATA_0s_file.amnt = 1024;// TODO Change
+	ATA_0s_file.obj = &ATA_0s;
+	ATA_1m_file.reliance = &ATA_BlockFile;
+	ATA_1m_file.pos = 0;
+	ATA_1m_file.amnt = 1024;// TODO Change
+	ATA_1m_file.obj = &ATA_1m;
+	ATA_1s_file.reliance = &ATA_BlockFile;
+	ATA_1s_file.pos = 0;
+	ATA_1s_file.amnt = 1024;// TODO Change
+	ATA_1s_file.obj = &ATA_1s;
+	Mutex_initUnlocked(&(ATA_0m_file.lock));
+	Mutex_initUnlocked(&(ATA_0s_file.lock));
+	Mutex_initUnlocked(&(ATA_1m_file.lock));
+	Mutex_initUnlocked(&(ATA_1s_file.lock));
+	FileDriver_ATA.write = ATA_write;// TODO URGENT Implement and add to the `struct FileDriver' structure the remaining functions
+	FileDriver_ATA.read = ATA_read;
+	FileDriver_ATA.lseek = ATA_lseek;
+	FileDriver_ATA._llseek = ATA__llseek;
+	FileDriver_ATA.fsync = ATA_fsync;
+	FileDriver_ATA.fdatasync = ATA_fdatasync;
+	FileDriver_ATA.close = ATA_close;
+	FileDriver_ATA.closeFinal = ATA_closeFinal;
+}
 #endif

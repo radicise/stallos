@@ -1,6 +1,7 @@
 #ifndef __STD_H__
 #define __STD_H__ 1
 #include "perThread.h"
+#include "util.h"
 #define FAILMASK_STD 0x00100000
 int have_cap(int cap) {
 	return 1;// TODO Implement
@@ -46,6 +47,4 @@ void associate_kfd(int kfd, struct FileDriver* driver, int statusflags, int user
 	}
 	return;
 }
-
-
 #endif

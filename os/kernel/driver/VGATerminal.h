@@ -27,7 +27,7 @@ struct VGATerminal {
 	ssize_t (*read)(int, void*, size_t);
 };
 extern struct VGATerminal mainTerm;
-void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigned int height, void* screen, ssize_t (*read)(int, void*, size_t)) {
+void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigned int height, volatile void* screen, ssize_t (*read)(int, void*, size_t)) {
 	term->extra[0] = 0;
 	term->format = 0x07;
 	term->pos = 0;
@@ -45,7 +45,7 @@ void initializeVGATerminal(struct VGATerminal* term, unsigned int width, unsigne
 void VGATerminalAdjustVis(struct VGATerminal* term) {
 	unsigned int w = term->width;
 	unsigned int t = term->total;
-	struct VGACell* screen = term->screen;
+	volatile struct VGACell* screen = term->screen;
 	unsigned char format = term->format;
 	while (term->pos >= t) {
 		term->pos -= w;
@@ -206,5 +206,11 @@ int VGATerminal__llseek(int kfd, off_t hi32, off_t lo32, loff_t* res, int how) {
 	return (-1);
 }
 #include "../FileDriver.h"
-struct FileDriver FileDriver_VGATerminal = (struct FileDriver){VGATerminal_write, VGATerminal_read, VGATerminal_lseek, VGATerminal__llseek};
+struct FileDriver FileDriver_VGATerminal;
+void initVGATerminal(void) {
+	FileDriver_VGATerminal.write = VGATerminal_write;// TODO URGENT Implement and add to the `struct FileDriver' structure the remaining functions
+	FileDriver_VGATerminal.read = VGATerminal_read;
+	FileDriver_VGATerminal.lseek = VGATerminal_lseek;
+	FileDriver_VGATerminal._llseek = VGATerminal__llseek;
+}
 #endif

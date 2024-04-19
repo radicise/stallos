@@ -1,6 +1,7 @@
 #ifndef __MAP_H__
 #define __MAP_H__ 1
 #include "Set.h"
+#include "../kmemman.h"
 #define FAILMASK_MAP 0x000c0000
 struct Map {
 	struct Set* set;

@@ -10,7 +10,7 @@
 #include "capabilities.h"
 #include "perThreadgroup.h"
 #include "perThread.h"
-#include "Map.h"
+#include "obj/Map.h"
 #include "kmemman.h"
 #include "paging.h"
 #define FAILMASK_SYSCALLS 0x000e0000
@@ -705,6 +705,7 @@ int close(int fd) {
 	bugCheck();
 	return 0;
 }
+/*
 int open(char* path, int flg, mode_t mode) {// `path' is not of type `const char*' because the calling program is not to be trusted
 	// TODO URGENT Ensure that the area from `path' to (and including) the NUL terminator is readable by the userspace program and let `n' be the sum of the string length (not including the NUL terminator) and 1 and let `m' represent a copy of the string of the type `const char*' such that `m' can be deallocated with sizeof
 	// TODO URGENT Validate string length
@@ -752,7 +753,7 @@ int open(char* path, int flg, mode_t mode) {// `path' is not of type `const char
 	// TODO retDesc the kfd after it is opened
 
 }
-
+*/
 
 
 int mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags, const void* data) {
