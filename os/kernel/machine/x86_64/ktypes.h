@@ -33,4 +33,11 @@ typedef unsigned int _kernel_mode_t;
 typedef _kernel_u32 _kernel_kdev_t;
 typedef _kernel_u16 _kernel_udev_old_t;
 typedef _kernel_u32 _kernel_udev_new_t;
+/*
+ *
+ * Other
+ *
+ */
+typedef volatile unsigned char _kernel_SimpleMutex;// Not reentrant, acquisition also acts as a memory fence for the thread
+typedef volatile unsigned long _kernel_AtomicULong;
 #endif

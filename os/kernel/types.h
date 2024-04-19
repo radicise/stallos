@@ -31,4 +31,16 @@ typedef _kernel_mode_t mode_t;
 typedef _kernel_kdev_t kdev_t;
 typedef _kernel_udev_old_t udev_old_t;
 typedef _kernel_udev_new_t udev_new_t;
+/*
+ *
+ * Other
+ *
+ */
+typedef _kernel_SimpleMutex SimpleMutex;
+typedef _kernel_AtomicULong AtomicULong;
+typedef volatile struct {
+	SimpleMutex stateLock;
+	pid_t ownerThread;
+	unsigned long acquires;
+} Mutex;// Reentrant, acquisition even if it is already acquired by the thread also acts as a memory fence for the thread
 #endif

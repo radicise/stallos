@@ -46,7 +46,7 @@ void dalloc(void* p, size_t s) {
 #define allocate malloc
 #define deallocate dalloc
 #endif
-#include "./tsfsconst.h"
+//#include "./tsfsconst.h"
 #include "../FileDriver.h"
 #include "../fsiface.h"
 typedef struct FSReturn FSRet;

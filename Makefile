@@ -87,3 +87,7 @@ build/Salth.class: Salth.java
 clean:
 	rm -f build/*
 
+tsfs: os/kernel/filesystems/tsfs.c os/kernel/filesystems/*.h
+	# TODO Revise "tsfs" file organisation
+	${CCPRGM} ${CFLAGS} -o build/tsfs-ul.elf os/kernel/filesystems/tsfs.c
+

@@ -39,11 +39,6 @@ extern void SimpleMutex_release(SimpleMutex*);
 extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
 extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
 extern void SimpleMutex_initUnlocked(SimpleMutex*);// Performs a memory barrier
-typedef volatile struct {
-	SimpleMutex stateLock;
-	pid_t ownerThread;
-	unsigned long acquires;
-} Mutex;// Reentrant, acquisition even if it is already acquired by the thread also acts as a memory fence for the thread
 void Mutex_acquire(Mutex* mutex) {
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	while (1) {
