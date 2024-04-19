@@ -53,7 +53,7 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
         TSFSStructNode sn = {0};
         read_structnode(s, &sn);
-        printf("@ %lu : %s\n", ce->dloc, sn.name);
+        printf("@ %u : %s\n", ce->dloc, sn.name);
         loc_seek(s, l);
     }
     return 0;
@@ -102,7 +102,7 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
         tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
         tsfs_unload(s, sb);
         u32 llc = tsfs_resolve_path(s, nbuf);
-        printf("disk addr of file node: %lu\n", llc);
+        printf("disk addr of file node: %u\n", llc);
         if (llc > 7) {
             printf("BAD LLC\n");
             goto dealloc;

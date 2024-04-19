@@ -19,13 +19,13 @@ struct PosDat {
 };
 
 TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockno) {
-    printf("blkno: %lu\n", blockno);
-    _DBG_print_node(sn);
+    printf("blkno: %u\n", blockno);
+    // _DBG_print_node(sn);
     TSFSDataBlock databloc = {0};
     block_seek(fs, sn->data_loc, BSEEK_SET);
     TSFSDataHeader dh;
     read_dataheader(fs, &dh);
-    _DBG_print_head(&dh);
+    // _DBG_print_head(&dh);
     if (dh.blocks <= blockno) {
         _DBG_here();
         return databloc;
@@ -95,7 +95,7 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
     TSFSSBChildEntry ce = {0};
     for (int i = 0; i < sb->entrycount; i ++) {
         read_childentry(fs, &ce);
-        _DBG_print_child(&ce);
+        // _DBG_print_child(&ce);
         if (ce.flags == TSFS_CF_EXTT) {
             printf("FE EXTT\n");
             TSFSStructBlock ssb = {0};
@@ -119,15 +119,15 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
 
 void __DBG_print_block(TSFSStructBlock* sb, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("STRUCT BLOCK {\nDISK_LOC: 0x%lx,\nDISK_REF: 0x%lx,\nENTRYCOUNT: %u,\nFLAGS: %u,\nMAGIC_NO: %lu\n}%s\n", sb->disk_loc, sb->disk_ref, sb->entrycount, sb->flags, sb->magicno, TSFS_ANSI_NUN);
+    printf("STRUCT BLOCK {\nDISK_LOC: 0x%x,\nDISK_REF: 0x%x,\nENTRYCOUNT: %u,\nFLAGS: %u,\nMAGIC_NO: %lu\n}%s\n", sb->disk_loc, sb->disk_ref, sb->entrycount, sb->flags, sb->magicno, TSFS_ANSI_NUN);
 }
 void __DBG_print_node(TSFSStructNode* sn, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("STRUCT NODE {\nDISK_LOC: 0x%lx,\nB_LOCK: 0x%lx,\nPNODE: 0x%lx,\nDATA_LOC: 0x%lx,\nFLAGS: %u,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->data_loc, sn->storage_flags, sn->name, sn->magicno, TSFS_ANSI_NUN);
+    printf("STRUCT NODE {\nDISK_LOC: 0x%x,\nB_LOCK: 0x%x,\nPNODE: 0x%x,\nDATA_LOC: 0x%x,\nFLAGS: %u,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->data_loc, sn->storage_flags, sn->name, sn->magicno, TSFS_ANSI_NUN);
 }
 void __DBG_print_head(TSFSDataHeader* dh, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("DATA HEADER {\nDISK_LOC: 0x%lx,\nREF_C: %hu,\nHEAD: 0x%lx,\nBLOCKS: %lu,\nSIZE: %llu,\nMAGIC_NO: %lu\n}%s\n", dh->disk_loc, dh->refcount, dh->head, dh->blocks, dh->size, dh->magicno, TSFS_ANSI_NUN);
+    printf("DATA HEADER {\nDISK_LOC: 0x%x,\nREF_C: %hu,\nHEAD: 0x%x,\nBLOCKS: %u,\nSIZE: %lu,\nMAGIC_NO: %lu\n}%s\n", dh->disk_loc, dh->refcount, dh->head, dh->blocks, dh->size, dh->magicno, TSFS_ANSI_NUN);
 }
 void __DBG_print_cename(char const* name, long l, const char* f, const char* fid) {
     if (l) {
@@ -140,7 +140,7 @@ void __DBG_print_cename(char const* name, long l, const char* f, const char* fid
 }
 void __DBG_print_child(TSFSSBChildEntry* ce, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("CHILD ENTRY {\nDLOC: 0x%lx,\nFLAGS: %u,\nNAME:", ce->dloc, ce->flags);
+    printf("CHILD ENTRY {\nDLOC: 0x%x,\nFLAGS: %u,\nNAME:", ce->dloc, ce->flags);
     __DBG_print_cename(ce->name, 0, 0, 0);
     printf("\n}%s\n", TSFS_ANSI_NUN);
 }

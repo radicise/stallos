@@ -208,7 +208,7 @@ void* _tsm_cintern(Magic* m, u32 pos) {
         printf("INTERN PTR: %p\n", ptr);
         if (ptr == 0) continue;
         u32 tp = *((u32*)(((char*)ptr)+sizeof(size_t)));
-        printf("INTERNCHECK: t:{%lx} == %lx?\n", tp, pos);
+        printf("INTERNCHECK: t:{%x} == %x?\n", tp, pos);
         if (tp == pos) {
             return ptr;
         }

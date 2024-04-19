@@ -172,7 +172,7 @@ all cleanup MUST be done prior to freeing it
 int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     u32 ul = fs->rootblock->usedleft;
     if (block_no >= ul || block_no < 3) { // protect bounds
-        printf("BLKNO: %lu\n", block_no);
+        printf("BLKNO: %u\n", block_no);
         magic_smoke(FEDRIVE | FEARG | FEBIG);
         return -1;
     }
@@ -181,7 +181,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     longseek(fs, 0, SEEK_SET);
     write_rootblock(fs, fs->rootblock);
     printf("AFTER ROOT UPDATE\n");
-    printf("NULLING BLOCK {%lu}\n", block_no);
+    printf("NULLING BLOCK {%u}\n", block_no);
     getchar();
     dmanip_null(fs, block_no, 1); // destroy invalid data
     getchar();
@@ -190,7 +190,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     }
     printf("AFTER EARLY END CHECK\n");
     u64 np = ((u64)(block_no)) * ((u64)BLOCK_SIZE);
-    printf("AFTER CALC, NEW POS: %llx, NEW BLK: %lu\n", np, tsfs_loc_to_block(np));
+    printf("AFTER CALC, NEW POS: %lx, NEW BLK: %u\n", np, tsfs_loc_to_block(np));
     // TSFSStructBlock sblock = {0};
     // TSFSStructNode snode = {0};
     TSFSStructBlock* blockptr = 0;
@@ -202,8 +202,8 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     _DBG_print_block(blockptr);
     u64 comphash = hash_structblock(blockptr);
     printf("AFTER HASH\n");
-    printf("COMP HASH = %llx\n", comphash);
-    printf("PTRHASH = %llx\n", blockptr->checksum);
+    printf("COMP HASH = %lx\n", comphash);
+    printf("PTRHASH = %lx\n", blockptr->checksum);
     // check if the final block is a struct block by reading it as one and seeing if the hash is correct
     if (blockptr->checksum == comphash) { // struct block
         printf("FREE BLOCK\n");

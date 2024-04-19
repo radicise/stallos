@@ -1,10 +1,13 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
 
-#ifndef __MOCKTEST
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
+#if TARGETNUM == 1
+#define FMT_ 0
+#endif
+#ifndef __MOCKTEST
 #include "../types.h"
 extern void* alloc(size_t);
 extern void dealloc(void*, size_t);
@@ -14,12 +17,12 @@ extern void dealloc(void*, size_t);
 typedef int pid_t;
 typedef unsigned char u8;
 typedef unsigned short u16;
-typedef unsigned long u32;
-typedef unsigned long long u64;
+typedef unsigned int u32;
+typedef unsigned long u64;
 typedef char s8;
 typedef short s16;
-typedef long s32;
-typedef long long s64;
+typedef int s32;
+typedef long s64;
 typedef unsigned int uid32_t;
 #ifdef __DARWIN_BYTE_ORDER
 typedef unsigned long long loff_t;
@@ -45,6 +48,10 @@ void dalloc(void* p, size_t s) {
 }
 #define allocate malloc
 #define deallocate dalloc
+#endif
+#ifndef SEEK_CUR
+#define SEEK_SET 0
+#define SEEK_CUR 1
 #endif
 #include "./tsfsconst.h"
 #include "../FileDriver.h"
@@ -518,6 +525,7 @@ void tsfs_dummy_flush(FileSystem* fs) {}
 #define fsflush(fs) fs->fdrive->fsync(fs->kfd);
 #endif
 
+#include "./funcdefs.h"
 #include "./diskmanip.h"
 #include "./tsfs_magic.h"
 #include "./tsfshelpers.h"

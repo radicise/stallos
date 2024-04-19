@@ -211,7 +211,7 @@ int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
     u8 no = (u8)((c_loc - b_loc) / 14);
     // printf("DELNODE\n");
     // _DBG_print_node(sn);
-    printf("B_LOCK = %llx\nC_LOC = %llx\nNO = %u\n", b_loc, c_loc, no);
+    printf("B_LOCK = %lx\nC_LOC = %lx\nNO = %u\n", b_loc, c_loc, no);
     TSFSStructBlock* opb = tsfs_load_block(fs, b_loc/BLOCK_SIZE);
     if (_tsfs_delce(fs, opb, no)) {tsfs_unload(fs, opb);}
     sn->pnode = 0;
@@ -352,9 +352,9 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
 }
 
 int _tsfs_find_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
-    _DBG_print_child(ce);
+    // _DBG_print_child(ce);
     if (tsfs_cmp_cename(ce->name, data)) {
-        _DBG_here();
+        // _DBG_here();
         u64 cl = tsfs_tell(fs);
         block_seek(fs, ce->dloc, BSEEK_SET);
         TSFSStructNode sn;
@@ -381,7 +381,6 @@ u32 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
     *((u32*)(((char*)p)+9)) = 0;
     printf("NAME: %s\n", name);
     tsfs_mk_ce_name(p, name, strlen(name)+1);
-    _DBG_print_cename(p);
     *((const void**)(((char*)p)+13)) = name;
     TSFSStructBlock sb;
     block_seek(fs, par->parent_loc, BSEEK_SET);
@@ -445,7 +444,7 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
     int cfs = 1;
     while (1) {
         if (path[i] == '/' || path[i] == 0) {
-            _DBG_print_node(&curr);
+            // _DBG_print_node(&curr);
             _tsfs_respath_step(fs, &curr, path, cfs, i);
             if (curr.disk_loc == 0) {
                 return 0;
@@ -455,7 +454,7 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
         if (path[i] == 0) break;
         i ++;
     }
-    _DBG_print_node(&curr);
+    // _DBG_print_node(&curr);
     return curr.disk_loc;
 }
 

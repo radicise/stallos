@@ -33,7 +33,7 @@ defines constants such as O_RDWR
     // open in read only mode
     #define O_RDONLY 0b00000001
     // open in write only mode
-    #define O_RDONLY 0b00000010
+    #define O_WRONLY 0b00000010
     // open in read+write mode
     #define O_RDWR   0b00000011
     // create file if it does not already exist
