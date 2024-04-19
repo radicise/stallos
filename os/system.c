@@ -447,7 +447,9 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 }
 #define FAILMASK_ELFLOADER 0x000a0000
 void systemEntry(void) {
+	// TODO URGENT Memory barrier
 	Mutex_initUnlocked(&kmsg);
+	initVGATerminal();
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
 	mainTerm.pos = readLongPhysical(0x00000506) & 0xffff;
 	mainTerm.format = readLongPhysical(0x00000508) & 0x00ff;
@@ -510,7 +512,7 @@ void systemEntry(void) {
 	kernelMsg("done\n");
 	kernelMsg("Starting `init'\n");
 	Mutex_acquire(&Threads_threadManage);
-	volatile struct Thread* th = alloc(sizeof(struct Thread));
+	struct Thread* th = alloc(sizeof(struct Thread));// Should this be declared `volatile'? It is conceivable that a thread may run on multiple CPU over time.
 	PerThread_context = &(th->thread);
 	(th->group) = (PerThreadgroup_context = alloc(sizeof(struct PerThreadgroup)));
 	___nextTask___ = 1;// For consistency of the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process

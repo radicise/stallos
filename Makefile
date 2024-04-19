@@ -7,7 +7,7 @@ OBJCOPYPRGM ?= i686-linux-gnu-objcopy
 TARGETMACHINE ?= x86_32
 TARGETNUM ?= 1
 
-CFLAGS ?= -D TARGET=${TARGETMACHINE} -D TARGETNUM=${TARGETNUM} -D __TESTING__=1 -O0 -std=c99 -Wpedantic -march=i386 -mabi=sysv -nostartfiles -nostdlib -nodefaultlibs -static -c
+CFLAGS ?= -D TARGET=${TARGETMACHINE} -D TARGETNUM=${TARGETNUM} -D __TESTING__=1 -O0 -std=c99 -pedantic -march=i386 -mabi=sysv -nostartfiles -nostdlib -nodefaultlibs -static -c
 ASFLAGS ?= -march=i386
 LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
 
@@ -46,7 +46,8 @@ build/system-comp.s: os/system.s os/irupt_generic.s os/kernel/machine/${TARGETMA
 	awk '1{gsub(/NUM/, thenum, $$0);print($$0);}' thenum=70 os/irupt_generic.s thenum=71 os/irupt_generic.s thenum=72 os/irupt_generic.s thenum=73 os/irupt_generic.s thenum=74 os/irupt_generic.s thenum=75 os/irupt_generic.s thenum=76 os/irupt_generic.s thenum=77 os/irupt_generic.s thenum=78 os/irupt_generic.s thenum=79 os/irupt_generic.s thenum=7a os/irupt_generic.s thenum=7b os/irupt_generic.s thenum=7c os/irupt_generic.s thenum=7d os/irupt_generic.s thenum=7e os/irupt_generic.s thenum=7f os/irupt_generic.s >> build/system-comp.s
 	cat os/kernel/machine/${TARGETMACHINE}/*.s >> build/system-comp.s # TODO Have this not fail if there are no /*.s/ files present for the machine
 
-build/kernel-ul.elf: os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h
+build/kernel-ul.elf: os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h os/kernel/obj/*.h
+	# Update requirement list when appropriate
 	${CCPRGM} ${CFLAGS} -o build/kernel-ul.elf os/system.c
 
 build/loader.bin: build/loader.o build/sysc.elf build/irupts.o

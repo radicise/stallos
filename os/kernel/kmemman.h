@@ -73,7 +73,7 @@ void* alloc(size_t siz) {// Allocated memory is guaranteed to not be at NULL and
 		k++;
 	}
 }
-void dealloc(void* obj, size_t siz) {
+void dealloc(volatile void* obj, size_t siz) {
 	if (obj == NULL) {
 		return;
 	}
@@ -109,7 +109,7 @@ void* alloc_lb(void) {// Allocated memory is guaranteed to not be at NULL and to
 		return (void*) ((KMEM_LB_DATSTART - RELOC) + (k * KMEM_LB_BS));
 	}
 }
-void dealloc_lb(void* obj) {
+void dealloc_lb(volatile void* obj) {
 	if (obj == NULL) {
 		return;
 	}

@@ -47,6 +47,7 @@ lidt 0x0000073fa
 ret
 runSystem:
 &/
+imply u8 farRunELF;
 int runSys() {
 	setup();
 	/*
@@ -55,6 +56,7 @@ int runSys() {
 	goto runSys_loop1;
 	*/
 	/*((0xb8002 as *u8)@ as int + 1) -> (0xb8002 as *u8);*/
+	farRunELF$ -> (0x7f7f8 as *addr);
 	int i = executeSystem();
 	(i + 0x30) as u8 -> (0xb8000 as *u8);
 	return i;

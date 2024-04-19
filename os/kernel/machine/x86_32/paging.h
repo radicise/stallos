@@ -47,8 +47,8 @@ void PGDWrite(volatile PGDEnt* valptr, unsigned long datt) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
-void PGDSetAddr(volatile PGDEnt* valptr, void* ptr) {
-	u32 b = (u32) (((uintptr) ptr) + ((uintptr) RELOC));
+void PGDSetAddr(volatile PGDEnt* valptr, uintptr ptr) {
+	u32 b = (u32) ((ptr) + ((uintptr) RELOC));
 	if (b & 0x00000fff) {
 		bugCheckNum(0x0002 | FAILMASK_PAGING);
 	}
@@ -62,21 +62,23 @@ void* PGDGetAddr(volatile PGDEnt* valptr) {
 	return (void*) (((uintptr) (((u32) p) & ((u32) 0xfffff000))) - ((uintptr) RELOC));
 }
 void nullifyEntry(volatile PGDEnt* entry) {
-	set(entry, 0x00, 4);
+	(*((u32*) entry)) = 0x00000000;
 }
 void initPageTable(volatile PGDEnt* table) {
-	set(table, 0x00, 4096);
+	for (int i = 0; i < 1024; i++) {
+		nullifyEntry(table + i);
+	}
 	return;
 }
-void initEntry(volatile PGDEnt* ent, int userWritable, int privileged, void* addr) {
-	set(ent, 0x00, 4);
+void initEntry(volatile PGDEnt* ent, int userWritable, int privileged, volatile void* addr) {
+	nullifyEntry(ent);
 	if (!privileged) {
 		PGDSet(ent, PG_US);
 	}
 	if (userWritable) {
 		PGDSet(ent, PG_RW);
 	}
-	PGDSetAddr(ent, addr);
+	PGDSetAddr(ent, (uintptr) addr);
 	PGDSet(ent, PG_P);
 	return;
 }

@@ -309,7 +309,7 @@ int kbd8042_outSeq(const void* dat, size_t siz, struct Keyboard8042* kbd) {// Mu
 			return (-1);
 		}
 	}
-	cpy(kbd->bufTerm + kbd->availTerm, dat, siz);
+	moveExv(kbd->bufTerm + kbd->availTerm, dat, siz);
 	kbd->availTerm += siz;
 	return 0;
 }
@@ -781,7 +781,7 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have 
 		if (kbd8042_process(kbd->buf[i], kbd)) {
 			if (i) {
 				kbd->avail -= i;
-				move(kbd->buf, kbd->buf + i, kbd->avail);
+				moveExv(kbd->buf, kbd->buf + i, kbd->avail);
 			}
 			i = 1;
 			break;
@@ -832,13 +832,13 @@ ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
 			continue;
 		}
 		if (kbd->availTerm >= count) {
-			cpy(dats, kbd->bufTerm, count);
+			moveExv(dats, kbd->bufTerm, count);
 			kbd->availTerm -= count;
-			move(kbd->bufTerm, kbd->bufTerm + count, kbd->availTerm);
+			moveExv(kbd->bufTerm, kbd->bufTerm + count, kbd->availTerm);
 			Mutex_release(&(kbd->bufLock));
 			return oCount;
 		}
-		cpy(dats, kbd->bufTerm, kbd->availTerm);
+		moveExv(dats, kbd->bufTerm, kbd->availTerm);
 		count -= kbd->availTerm;
 		dats += kbd->availTerm;
 		kbd->availTerm = 0;

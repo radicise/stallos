@@ -60,7 +60,6 @@ int executeSystem() {
 	while (1) {
 	}
 	*/
-	(*((void* volatile*) 0x7f7f8)) = (void*) farRunELF;
 	(*((volatile int*) 0x7f7fc)) = 0x00000008;
 	struct Thread_state state;
 	int i = runELF((void*) 0x00020000, (void*) 0x00040000, &state);
