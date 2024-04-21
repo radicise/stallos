@@ -1,6 +1,5 @@
 #ifndef __MACHINE_X86_64_TYPES_H__
 #define __MACHINE_X86_64_TYPES_H__ 1
-#define NULL ((void*) 0)
 /*
  *
  * Definition of CHAR_BIT

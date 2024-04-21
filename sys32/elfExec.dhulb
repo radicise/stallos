@@ -193,7 +193,7 @@ int loadELF(*Elf32_Ehdr prgm, addr base, *addr s) {
 	if ((t > 8) | (t == 6)) {
 		return 18;/* Unrecognised architecture */
 	}
-	addr*Elf32_Phdr seg = prgm + 52;
+	addr*Elf32_Phdr seg = prgm + (prgm.e_phoff@);
 	uint ps = prgm.e_phentsize@;
 	uint pnum = prgm.e_phnum@;
 	int res = 0;

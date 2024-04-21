@@ -1,6 +1,7 @@
 #ifndef __MACHINE_X86_32_PAGING_H__
 #define __MACHINE_X86_32_PAGING_H__ 1
 #define PAGE_SIZE 4096
+#define PAGEOF(x) ((uintptr) ((((uintptr) x) / PAGE_SIZE) * PAGE_SIZE))
 const uintptr amntMem = 64 * 1024 * 1024;// The value of `amntMem' must be an integer multiple of the value of `PAGE_SIZE'
 #include "../../kmemman.h"
 #if KMEM_LB_BS != PAGE_SIZE

@@ -1,6 +1,7 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__ 1
 #include "ktypes.h"
+#define NULL ((void*) 0)
 #ifndef TARGETNUM
 #error "'TARGETNUM' is not set"
 #endif
