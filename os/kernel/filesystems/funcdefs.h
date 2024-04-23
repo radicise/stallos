@@ -21,6 +21,7 @@ void getcreat_databloc(FileSystem*, u32, u32, TSFSDataBlock*, int*);
 size_t data_write(FSP, SNP, u64, const void*, size_t);
 size_t data_read(FSP, SNP, u64, void*, size_t);
 u32 tsfs_resolve_path(FSP, const char*);
+size_t strlen(const char*);
 #undef FSP
 #undef DBP
 #undef SNP

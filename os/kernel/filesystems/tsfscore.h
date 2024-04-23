@@ -17,6 +17,8 @@ void strcpy(char* dst, const char* src) {
 #include <string.h>
 #endif
 
+#define TSFS_CORE_LPROTECT 7
+
 /*
 available for external use
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
@@ -144,6 +146,7 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
     u32 ur = fs->rootblock->usedright;
     u32 uhl = fs->rootblock->usedhalfleft;
     u32 uhr = fs->rootblock->usedhalfright;
+    u32 ret;
     if (area == 1) {
         if (count >= ur) return 0;
         ur -= count;
@@ -151,32 +154,96 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
             return 0;
         }
         fs->rootblock->usedright = ur;
-        return ur;
+        ret = ur;
+        goto end;
     }
     if (area == 2) {
         u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
-        if ((center-uhl) - (uhr-center) == 0) {
-            u32 o = uhl;
+        if ((center-uhl) == (uhr-center)) {
+            ret = uhl;
             uhl -= 1;
             if (uhl < ul) return 0;
             fs->rootblock->usedhalfleft = uhl;
-            return o;
+            goto end;
         }
         uhr += 1;
         if (uhr >= ur) return 0;
         fs->rootblock->usedhalfright = uhr;
-        return uhr;
+        ret = uhr;
+        goto end;
     }
     ul += count;
     if (ul > ur) { // ensure no overwrite
         return 0;
     }
     fs->rootblock->usedleft = ul;
-    return ul - count;
+    ret = ul - count;
+    end:
+    block_seek(fs, 0, BSEEK_SET);
+    write_rootblock(fs, fs->rootblock);
+    return ret;
 }
 
+/*
+frees an itable block
+
+if a hole is created, the moved block may be from the other side of the center in order to keep the middle
+balanced
+*/
 int tsfs_free_centered(FileSystem* fs, u32 block_no) {
-    return -1;
+    u32 ul = fs->rootblock->usedleft;
+    u32 ur = fs->rootblock->usedright;
+    u32 uhl = fs->rootblock->usedhalfleft;
+    u32 uhr = fs->rootblock->usedhalfright;
+    u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+    u32 dl = (center-uhl); 
+    u32 dr = (uhr-center);
+    if (block_no <= uhl || block_no > uhr) return -1; // bounds check
+    u32 move_no;
+    if (block_no > center) {
+        uhr --;
+        if ((block_no-1) == uhr) {
+            goto good_exit;
+        }
+        if (dl >= dr) {
+            uhl ++;
+            uhr ++;
+            move_no = uhl;
+        } else {
+            move_no = uhr+1;
+        }
+    } else {
+        uhl ++;
+        if (block_no == uhl) {
+            goto good_exit;
+        }
+        if (dr >= dl) {
+            uhl --;
+            uhr --;
+            move_no = uhr+1;
+        } else {
+            move_no = uhl;
+        }
+    }
+    block_seek(fs, move_no, BSEEK_SET);
+    unsigned char* buffer = allocate(BLOCK_SIZE);
+    read_buf(fs, buffer, BLOCK_SIZE);
+    block_seek(fs, block_no, BSEEK_SET);
+    write_buf(fs, buffer, BLOCK_SIZE);
+    u32 meta = areadu32be(buffer);
+    u32 ploc = areadu32be(buffer+4);
+    deallocate(buffer, BLOCK_SIZE);
+    block_seek(fs, ploc, BSEEK_SET);
+    seek(fs, ((meta&0xff0000)?8:0) // offset by 8 bytes if the parent is an L1 table to account for metadata
+        +(4*(meta&0xff)), // go to the entry that needs to be updated
+        SEEK_CUR);
+    write_u32be(fs, block_no);
+    good_exit:
+    fs->rootblock->usedhalfleft = uhl;
+    fs->rootblock->usedhalfright = uhr;
+    block_seek(fs, 0, BSEEK_SET);
+    write_rootblock(fs, fs->rootblock);
+    return 0;
 }
 
 int _tsfs_free_struct_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
@@ -197,9 +264,9 @@ all cleanup MUST be done prior to freeing it
 */
 int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     u32 ul = fs->rootblock->usedleft;
-    if (block_no >= ul || block_no < 3) { // protect bounds
+    if (block_no >= ul || block_no < TSFS_CORE_LPROTECT) { // protect bounds
         printf("BLKNO: %u\n", block_no);
-        magic_smoke(FEDRIVE | FEARG | FEBIG);
+        magic_smoke(FEDRIVE | FEARG | FEINVL);
         return -1;
     }
     fs->rootblock->usedleft -= 1;

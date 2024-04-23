@@ -14,7 +14,7 @@ all other bytes - children
 <8>bytes
 <a,1><b,1><c,1><d,1><3,4>
 <a> - constant - 0xff, identifies this block as an ITABLE
-<b> - bool - singly or doubly indirected block
+<b> - bool - singly or doubly indirected block (0=L1,1=L2)
 <c> - uint8 - number of entries in this table, when zero, the table will be deallocated, excepting if the table is singly indirected to the first table and has index zero, or is doubly indirected through that table and has index zero
 <d> - uint8 - index of this block in parent
 <e> - uint32 - disk addr of parent
@@ -31,7 +31,7 @@ key flags:
 <a> - failed - there was no available entry, has different meanings dependent on what level of search is performed
     when searching an l1 or l2 table, the next table should be searched, when searching the root table, it signals
     that the inode tables are all full, this is highly unlikely to be possible
-<b> - created - this is not a valid return of an l1 search, signals that there was no space in any existing
+<b> - created - this is not a valid return of an l2 search, signals that there was no space in any existing
     sub-table, but there was space for a new sub-table to be created, and this has been done
     this can only be returned when the search flags include both ITABLE_FCREATE and ITABLE_FWRITE, the
     returned entry is guaranteed to be filled by the provided value
@@ -48,6 +48,10 @@ key path:
 #define ITABLE_CREATED 0x40000000UL
 #define ITABLE_FOUND 0x20000000UL
 #define ITABLE_INDEX 0x03ffffffUL
+
+#define IDATA_LEVL 0xff0000UL
+#define IDATA_ENTS 0xff00UL
+#define IDATA_INDX 0xffUL
 
 #define ITABLE_FSEARCH 0
 #define ITABLE_FWRITE 1
@@ -88,7 +92,7 @@ u32 _search_l2_table(FileSystem* fs, u32 dl, char flags, u32 val) {
 u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
     u32 r = allocate_blocks(fs, 2, 1);
     block_seek(fs, r, BSEEK_SET);
-    write_u32be(fs, 0xff0101 + (u32)pindex);
+    write_u32be(fs, 0xff010100 + (u32)pindex);
     write_u32be(fs, ploc);
     write_u32be(fs, initval);
     return r;
@@ -97,7 +101,7 @@ u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
 u32 _create_l1_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
     u32 r = allocate_blocks(fs, 2, 1);
     block_seek(fs, r, BSEEK_SET);
-    write_u32be(fs, 0xff0001 + (u32)pindex);
+    write_u32be(fs, 0xff000100 + (u32)pindex);
     write_u32be(fs, ploc);
     write_u32be(fs, _create_l2_table(fs, r, 0, initval));
     return r;
@@ -160,6 +164,41 @@ u32 aquire_itable_slot(FileSystem* fs, u32 value) {
 }
 
 int release_itable_slot(FileSystem* fs, u32 imapkey) {
+    imapkey = imapkey&ITABLE_INDEX;
+    u32 croot, cl1, cl2;
+    croot = imapkey>>16;
+    cl1 = (imapkey>>8)&0xff;
+    cl2 = imapkey&0xff;
+    u32 l1p, l2p;
+    block_seek(fs, 1, BSEEK_SET);
+    seek(fs, 4*croot, SEEK_CUR);
+    l1p = read_u32be(fs);
+    block_seek(fs, l1p, BSEEK_SET);
+    u32 l1d = read_u32be(fs);
+    seek(fs, 4+(4*cl1), SEEK_CUR);
+    l2p = read_u32be(fs);
+    block_seek(fs, l2p, BSEEK_SET);
+    u32 l2d = read_u32be(fs);
+    seek(fs, 4+(4*cl1), SEEK_CUR);
+    write_u32be(fs, 0);
+    l2d -= 256;
+    block_seek(fs, l2p, BSEEK_SET);
+    write_u32be(fs, l2d);
+    if (croot == 0 && cl1 == 0) return 0;
+    if (l2d & IDATA_ENTS) return 0;
+    l1d -= 256;
+    block_seek(fs, l1p, BSEEK_SET);
+    write_u32be(fs, l1d);
+    seek(fs, 4 + (4*cl1&IDATA_INDX), SEEK_CUR);
+    write_u32be(fs, 0);
+    tsfs_free_centered(fs, l2p);
+    if (croot == 0 || (l1d&IDATA_ENTS)) return 0;
+    block_seek(fs, 1, BSEEK_SET);
+    seek(fs, 4 * croot, SEEK_CUR);
+    l1p = read_u32be(fs);
+    seek(fs, -4, SEEK_CUR);
+    write_u32be(fs, 0);
+    tsfs_free_centered(fs, l1p);
     return 0;
 }
 

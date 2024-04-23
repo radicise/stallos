@@ -112,6 +112,12 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
     return 0;
 }
 
+size_t strlen(const char* s) {
+    size_t o = 0;
+    while (s[o++]);
+    return o;
+}
+
 #define TSFS_ANSI_NUN "\x1b[0m"
 #define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
 #define TSFS_ANSI_GRN "\x1b[38;2;0;200;0m"
