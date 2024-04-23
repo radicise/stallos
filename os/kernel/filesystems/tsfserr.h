@@ -23,19 +23,19 @@ int PUTS(const char* c) {while (*c){putchar((int)*c);c++;}return 0;}
 #define FEBIG 0x8
 #define FESMALL 0x10
 // coolaid
-#define FEDRIVE 0xc001a1d000000
+#define FEDRIVE 0xc001a1d0
 #define FEINVL 0x20
 #define FEARG 0x40
 #define FETEST 0x80
 #define FEIMPL 0x100
 #define FEDATA 0x200
 #define FEOP   0x400
-int magic_check(long code, long err) {
+int magic_check(unsigned long code, long err) {
     // long x = code ^ err;
     // return ((code ^ x) == err);
     return (code & err) == err;
 }
-void _magic_smoke(long ecode, long line, const char* fin, const char* fun) {
+void _magic_smoke(unsigned long ecode, long line, const char* fin, const char* fun) {
     printf("SOURCE {%ld} of {%s} {%s}\n", line, fin, fun);
     PUTS("THE FOLLOWING CAUSED THE MAGIC SMOKE TO ESCAPE:\n");
     printf("%lx -- ", ecode);
@@ -79,7 +79,7 @@ void _magic_smoke(long ecode, long line, const char* fin, const char* fun) {
         PUTS("WISP");
     }
     PUTS("\n");
-    exit(ecode);
+    bugCheckNum(ecode);
 }
 
 #define magic_smoke(code) _magic_smoke(code, __LINE__, __FILE__, __func__)

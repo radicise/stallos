@@ -6,6 +6,9 @@ Doing so is undefined behavior
 - Tristan
 */
 #define __STALLOS__ 1
+#ifndef TARGETNUM
+#define TARGETNUM 2
+#endif
 #define printf(...)
 #include "tsfscore.h"
 #include "tsfsmanage.h"

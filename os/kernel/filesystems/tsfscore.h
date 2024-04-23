@@ -5,17 +5,18 @@
 // #include "./tsfsmanage.h"
 // #include <string.h>
 // #undef __MOCKTEST
-#ifndef __MOCKTEST
-void strcpy(char* dst, const char* src) {
-    while (src && dst) {
+// #ifndef __MOCKTEST
+char* strcpy(char* dst, const char* src) {
+    while (*src) {
         *dst = *src;
         src++;
         dst++;
     }
+    return 0;
 }
-#else
-#include <string.h>
-#endif
+// #else
+// #include <string.h>
+// #endif
 
 #define TSFS_CORE_LPROTECT 7
 
@@ -27,63 +28,59 @@ RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, s64 curr_time) {
     FSRet rv = {.err=EINVAL};
     if (p_size > 48) {
+        kernelWarnMsg("PARTITION TOO BIG");
         return rv;
     }
     rv.err = 0;
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
-    printf("FS ALLOC, %p\n", (void*)fs);
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
     fdr->lseek(kfd, 0, SEEK_SET);
-    printf("BMAKE\n");
     tsmagic_make(fs);
-    printf("AMAKE\n");
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
     rblock->breakver = VERNOBN;
     strcpy(rblock->version, TSFSVERSION);
     rblock->partition_size = p_size;
     rblock->creation_time = *((u64*)(&curr_time));
-    // write_u16be(fs, VERNOBN);
-    // write_u64be(fs, rblock->partition_size);
     rblock->usedleft = 7;
     u32 tblocks = (u32)((((u64)2)<<(rblock->partition_size-1)) / BLOCK_SIZE);
     rblock->usedright = tblocks - 1;
     u32 center = tblocks/2;
-    rblock->usedhalfleft = center;
-    rblock->usedhalfright = center;
-    // fs->fdrive->write(fs->kfd, &rblock->system_size, 1);
-    // write_u64be(fs, curr_time);
-    // fs->fdrive->write(fs->kfd, rblock->version, 16);
-    // write_u16be(fs, rblock->block_size);
-    // write_u64be(fs, rblock->top_dir);
-    rblock->top_dir = 1;
+    rblock->usedhalfleft = center-1;
+    rblock->usedhalfright = center+1;
+    rblock->top_dir = 5;
     u64 checksum = hash_rootblock(rblock);
-    // printf("CHECKSUM: %llx\n", checksum);
     rblock->checksum = checksum;
     write_rootblock(fs, rblock);
+    dmanip_null(fs, 1, 4);
+    block_seek(fs, 1, BSEEK_SET);
+    write_u32be(fs, center);
     TSFSStructNode snode = {
         .storage_flags = TSFS_KIND_DIR,
-        // .size = 0,
         .parent_loc = rblock->top_dir + 1,
         .disk_loc = rblock->top_dir,
         .pnode = 0,
-        // .blocks = 0,
-        .data_loc = 0
+        .data_loc = 0,
+        .inum = 0
     };
     snode.name[0] = '/';
-    // _DBG_print_node(&snode);
     block_seek(fs, rblock->top_dir, BSEEK_SET);
     write_structnode(fs, &snode);
     TSFSStructBlock sblock = {0};
     sblock.disk_ref = rblock->top_dir;
     sblock.flags = TSFS_CF_DIRE;
     sblock.entrycount = 0;
-    // printf("NODE: %llx\nBLOC: %llx\n", sblock.disk_loc, snode.parent_loc);
     block_seek(fs, snode.parent_loc, BSEEK_SET);
     write_structblock(fs, &sblock);
+    block_seek(fs, center, BSEEK_SET);
+    write_u32be(fs, 0xff010000UL);
+    write_u32be(fs, 1);
+    block_seek(fs, center+1, BSEEK_SET);
+    write_u32be(fs, 0xff010100UL);
+    write_u32be(fs, center);
+    write_u32be(fs, rblock->top_dir);
     rv.retptr = fs;
-    // write_u64be(fs, checksum);
     return rv;
 }
 
@@ -107,6 +104,7 @@ ON ERROR:
 returns a filesystem object with a null rootblock or a rootblock with zero breakver
 */
 FSRet loadFS(struct FileDriver* fdr, int kfd) {
+    kernelWarnMsg("WARNING: itable reorganization not implemented yet");
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
@@ -173,7 +171,7 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
         goto end;
     }
     ul += count;
-    if (ul > ur) { // ensure no overwrite
+    if (ul > uhl) { // ensure no overwrite
         return 0;
     }
     fs->rootblock->usedleft = ul;
@@ -273,17 +271,17 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     ul --;
     longseek(fs, 0, SEEK_SET);
     write_rootblock(fs, fs->rootblock);
-    printf("AFTER ROOT UPDATE\n");
-    printf("NULLING BLOCK {%u}\n", block_no);
-    getchar();
+    // printf("AFTER ROOT UPDATE\n");
+    // printf("NULLING BLOCK {%u}\n", block_no);
+    // getchar();
     dmanip_null(fs, block_no, 1); // destroy invalid data
-    getchar();
+    // getchar();
     if (block_no == ul) { // freed the last used block, nothing else needs to be done
         return 0;
     }
-    printf("AFTER EARLY END CHECK\n");
+    // printf("AFTER EARLY END CHECK\n");
     u64 np = ((u64)(block_no)) * ((u64)BLOCK_SIZE);
-    printf("AFTER CALC, NEW POS: %lx, NEW BLK: %u\n", np, tsfs_loc_to_block(np));
+    // printf("AFTER CALC, NEW POS: %lx, NEW BLK: %u\n", np, tsfs_loc_to_block(np));
     // TSFSStructBlock sblock = {0};
     // TSFSStructNode snode = {0};
     TSFSStructBlock* blockptr = 0;
@@ -291,20 +289,20 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     block_seek(fs, (s32)ul, BSEEK_SET);
     // read_structblock(fs, &sblock);
     blockptr = tsfs_load_block(fs, 0);
-    printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
-    _DBG_print_block(blockptr);
+    // printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
+    // _DBG_print_block(blockptr);
     u64 comphash = hash_structblock(blockptr);
-    printf("AFTER HASH\n");
-    printf("COMP HASH = %lx\n", comphash);
-    printf("PTRHASH = %lx\n", blockptr->checksum);
+    // printf("AFTER HASH\n");
+    // printf("COMP HASH = %lx\n", comphash);
+    // printf("PTRHASH = %lx\n", blockptr->checksum);
     // check if the final block is a struct block by reading it as one and seeing if the hash is correct
     if (blockptr->checksum == comphash) { // struct block
-        printf("FREE BLOCK\n");
-        _DBG_print_block(blockptr);
+        // printf("FREE BLOCK\n");
+        // _DBG_print_block(blockptr);
         // loc_seek(fs, blockptr->disk_ref);
         // read_structnode(fs, &snode);
         nodeptr = tsfs_load_node(fs, blockptr->disk_ref);
-        _DBG_print_node(nodeptr);
+        // _DBG_print_node(nodeptr);
         // snode.parent_loc = np;
         nodeptr->parent_loc = block_no;
         // sblock.disk_loc = snode.parent_loc;
@@ -313,11 +311,11 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
         loc_seek(fs, nodeptr->parent_loc); // move the struct block to its new location
         write_structblock(fs, blockptr);
     } else { // struct node
-        printf("FREE NODE\n");
+        // printf("FREE NODE\n");
         seek(fs, -14, SEEK_CUR);
         // read_structnode(fs, &snode);
         nodeptr = tsfs_load_node(fs, 0);
-        _DBG_print_node(nodeptr);
+        // _DBG_print_node(nodeptr);
         dmanip_null(fs, ul, 1);
         if (nodeptr->parent_loc) {
             tsfs_unload(fs, blockptr);

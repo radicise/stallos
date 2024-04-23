@@ -16,6 +16,7 @@ u32 aquire_itable_slot(FSP, u32);
 int release_itable_slot(FSP, u32);
 u32 allocate_blocks(FSP, u8, u16);
 int tsfs_free_structure(FSP, u32);
+int tsfs_free_centered(FSP, u32);
 int tsfs_free_data(FSP, u32);
 void getcreat_databloc(FileSystem*, u32, u32, TSFSDataBlock*, int*);
 size_t data_write(FSP, SNP, u64, const void*, size_t);

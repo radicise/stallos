@@ -25,7 +25,7 @@ whenever it feels like it
 size_t _tsfs_magic_grabno(void* object) {
     return *((size_t*)object);
 }
-void _tsfs_magic_stabno(void*object, size_t no) {
+void _tsfs_magic_stabno(void* object, size_t no) {
     *((size_t*)object) = no;
 }
 
@@ -34,16 +34,16 @@ copies only non-zero entries from src to dst
 dst MUST have enough space for ALL non-zero entries in src
 */
 size_t _tsfs_magic_copy(void** dst, void** src, size_t ds, size_t ss) {
-    size_t* dp = (size_t*)dst;
-    size_t* sp = (size_t*)src;
     size_t j = 0;
-    size_t cc;
+    void* cc;
     for (int i = 0; i < ss; i ++) {
-        cc = *(sp+i);
+        cc = src[i];
         if (cc) {
-            if (j >= ds) return j;
-            _tsfs_magic_stabno((void*)cc, j);
-            *(dp+(j++)) = cc;
+            if (j >= ds) {
+                return j;
+            }
+            _tsfs_magic_stabno(cc, j);
+            dst[j++] = cc;
         }
     }
     return j;

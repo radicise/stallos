@@ -1,16 +1,9 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
 
-#ifndef TARGETNUM
-#define TARGETNUM 2
-#endif
-#if TARGETNUM == 1
-#define FMT_ 0
-#endif
 #ifndef __MOCKTEST
-#include "../types.h"
-extern void* alloc(size_t);
-extern void dealloc(void*, size_t);
+// #include "../types.h"
+#include "./tsfsstd.h"
 #define allocate alloc
 #define deallocate dealloc
 #else
@@ -34,26 +27,25 @@ typedef unsigned long long loff_t;
 
 // #error "reminder, use double indirection for inode tables"
 
-size_t strlen(const char* s) {
-    size_t c = 0;
-    while (*s) {
-        c ++;
-        s ++;
-    }
-    return c;
-}
-
 void dalloc(void* p, size_t s) {
     free(p);
 }
 #define allocate malloc
 #define deallocate dalloc
 #endif
-#ifndef SEEK_CUR
-#define SEEK_SET 0
-#define SEEK_CUR 1
-#define SEEK_END 2
-#endif
+// size_t strlen(const char* s) {
+//     size_t c = 0;
+//     while (*s) {
+//         c ++;
+//         s ++;
+//     }
+//     return c;
+// }
+// #ifndef SEEK_CUR
+// #define SEEK_SET 0
+// #define SEEK_CUR 1
+// #define SEEK_END 2
+// #endif
 // #include "./tsfsconst.h"
 #include "../FileDriver.h"
 #include "../fsiface.h"
@@ -328,6 +320,8 @@ typedef struct {
     u32   parent_loc;
     // parent node
     u32   pnode;
+    // inode number
+    u32   inum;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
     char  name[255];
