@@ -84,7 +84,7 @@ movl 4(%esp),%eax
 movl %es:(%eax),%ecx
 movl %ecx,%eax
 ret
-runELF:# int runELF(void* elfPhys, void* memAreaPhys, int* retVal)
+runELF:# int runELF(void* elfPhys, void* memAreaPhys, struct Thread_state* state)
 .globl runELF
 pushl %ebp
 movl %esp,%ebp

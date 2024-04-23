@@ -165,6 +165,9 @@ void* set(void* ptr, int val, size_t count) {
 	}
 	return ptr;
 }
+void* memset(void* ptr, int val, size_t count) {
+	 return set(ptr, val, count);
+}
 extern void bus_out_u8(unsigned long, u8);
 extern void bus_out_u16(unsigned long, u16);
 extern void bus_out_u32(unsigned long, u32);
