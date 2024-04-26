@@ -46,9 +46,11 @@ build/system-comp.s : os/system.s os/irupt_generic.s os/kernel/machine/${TARGETM
 	awk '1{gsub(/NUM/, thenum, $$0);print($$0);}' thenum=70 os/irupt_generic.s thenum=71 os/irupt_generic.s thenum=72 os/irupt_generic.s thenum=73 os/irupt_generic.s thenum=74 os/irupt_generic.s thenum=75 os/irupt_generic.s thenum=76 os/irupt_generic.s thenum=77 os/irupt_generic.s thenum=78 os/irupt_generic.s thenum=79 os/irupt_generic.s thenum=7a os/irupt_generic.s thenum=7b os/irupt_generic.s thenum=7c os/irupt_generic.s thenum=7d os/irupt_generic.s thenum=7e os/irupt_generic.s thenum=7f os/irupt_generic.s >> build/system-comp.s
 	cat os/kernel/machine/${TARGETMACHINE}/*.s >> build/system-comp.s # TODO Have this not fail if there are no /*.s/ files present for the machine
 
-build/kernel-ul.elf : os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h os/kernel/obj/*.h os/kernel/object/*.h
+build/kernel-ul.elf : os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h os/kernel/obj/*.h os/kernel/object/*.h os/kernel/filesystems/*
 	# Update prerequisite list when appropriate
-	${CCPRGM} -o build/kernel-ul.elf os/system.c
+	${CCPRGM} -o build/kernelbase-ul.elf os/system.c
+	${CCPRGM} -o build/tsfs.out os/kernel/filesystems/tsfs.c
+	${LDPRGM} --no-dynamic-linker -o build/kernel-ul.elf build/kernelbase-ul.elf build/tsfs.out
 
 build/loader.bin : build/loader.o build/sysc.elf build/irupts.o
 	${LDPRGM} ${LDFLAGS} -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc
@@ -86,11 +88,8 @@ build/Salth.class : Salth.java
 
 clean :
 	rm -f build/*
-
-tsfs : build/tsfs-ul.elf
-	cp build/tsfs-ul.elf Stallos/tsfs.elf
+	rm -f bin/*
 
 build/tsfs-ul.elf : os/kernel/filesystems/tsfs.c os/kernel/filesystems/*.h
 	# TODO Revise "tsfs" file organisation
 	${CCPRGM} -o build/tsfs-ul.elf os/kernel/filesystems/tsfs.c
-

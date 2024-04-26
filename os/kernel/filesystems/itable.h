@@ -202,4 +202,18 @@ int release_itable_slot(FileSystem* fs, u32 imapkey) {
     return 0;
 }
 
+u32 resolve_itable_entry(FileSystem* fs, u32 ikey) {
+    ikey = ikey & ITABLE_INDEX;
+    u32 iroot = ikey >> 16;
+    u32 il1 = (ikey >> 8) & 0xff;
+    u32 il2 = ikey & 0xff;
+    block_seek(fs, 1, BSEEK_SET);
+    seek(fs, 4 * iroot, SEEK_CUR);
+    block_seek(fs, read_u32be(fs), BSEEK_SET);
+    seek(fs, 8 + (4 * il1), SEEK_CUR);
+    block_seek(fs, read_u32be(fs), BSEEK_SET);
+    seek(fs, 8 + (4 * il2), SEEK_CUR);
+    return read_u32be(fs);
+}
+
 #endif

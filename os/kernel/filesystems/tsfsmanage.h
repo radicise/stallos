@@ -215,6 +215,7 @@ int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
     TSFSStructBlock* opb = tsfs_load_block(fs, b_loc/BLOCK_SIZE);
     if (_tsfs_delce(fs, opb, no)) {tsfs_unload(fs, opb);}
     sn->pnode = 0;
+    release_itable_slot(fs, sn->inum);
     tsfs_free_structure(fs, sn->disk_loc);
     _tsmagic_force_release(fs, sn);
     return 0;
@@ -317,7 +318,7 @@ int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSSt
     }
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 2);
-    TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+1,.pnode=parent->disk_loc};
+    TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+1,.pnode=parent->disk_loc,.inum=aquire_itable_slot(fs, ac1+1)};
     awrite_buf(sn.name, name, strlen(name));
     nsb->flags = TSFS_CF_DIRE;
     nsb->disk_ref = sn.disk_loc;
@@ -341,7 +342,7 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
     }
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 1);
-    TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.data_loc=0};
+    TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.data_loc=0,.inum=aquire_itable_slot(fs, ac1)};
     awrite_buf(sn.name, name, strlen(name));
     block_seek(fs, ac1, BSEEK_SET);
     write_structnode(fs, &sn);

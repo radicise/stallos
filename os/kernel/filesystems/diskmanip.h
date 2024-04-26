@@ -19,16 +19,16 @@ u64 dmanip_rep1to8(unsigned char one) {
     return v;
 }
 
-void* dman_buf = 0;
+static void* dman_buf = 0;
 
-char dmanip_albuf(u32 bsize) {
+static char dmanip_albuf(u32 bsize) {
     if (dman_buf != 0) {
         return 0;
     }
     dman_buf = allocate(bsize * FS_DMANIP_MAX_RAM_BLKS);
     return 1;
 }
-void dmanip_debuf(u32 bsize) {
+static void dmanip_debuf(u32 bsize) {
     if (dman_buf == 0) {
         return;
     }

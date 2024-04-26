@@ -1,6 +1,7 @@
 #ifndef __FSDEFS_H__
 #define __FSDEFS_H__ 1
 
+// #include "./fsmacros.h"
 #ifndef __MOCKTEST
 // #include "../types.h"
 #include "./tsfsstd.h"
@@ -49,14 +50,14 @@ void dalloc(void* p, size_t s) {
 // #include "./tsfsconst.h"
 #include "../FileDriver.h"
 #include "../fsiface.h"
-typedef struct FSReturn FSRet;
+// typedef struct FSReturn FSRet;
 #include "./tsfserr.h"
 #define u48 u64
 // imagine there are '.'s between each digit
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 7
+#define VERNOBN 8
 
 /*
 PYGENSTART
@@ -329,7 +330,7 @@ typedef struct {
 } TSFSStructNode;
 
 /*
-contains up to 63 child entries
+contains up to 72 child entries
 */
 typedef struct {
     /*

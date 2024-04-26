@@ -18,3 +18,5 @@ __pycache__
 local
 fstestinggcc
 *.gch
+*.out
+/bin
