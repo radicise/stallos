@@ -222,10 +222,25 @@ int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
 }
 
 /*
-deletes a "name" from the file system
+deletes a "name" from the file system, the object MUST be a hard link
 */
 int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
-    return 0;
+    if (sn->storage_flags&TSFS_KIND_FILE) {
+        TSFSDataHeader* dh = tsfs_load_head(fs, sn->data_loc);
+        dh->refcount --;
+        block_seek(fs, dh->disk_loc, BSEEK_SET);
+        write_dataheader(fs, dh);
+        if (dh->refcount == 0) {
+            u32 pos = dh->disk_loc;
+            _tsmagic_force_release(fs, dh);
+            // DELETE THE DATA
+            magic_smoke(FEOP | FEIMPL);
+            return 0;
+        }
+        tsfs_unload(fs, dh);
+        return 0;
+    }
+    return -1;
 }
 
 /*

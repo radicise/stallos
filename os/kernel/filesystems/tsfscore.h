@@ -25,7 +25,8 @@ available for external use
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
-FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, s64 curr_time) {
+FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size) {
+    s64 curr_time = (s64)(kernel_time(NULL));
     FSRet rv = {.err=EINVAL};
     if (p_size > 48) {
         kernelWarnMsg("PARTITION TOO BIG");

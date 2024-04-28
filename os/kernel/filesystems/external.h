@@ -37,7 +37,7 @@ extern void write_datablock(FileSystem*, TSFSDataBlock*);
 extern void write_dataheader(FileSystem*, TSFSDataHeader*);
 extern void write_structblock(FileSystem*, TSFSStructBlock*);
 extern void write_structnode(FileSystem*, TSFSStructNode*);
-extern FSRet createFS(struct FileDriver*, int, _kernel_u8, _kernel_s64);
+extern FSRet createFS(struct FileDriver*, int, _kernel_u8);
 extern FSRet loadFS(struct FileDriver*, int);
 extern void releaseFS(FileSystem*);
 extern _kernel_size_t data_write(FileSystem*, TSFSStructNode*, _kernel_u64, const void*, _kernel_size_t);

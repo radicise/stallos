@@ -84,13 +84,15 @@ int regen_mock(int fd) {
     ftruncate(fd, 2<<(MDISK_SIZE-1));
     return 0;
 }
-
+_kernel_time_t kernel_time(_kernel_time_t* t) {
+    return (_kernel_time_t)time((time_t*)t);
+}
 int data_test(struct FileDriver* fdrive, int fd, char regen) {
     FileSystem* s = 0;
     if (regen) {
         printf("REGEN\n");
         regen_mock(fd);
-        s = (createFS(fdrive, 0, MDISK_SIZE, (_kernel_s64) time(NULL))).retptr;
+        s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
     }
     if (s == 0) {
         s = (loadFS(fdrive, 0)).retptr;
@@ -190,7 +192,7 @@ int manip_test(struct FileDriver* fdrive, int fd, char kind) {
     if (kind == 1) {
         regen_mock(fd);
         FileSystem* s = 0;
-        s = (createFS(fdrive, 0, MDISK_SIZE, (_kernel_s64) time(NULL))).retptr;
+        s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
         dmanip_fill(s, 0, 2, 97);
         dmanip_null_shift_right(s, 0, 2, 2);
         fflush(fp);
@@ -217,14 +219,14 @@ int stringcmp(const char* s1, const char* s2) {
 
 int fmt_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
-    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE, (_kernel_s64)time(NULL))).retptr;
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
     releaseFS(s);
     return 0;
 }
 
 int struct_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
-    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE, (_kernel_s64)time(NULL))).retptr;
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
     // TSFSStructBlock sb = {0};
     block_seek(s, s->rootblock->top_dir, BSEEK_SET);
     TSFSStructNode topdir = {0};
@@ -269,7 +271,7 @@ int magic_test(struct FileDriver* fdrive, int kf, char flags) {
         magic_smoke(FEWAND | FEALLOC);
     } else if (flags == 2) {
         puts("BEFORE");
-        FileSystem* s = (createFS(fdrive, 0, MDISK_SIZE, (_kernel_s64)time(NULL))).retptr;
+        FileSystem* s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
         puts("FS DONE");
         TSFSStructBlock* blk1 = _tsmagic_block(s);
         puts("BLK1 DONE");
