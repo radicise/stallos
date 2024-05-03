@@ -9,7 +9,8 @@ Doing so is undefined behavior
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
-#define printf(...)
+// #define printf(...)
+extern int printf(const char*, ...);
 #include "tsfscore.h"
 #include "tsfsmanage.h"
 #include "tsfsinterface.h"
