@@ -1,5 +1,7 @@
 irupt_NUMh:# TODO Correctly handle any "spurious" IRQ
 .globl irupt_NUMh
+/*
+movl 12(%esp),%eax
 .if (0xNUM == 0x70)
 pushl %eax
 movw %cs,%ax
@@ -52,7 +54,10 @@ movl $0x00000001,handlingIRQ
 .if (0xNUM == 0x70)
 pushl $(0x007fff00 - RELOC)
 .endif
+*/
+cld
 call irupt_handler_NUMh
+/*
 .if (0xNUM == 0x70)
 addl $0x04,%esp
 .endif
@@ -64,10 +69,14 @@ movw %bx,%ds
 roll $0x10,%ebx
 movw %bx,%ss
 movl %esi,%esp
+*/
 movb $0x20,%al
 .if (0xNUM >= 0x78)
 outb %al,$0xa0
 .endif
 outb %al,$0x20
+/*
 popal
-iretl
+movl %eax,12(%esp)
+*/
+iret

@@ -570,6 +570,7 @@ void initSystemCallInterface(void) {
 	kfdNext = 6;
 	Mutex_initUnlocked(&kfdgenLock);
 	initPaging();
+	initSegmentation();
 	return;
 }
 void endingCleanup(void) {
@@ -892,7 +893,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		kernelMsg("\n");
 	}
 #endif
-	Mutex_release(&(PerThread_context->dataLock));
+	Mutex_release(&(PerThread_context->dataLock));// THIS ADDITIONALLY SERVES AS A MEMORY BARRIER
 	return retVal;
 }// TODO Allow returning of values wider than the `long' type
 #endif

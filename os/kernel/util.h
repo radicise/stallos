@@ -1,6 +1,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__ 1
 #include "types.h"
+#define FAILMASK_UTIL 0x00110000
 int strcmp(const char* d, const char* g) {
 	if (!((*d) | (*g))) {
 		return 0;
@@ -36,6 +37,7 @@ extern unsigned long AtomicULong_get(AtomicULong*);// Performs a memory barrier 
 extern void AtomicULong_set(AtomicULong*, unsigned long);// Performs a memory barrier after storing, before returning
 extern void SimpleMutex_acquire(SimpleMutex*);
 extern void SimpleMutex_release(SimpleMutex*);
+extern void mem_barrier();
 extern int SimpleMutex_tryAcquire(SimpleMutex*);// Returns 1 if acquired, otherwise returns 0
 extern void SimpleMutex_wait(void);// Wastes enough time to let at least one other thread acquire a SimpleMutex in that time span if it is already executing SimpleMutex_acquire, assuming that the thread attempting to acquire is not interrupted
 extern void SimpleMutex_initUnlocked(SimpleMutex*);// Performs a memory barrier
@@ -53,7 +55,7 @@ void Mutex_acquire(Mutex* mutex) {
 		}
 		(mutex->acquires)++;
 		if ((mutex->acquires) == 0) {
-			bugCheckNum(0x0101 | FAILMASK_SYSTEM);
+			bugCheckNum(0x0101 | FAILMASK_UTIL);
 		}
 		SimpleMutex_release(&(mutex->stateLock));
 		return;
@@ -63,10 +65,10 @@ void Mutex_release(Mutex* mutex) {// Acts as a memory barrier
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	SimpleMutex_acquire(&(mutex->stateLock));
 	if ((mutex->ownerThread) != id) {
-		bugCheckNum(0x0102 | FAILMASK_SYSTEM);
+		bugCheckNum(0x0102 | FAILMASK_UTIL);
 	}
 	if ((mutex->acquires) == 0) {
-		bugCheckNum(0x0103 | FAILMASK_SYSTEM);
+		bugCheckNum(0x0103 | FAILMASK_UTIL);
 	}
 	(mutex->acquires)--;
 	SimpleMutex_release(&(mutex->stateLock));
@@ -83,7 +85,7 @@ int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 
 	}
 	(mutex->acquires)++;
 	if ((mutex->acquires) == 0) {
-		bugCheckNum(0x0104 | FAILMASK_SYSTEM);
+		bugCheckNum(0x0104 | FAILMASK_UTIL);
 	}
 	SimpleMutex_release(&(mutex->stateLock));
 	return 1;

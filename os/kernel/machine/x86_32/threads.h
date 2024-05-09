@@ -5,6 +5,7 @@
 #include "../../perThread.h"
 #include "../../perThreadgroup.h"
 #include "../../obj/Map.h"
+#include "segments.h"
 struct Map* ___taskMap___;// Do NOT access directly except for within the prescribed interaction functions; pid_t -> struct Thread*
 int ___amntTasks___;// Do NOT access directly except for within the prescribed interaction functions
 pid_t ___nextTask___;// Do NOT access directly except for within the prescribed interaction functions
@@ -55,7 +56,7 @@ int Threads_findNext(uintptr suspect, uintptr u) {// Threads_threadManage must h
 #include "../../perThread.h"
 struct PerThreadgroup* volatile PerThreadgroup_context;
 struct PerThread* volatile PerThread_context;
-void Threads_nextThread(struct Thread_state* state, int interrupt, long irupt) {
+void Threads_nextThread(struct Thread_state* state, long irupt) {
 	Mutex_acquire(&Threads_threadManage);
 	uintptr st = Map_fetch((uintptr) currentThread, ___taskMap___);
 	if (st == ((uintptr) (-1))) {
@@ -87,12 +88,9 @@ void Threads_nextThread(struct Thread_state* state, int interrupt, long irupt) {
 	struct Thread_state stt;
 	cpy(&stt, &(thns->state), sizeof(struct Thread_state));
 	Mutex_release(&Threads_threadManage);
-	if (interrupt) {
-		Thread_restore(&stt, irupt);
-	}
-	else {
-		Thread_run(&stt);
-	}
-	bugCheck();
+	moveExv(((TSS*) (((volatile char*) physicalZero) + 0xb00)) + 5, &(stt.tss), sizeof(TSS));
+	TS_setDesc(0x0d80, 127, 0, 0, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	return;
 }
 #endif

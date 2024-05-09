@@ -84,8 +84,8 @@ void initEntry(volatile PGDEnt* ent, int userWritable, int privileged, volatile 
 	return;
 }
 struct MemSpace {
-	Mutex lock;
 	volatile PGDEnt* dir;
+	Mutex lock;
 };
 struct MemSpace* MemSpace_create(void) {
 	struct MemSpace* ms = alloc(sizeof(struct MemSpace));
@@ -105,6 +105,23 @@ void MemSpace_destroy(struct MemSpace* ms) {
 	}
 	dealloc_lb(dir);
 	dealloc(ms, sizeof(struct MemSpace));
+	return;
+}
+void MemSpace_forEach(void (*operation)(uintptr, void*, void*), void* obj, struct MemSpace* mem) {
+	Mutex_acquire(&(mem->lock));
+	volatile PGDEnt* dir = (mem->dir);
+	for (int i = 0; i < 1024; i++) {
+		if (PGDTest(dir + i, PG_P)) {
+			volatile PGDEnt* tbl = PGDGetAddr(dir + i);
+			for (int j = 0; j < 1024; j++) {
+				if (PGDTest(tbl + j, PG_P)) {
+					void* addr = PGDGetAddr(tbl + j);
+					operation((((uintptr) i) << 22) | (((uintptr) j) << 12), addr, obj);
+				}
+			}
+		}
+	}
+	Mutex_release(&(mem->lock));
 	return;
 }
 int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int privileged, struct MemSpace* ms) {
@@ -208,7 +225,7 @@ void initPaging(void) {
 	MemSpace_kernel = MemSpace_create();
 	uintptr m = 0;
 	while (m < amntMem) {
-		if (mapPageSpecificPrivilege(m, (void*) (m - RELOC), 0, 1, MemSpace_kernel)) {
+		if (mapPageSpecificPrivilege(m, (void*) (m - RELOC), 0, 1, MemSpace_kernel)) {// TODO URGENT Ensure that casting an underflowed `uintptr' to a `void*' works as it was taken to work
 			bugCheckNum(0x0003 | FAILMASK_PAGING);
 		}
 		m += PAGE_SIZE;

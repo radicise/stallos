@@ -7,6 +7,8 @@ call systemEntry
 lret
 irupt_80h:# NOTE: This is under the assumption that %edx can never be used to return anything, which is contrary to the `syscall' Linux man-pages page; TODO resolve this conflict
 .globl irupt_80h
+/*
+movl 12(%esp),%eax
 pushw %es
 pushw %fs
 pushw %gs
@@ -46,16 +48,31 @@ pushl %esi
 pushl %edx
 pushl %ecx
 pushl %ebx
+*/
 cld
-call system_call# TODO Normalise argument structure if it had been re-formatted to fit the ABI
-movl PerThread_context,%ebp
-movl %ds:(%ebp),%ebp
-testl %ebp,%ebp
+call mem_barrier
+xorl %eax,%eax
+subl $RELOC,%eax
+addl $0xd80,%eax
+pushl 0x28(%eax)
+pushl $0x00000000
+pushl 0x3c(%eax)
+pushl 0x44(%eax)
+pushl 0x40(%eax)
+pushl 0x30(%eax)
+pushl 0x2c(%eax)
+pushl 0x34(%eax)
+call system_call# TODO URGENT Normalise argument structure if it had been re-formatted to fit the ABI
+addl $32,%esp
+movl PerThread_context,%eax
+movl (%eax),%eax
+testl %eax,%eax
 jz irupt_80h__noError
-movl %ebp,%eax
 notl %eax
 incl %eax
 irupt_80h__noError:
+iret
+/*
 addl $0x20,%esp
 popl %ebp
 popl %edx
@@ -67,23 +84,34 @@ addl $0x0c,%esp
 popw %gs
 popw %fs
 popw %es
-iretl
-writeLongPhysical:# void writePhysical(u32 addr, unsigned long dat)
-.globl writeLongPhysical
+movl %eax,12(%esp)
+lret
+*/
+irupt_fail:
+.globl irupt_fail
+pushl $0x1badfa17
+call bugCheck
+iret
+irupt_noprocess:
+.globl irupt_noprocess
+iret
+writeLongLinear:# void writeLongLinear(u32 addr, unsigned long dat)
+.globl writeLongLinear
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
 movl 8(%esp),%ecx
 movl %ecx,%es:(%eax)
 ret
-readLongPhysical:# unsigned long readPhysical(u32 addr)
-.globl readLongPhysical
+readLongLinear:# unsigned long readLongLinear(u32 addr)
+.globl readLongLinear
 movw $0x10,%ax
 movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
 movl %es:(%eax),%ecx
 movl %ecx,%eax
 ret
+/*
 runELF:# int runELF(void* elfPhys, void* memAreaPhys, struct Thread_state* state)
 .globl runELF
 pushl %ebp
@@ -100,6 +128,7 @@ popl %esi
 popl %ebx
 popl %ebp
 ret
+*/
 int_enable:
 .globl int_enable
 inb $0x70,%al
@@ -174,7 +203,7 @@ pushl %edx
 call bugCheckNumWrapped
 ret
 Thread_restore:# void Thread_restore(struct Thread_state*, long)
-.globl Thread_restore# Only invoke this from interrupt handlers called because pf IRQ interrupts
+.globl Thread_restore# Only invoke this from interrupt handlers called because of IRQ interrupts
 movl $0x00000000,handlingIRQ
 movl 4(%esp),%ebx
 movl 8(%esp),%eax
@@ -210,7 +239,8 @@ outb %al,$0xa0
 Thread_restore__1:
 outb %al,$0x20
 popl %eax
-iretl
+movl %eax,12(%esp)
+lret
 Thread_run:# void Thread_run(struct Thread_state*)
 .globl Thread_run# Do NOT invoke this from interrupt handlers called because of IRQ interrupts
 movl 4(%esp),%ebx
@@ -242,7 +272,7 @@ popl %edx
 popl %ecx
 popl %ebx
 popl %eax
-iretl
+lret
 strconcat:# const char* strconcat()
 .globl strconcat# Returns a const char* `a' that can deallocated with `dealloc(strlen(a) + 1)'
 pushl %ebp

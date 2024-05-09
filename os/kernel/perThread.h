@@ -21,29 +21,4 @@ struct PerThread {// TODO Make a system for threads to change the properties of 
 	struct FSInfo* fsinfo;// TODO Initialise
 };
 #include "threads.h"
-void lockThreadInfo(void) {
-	Mutex_acquire(&(PerThread_context->dataLock));
-	return;
-}
-void unlockThreadInfo(void) {
-	Mutex_release(&(PerThread_context->dataLock));
-	return;
-}
-void lockFSInfo(void) {
-	Mutex_acquire(&(PerThread_context->fsinfo->dataLock));
-	return;
-}
-void unlockFSInfo(void) {
-	Mutex_release(&(PerThread_context->fsinfo->dataLock));
-	return;
-}
-#define errno (PerThread_context->errno)
-#define tid (PerThread_context->tid)
-#define ruid (PerThread_context->ruid)
-#define euid (PerThread_context->euid)
-#define suid (PerThread_context->suid)
-#define fsuid (PerThread_context->fsuid)
-#define cwd (PerThread_context->fsinfo->cwd)
-#define root (PerThread_context->fsinfo->root)
-#define umask (PerThread_context->fsinfo->umask)
 #endif

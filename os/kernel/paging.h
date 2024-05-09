@@ -1,6 +1,7 @@
 #ifndef __PAGING_H__
 #define __PAGING_H__ 1
 /*
+ *
  * Defines:
  * PAGE_SIZE
  * // `PAGE_SIZE' must be a power of two and at least one
@@ -15,6 +16,7 @@
  * void* pageMapping(uintptr, struct MemSpace*);// Returns `NULL' if the specified page is not mapped
  * MemSpace* MemSpace_kernel;// This is initialised within `initPaging'
  * void initPaging(void);
+ * void MemSpace_forEach(void (*)(uintptr, void*, void*), void*, struct MemSpace*);
  *
  */
 #define FAILMASK_PAGING 0x000d0000
@@ -35,14 +37,14 @@ void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesU
 		uintptr page = PAGEOF(target);
 		void* usrmem = pageMapping(page, mem);
 		if (usrmem == NULL) {
-			int r = mapPage(page, usrmem = (alloc_lb()), newPagesUserWritable, mem);
+			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserWritable, mem);
 			if (r) {
 				bugCheckNum(0x1001 | FAILMASK_PAGING);
 			}
 		}
 		uintptr avail = page + PAGE_SIZE - target;
 		if (len <= avail) {
-			memmove((void*) (((char*) usrmem) + (target - page)), ptr, len);
+			memmove((void*) (((char*) usrmem) + (target - page)), ptr, len);// TODO Ensure that PAGE_SIZE is not greater than the maximum value of the type `size_t'
 			Mutex_release(&(mem->lock));
 			return;
 		}
@@ -50,6 +52,32 @@ void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesU
 		target += avail;
 		len -= avail;
 		ptr = (const void*) (((const char*) ptr) + avail);
+	}
+	return;
+}
+void MemSpace_mkFill(char val, uintptr target, uintptr len, int newPagesUserWritable, struct MemSpace* mem) {
+	if (len == 0) {
+		return;
+	}
+	Mutex_acquire(&(mem->lock));
+	while (1) {
+		uintptr page = PAGEOF(target);
+		void* usrmem = pageMapping(page, mem);
+		if (usrmem == NULL) {
+			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserWritable, mem);
+			if (r) {
+				bugCheckNum(0x1001 | FAILMASK_PAGING);
+			}
+		}
+		uintptr avail = page + PAGE_SIZE - target;
+		if (len <= avail) {
+			memset((void*) (((char*) usrmem) + (target - page)), val, len);// TODO Ensure that PAGE_SIZE is not greater than the maximum value of the type `size_t'
+			Mutex_release(&(mem->lock));
+			return;
+		}
+		memset((void*) (((char*) usrmem) + (target - page)), val, avail);// TODO Ensure that PAGE_SIZE is not greater than the maximum value of the type `size_t'
+		target += avail;
+		len -= avail;
 	}
 	return;
 }

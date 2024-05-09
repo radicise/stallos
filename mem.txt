@@ -1,4 +1,4 @@
-# Physical addresses of memory variables
+# Physical addresses of memory variables in the stages leading up to the main kernel's usage
 Type	Addr.	Description
 b	0x0500	BIOS boot drive number
 b	0x0502	Console width, characters
@@ -27,3 +27,15 @@ l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
 l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes
 STAKTOP	0x00800000	(Appriximate) top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack
+
+# Linear addresses of certain memory structures during the execution of the main kernel and during execution of user code
+Structure	Address		Notes
+IDT		0x00000000
+GDT		0x00000800
+LDT		0x00000828	Is backed by part of the GDT
+TSS		0x00000b00	TSS for interrupt 0x80
+TSS		0x00000b80	TSS for interrupt 0x70
+TSS		0x00000c00	TSS for interrupt 0x71
+TSS		0x00000c80	TSS for interrupts that should cause the system to issue a "bug check"
+TSS		0x00000d00	TSS for interrupts that should immediately return with no processing
+TSS		0x00000d80	TSS for the currently-executing userspace program

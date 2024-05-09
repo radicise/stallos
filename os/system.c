@@ -3,6 +3,27 @@
 #endif
 #define __STALLOS__ 1
 #define RELOC 0x00040000
+#define physicalZero ((volatile void*) (((uintptr) 0) - ((uintptr) RELOC)))
+// TODO URGENT Ensure that pointer underflow acts as expected
+extern void irupt_70h(void);
+extern void irupt_71h(void);
+extern void irupt_72h(void);
+extern void irupt_73h(void);
+extern void irupt_74h(void);
+extern void irupt_75h(void);
+extern void irupt_76h(void);
+extern void irupt_77h(void);
+extern void irupt_78h(void);
+extern void irupt_79h(void);
+extern void irupt_7ah(void);
+extern void irupt_7bh(void);
+extern void irupt_7ch(void);
+extern void irupt_7dh(void);
+extern void irupt_7eh(void);
+extern void irupt_7fh(void);
+extern void irupt_80h(void);
+extern void irupt_fail(void);
+extern void irupt_noprocess(void);
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
 #define LINUX_COMPAT_VERSION 0x20603904
 /*
@@ -87,7 +108,7 @@ const char hex[] = {0x30,
 	0x46};
 #define FAILMASK_SYSTEM 0x00010000
 long handlingIRQ = 0;// Have this be volatile if system calls may be interrupted
-pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Thread_run' or not during kernel-space operation
+pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Threads_nextThread' or not during kernel-space operation
 #include "kernel/util.h"
 void bugCheckNum_u32(u32 num, uintptr addr) {
 	bugMsg(addr);
@@ -312,8 +333,8 @@ int kernelInfoMsg(const char* msg) {
 	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
-extern unsigned long readLongPhysical(u32);
-extern void writeLongPhysical(u32, unsigned long);
+extern unsigned long readLongLinear(u32);
+extern void writeLongLinear(u32, unsigned long);
 #include "kernel/driver/kbd8042.h"
 #define KBDBUF_SIZE 16
 unsigned char kbdBuf[KBDBUF_SIZE];
@@ -329,13 +350,12 @@ extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 #include "kernel/threads.h"
 #include "kernel/perThreadgroup.h"
 #include "kernel/perThread.h"
-extern int runELF(void*, void*, struct Thread_state*);
-void irupt_handler_70h(struct Thread_state* state) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
+//extern int runELF(void*, void*, struct Thread_state*);
+void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
 	}
-	Thread_restore(state, 0x70);
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
@@ -423,36 +443,20 @@ void PICInit(unsigned char mOff, unsigned char sOff) {
 #include "kernel/driver/ATA.h"
 #include "kernel/blockdev.h"
 #include "kernel/syscalls.h"
-extern void irupt_70h(void);
-extern void irupt_71h(void);
-extern void irupt_72h(void);
-extern void irupt_73h(void);
-extern void irupt_74h(void);
-extern void irupt_75h(void);
-extern void irupt_76h(void);
-extern void irupt_77h(void);
-extern void irupt_78h(void);
-extern void irupt_79h(void);
-extern void irupt_7ah(void);
-extern void irupt_7bh(void);
-extern void irupt_7ch(void);
-extern void irupt_7dh(void);
-extern void irupt_7eh(void);
-extern void irupt_7fh(void);
-extern void irupt_80h(void);
 void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void), unsigned short segSel) {
 	(*((volatile unsigned short*) (0x7f800 - RELOC + (iruptNum * 8)))) = ((long) addr);
 	(*((volatile unsigned short*) (0x7f802 - RELOC + (iruptNum * 8)))) = segSel;
 	(*((volatile unsigned short*) (0x7f806 - RELOC + (iruptNum * 8)))) = (((long) addr) >> 16);
 }
-#define FAILMASK_ELFLOADER 0x000a0000
+void* originalLopage;
+#include "kernel/object/elf.h"
 void systemEntry(void) {
-	// TODO URGENT Memory barrier
+	mem_barrier();
 	Mutex_initUnlocked(&kmsg);
 	initVGATerminal();
 	initializeVGATerminal(&mainTerm, 80, 25, (struct VGACell*) (0x000b8000 - RELOC), kbd8042_read);
-	mainTerm.pos = readLongPhysical(0x00000506) & 0xffff;
-	mainTerm.format = readLongPhysical(0x00000508) & 0x00ff;
+	mainTerm.pos = readLongLinear(0x00000506) & 0xffff;
+	mainTerm.format = readLongLinear(0x00000508) & 0x00ff;
 	/*
 	for (unsigned int i = (0x000b8000 - RELOC); i < (0x000b8fa0 - RELOC); i += 2) {
 		((struct VGACell*) i)->format = mainTerm.format;
@@ -466,7 +470,7 @@ void systemEntry(void) {
 	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
-	kernelMsg("Stallos v0.0.1.2-dev\n");
+	kernelMsg("Stallos v0.0.2.0-dev\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
@@ -501,11 +505,17 @@ void systemEntry(void) {
 	kernelMsg("Initializing ATA driver . . . ");
 	initATA();
 	kernelMsg("done\n");
-	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
-	int_enable();
+	kernelMsg("Setting up system hardware-multitasking components . . . ");
+	unsigned long* lpd = (originalLopage = alloc_lb());
+	for (int i = 0; i < 1024; i++) {
+		lpd[i] = readLongLinear(i << 2);
+	}
 	kernelMsg("done\n");
 	kernelMsg("Initializing system call interface . . . ");
 	initSystemCallInterface();
+	kernelMsg("done\n");
+	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
+	int_enable();
 	kernelMsg("done\n");
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
@@ -521,7 +531,6 @@ void systemEntry(void) {
 	Mutex_acquire(&Threads_threadManage);
 	tgid = currentThread;
 	tid = tgid;
-	(PerThreadgroup_context->mem) = MemSpace_kernel;// TODO Set up a different memory space for the process
 	ruid = 0;
 	euid = 0;
 	suid = 0;
@@ -530,11 +539,13 @@ void systemEntry(void) {
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
-	int errVal = runELF((void*) 0x00010000, (void*) 0x00800000, (struct Thread_state*) (((char*) (&(th->state))) + RELOC));
+	int errVal = runELF((const void*) 0x00010000, PerThread_context);
 	if (errVal != 0) {
-		bugCheckNum(errVal | FAILMASK_ELFLOADER);
+		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
 	}
-	Thread_run(&(th->state));
+	while (1) {
+	}
+	// TODO Execute program
 	bugCheck();
 	return;
 }

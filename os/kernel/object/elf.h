@@ -20,6 +20,7 @@
 #include "../perThreadgroup.h"
 #include "../paging.h"
 #include "../kmemman.h"
+#define FAILMASK_ELF 0x00120000
 typedef u32 Elf32_Addr;
 typedef u16 Elf32_Half;
 typedef u32 Elf32_Off;
@@ -67,15 +68,15 @@ typedef struct {
 	Elf32_Word p_align;
 } Elf32_Phdr;
 int ELF_cpyUser(uintptr dest, const void* from, uintptr count, int userWritable, struct MemSpace* mem) {
-	// TODO C
+	MemSpace_mkData(from, dest, count, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
 int ELF_fillUser(uintptr dest, uintptr count, int userWritable, struct MemSpace* mem) {
-	// TODO C
+	MemSpace_mkFill(0x00, dest, count, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
-int loadSeg(Elf32_Phdr* seg, const void* fileBase, void* base, void** stack, struct MemSpace* mem) {/* TODO Fail if base address alignment is insufficient */
-	Elf32_Word t = seg.p_type;
+int loadSeg(Elf32_Phdr* seg, const void* fileBase, uintptr base, uintptr* stack, struct MemSpace* mem) {/* TODO Fail if base address alignment is insufficient */
+	Elf32_Word t = seg->p_type;
 	if ((t == 0) | (t == 4) | (t == 6)) {
 		return 0;
 	}
@@ -93,38 +94,38 @@ int loadSeg(Elf32_Phdr* seg, const void* fileBase, void* base, void** stack, str
 		/* TODO Check for these in the appropriate ABI &c. standards */
 	}
 	if (t > 6) {
-		if (t != (0x6474e551 as u32)) {/* Disregard of PT_GNU_STACK because all segments are executable *//* TODO Pay attention to the p_flags value of PT_GNU_STACK when p_flags becomes used for setting executability, in order to set executability of the stack accordingly */
+		if (t != (Elf32_Word) 0x6474e551) {/* Disregard of PT_GNU_STACK because all segments are executable *//* TODO Pay attention to the p_flags value of PT_GNU_STACK when p_flags becomes used for setting executability, in order to set executability of the stack accordingly */
 			return 23;/* Unrecognised segment type */
 		}
 	}
-	/* TODO Use p_flags */
-	if ((seg.p_filesz) > (seg.p_memsz)) {
+	/* TODO Use p_flags for setting read and execute permissions */
+	if ((seg->p_filesz) > (seg->p_memsz)) {
 		return 24;/* Memory image is of smaller size than file image */
 	}
-	ELF_cpyUser((uintptr) (((char*) base) + (seg.p_vaddr)), ((const char*) fileBase) + (seg.p_offset), seg.p_filesz, (seg.p_flags & 0x02) ? 1 : 0, mem);
-	if ((seg.p_memsz) > (seg.p_filesz)) {
-		ELF_fillUser((uintptr) (((char*) base) + (seg.p_vaddr) + (seg.p_filesz)), (seg.p_memsz) - (seg.p_filesz), (seg.p_flags & 0x02) ? 1 : 0, mem);
+	ELF_cpyUser((uintptr) (base + seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x02) ? 1 : 0, mem);
+	if ((seg->p_memsz) > (seg->p_filesz)) {
+		ELF_fillUser((uintptr) (base + (seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x02) ? 1 : 0, mem);
 	}
-	void* s = (void*) (((char*) base) + (seg.p_vaddr) + (seg.p_memsz));
-	if (((uintptr) s) > ((uintptr) (*stack))) {
+	uintptr s = base + seg->p_vaddr + seg->p_memsz;
+	if (s > (*stack)) {
 		(*stack) = s;
 	}
 	return 0;
 }
-int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) {
-	if (prgm.e_ident != 0x7F) {
+int loadELF(const Elf32_Ehdr* prgm, void* base, uintptr* s, struct MemSpace* mem) {
+	if (prgm->e_ident != 0x7F) {
 		return 1;/* Invalid magic */
 	}
-	if (prgm.e_ident_1 != 0x45) {
+	if (prgm->e_ident_1 != 0x45) {
 		return 1;
 	}
-	if (prgm.e_ident_2 != 0x4C) {
+	if (prgm->e_ident_2 != 0x4C) {
 		return 1;
 	}
-	if (prgm.e_ident_3 != 0x46) {
+	if (prgm->e_ident_3 != 0x46) {
 		return 1;
 	}
-	u8 c = prgm.e_ident_4;
+	u8 c = prgm->e_ident_4;
 	if (c == 0) {
 		return 2;/* Invalid ELF class */
 	}
@@ -134,7 +135,7 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) 
 	if (c > 2) {
 		return 4;/* ELF class not recognised */
 	}
-	c = prgm.e_ident_5;
+	c = prgm->e_ident_5;
 	if (c == 0) {
 		return 5;/* Invalid data encoding */
 	}
@@ -144,8 +145,8 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) 
 	if (c > 2) {
 		return 7;/* Unrecognised data encoding */
 	}
-	c = prgm.e_ident_6;
-	if (c != (prgm.e_version)) {
+	c = prgm->e_ident_6;
+	if (c != (prgm->e_version)) {
 		return 8;/* Inconsistent ELF version identifier */
 	}
 	if (c == 0) {
@@ -154,7 +155,7 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) 
 	if (c > 1) {
 		return 10;/* Unrecognised ELF version identifier */
 	}
-	Elf32_Half t = prgm.e_type;
+	Elf32_Half t = prgm->e_type;
 	if (t == 0) {
 		return 11;/* No ELF file type */
 	}
@@ -178,7 +179,7 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) 
 	if (t != 2) {
 		return 16;/* Unrecognised ELF file type */
 	}
-	t = prgm.e_machine;
+	t = prgm->e_machine;
 	if (t != 0) {
 #ifndef TARGETNUM
 #error "'TARGETNUM' is not set"
@@ -197,70 +198,63 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, void** s, struct MemSpace* mem) 
 #error "Target is not supported"
 #endif
 	}
-	const Elf32_Phdr* seg = (const Elf32_Phdr*) (((const char*) prgm) + (prgm.e_phoff));
-	unsigned int ps = prgm.e_phentsize;
-	unsigned int pnum = prgm.e_phnum;
+	const Elf32_Phdr* seg = (const Elf32_Phdr*) (((const char*) prgm) + (prgm->e_phoff));
+	Elf32_Half ps = prgm->e_phentsize;
+	Elf32_Half pnum = prgm->e_phnum;
 	int res = 0;
-	loadELF_loop1:
-	if (pnum == 0) {
-		return 0;
+	while (pnum--) {
+		res = loadSeg(seg, prgm, base, s, mem);
+		if (res != 0) {
+			return res;
+		}
+		seg = (const Elf32_Phdr*) (((const char*) seg) + (uintptr) ps);
 	}
-	res = loadSeg(seg, prgm, base, s, mem);
-	if (res != 0) {
-		return res;
-	}
-	seg = seg + ps;
-	pnum = pnum - 1;
-	goto loadELF_loop1;
+	return 0;
 }
-int execELF(addr base, uint entry, *Thread_state state, addr stackAddr) {
-	u16 segB;
-	int i = makeMemseg(base, 0x00, segB$);/* TODO Set privilege level appropriately *//* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
-	if (i != 0) {
-		return i;
-	}
-	0x00000000 as u32 -> state.eax;
-	0x00000000 as u32 -> state.ebx;
-	0x00000000 as u32 -> state.ecx;
-	0x00000000 as u32 -> state.edx;
-	0x00000000 as u32 -> state.ebp;/* TODO What value should this take? */
-	stackAddr as u32 -> state.esp;
-	0x00000000 as u32 -> state.esi;
-	0x00000000 as u32 -> state.edi;
-	entry as u32 -> state.eip;
-	0x00000202 as u32 -> state.eflags;
-	segB as u16 -> state.cs;
-	(segB + (0x0008 as u16)) as u16 -> state.ds;
-	(segB + (0x0008 as u16)) as u16 -> state.ss;
-	(segB + (0x0008 as u16)) as u16 -> state.es;
-	(segB + (0x0008 as u16)) as u16 -> state.fs;
-	(segB + (0x0008 as u16)) as u16 -> state.gs;
-	return 0;/* TODO Ensure that all uninitialised memory is zeroed */
+void freePage(uintptr vAddr, void* addr, void* arb) {
+	dealloc_lb(addr);
 }
 int runELF(const void* elf, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
-	thread->group->mem = MemSpace_create();// TODO Add to existing memory spaces, maybe
-	void* s = (void*) 0;
-	int i = loadELF(elf as *Elf32_Ehdr, (void*) 0, &s, thread->group->mem);// TODO C
+	thread->group->mem = MemSpace_create();
+	uintptr s = 0;
+	int i = loadELF((const Elf32_Ehdr*) elf, (void*) 0, &s, thread->group->mem);
 	if (i != 0) {
+		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_destroy(thread->group->mem);
 		return i;
 	}
-	// TODO URGENT Destroy all data from thread->group->mem and it itself if error
-	s = (void*) (((char*) s) + 0x00200000);// TODO How much space should be given to the stack?
-	// TODO Map stack, leaving a guard-page
+	uintptr sl = s;
+	s += ((uintptr) 0x00200000);// TODO How much space should be given to the stack?
+	if (s < (uintptr) 0x00200000) {// TODO Ensure that there is at least one available page in the stack
+		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_destroy(thread->group->mem);
+		return 28;// TODO Is this denial allowed?
+	}
+	//TODO URGENT Stop the assumption that the stack grows downward
 #ifndef TARGETNUM
 #error "'TARGETNUM' is not set"
 #endif
 #if TARGETNUM == 1
 	// x86_32
-	s = s - (s % 4);
+	s = (void*) (((uintptr) s) - (((uintptr) s) % 4));
+	if (mapPageSpecificPrivilege((uintptr) 0, (void*) (0 - RELOC), 0, 1, thread->group->mem)) {
+		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_destroy(thread->group->mem);
+		return 29;// TODO Is this denial allowed?
+	}
 #else
 #error "Target is not supported"
-#endif	
-	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, s);// TODO C
-	if (i != 0) {
-		return i;
+#endif
+	uintptr m = PAGEOF(s);
+	sl = PAGEOF(sl + PAGE_SIZE);
+	while (m != sl) {
+		if (mapPage(m, alloc_lb_wiped(), 1, thread->group->mem)) {
+			bugCheckNum(0x0001 | FAILMASK_ELF);
+		}
+		m = PAGEOF(m - 1);
 	}
-	// TODO URGENT Destroy all data from thread->group->mem and it itself if error
+	// TODO Do not allocate the entirety of the stack at once when on x86, maybe
+	Threadstate_fill(s, ((const Elf32_Ehdr*) elf)->e_entry, thread->group->mem, &(thread->state));
 	return 0;
 }
 #endif

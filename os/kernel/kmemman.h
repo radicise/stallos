@@ -119,4 +119,9 @@ void dealloc_lb(volatile void* obj) {
 	memAllocated_lb -= KMEM_LB_BS;
 	Mutex_release(&kmem_lb_access);
 }
+void* alloc_lb_wiped(void) {
+	void* block = alloc_lb();
+	memset(block, 0x00, KMEM_LB_BS);
+	return block;
+}
 #endif

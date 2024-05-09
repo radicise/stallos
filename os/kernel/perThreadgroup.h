@@ -7,5 +7,4 @@ struct PerThreadgroup {
 	struct MemSpace* mem;
 };
 #include "threads.h"
-#define tgid (PerThreadgroup_context->tgid)
 #endif

@@ -581,7 +581,7 @@ _boot_kernel32:
     movw %cx,%es
     movl %ebx,%edx
     movl %eax,%ebx
-    lgdtl %ds:(%edx)
+    lgdtl %ds:(%edx)# TODO URGENT Ensure proper alignment of the GDT
     movl %cr0,%edx
     orl $0x01,%edx
     movl %edx,%cr0

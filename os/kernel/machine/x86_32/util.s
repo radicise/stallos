@@ -196,3 +196,9 @@ rep insb
 popw %es
 popl %edi
 ret
+mem_barrier:
+.globl mem_barrier
+subl $4,%esp
+lock xchgl %eax,(%esp)# TODO Change for 80486 and newer
+popl %eax
+ret

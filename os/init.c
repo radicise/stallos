@@ -45,6 +45,8 @@ void printLine(void) {
 	return;
 }
 void _start() {
+	while (1) {
+	}
 	/*
 	unsigned long i = 0;
 	while (1) {

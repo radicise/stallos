@@ -9,13 +9,13 @@
 #else
 #error "Target is not supported"
 #endif
+#include "perThreadgroup.h"
+#include "perThread.h"
 struct Thread {
 	struct PerThread thread;
 	struct Thread_state state;
 	struct PerThreadgroup* group;
 };
-extern void Thread_restore(struct Thread_state*, long);// Does not return
-extern void Thread_run(struct Thread_state*);// Does not return
 Mutex Threads_threadManage;
 #ifndef TARGETNUM
 #error "`TARGETNUM' is not set"
@@ -25,4 +25,30 @@ Mutex Threads_threadManage;
 #else
 #error "Target is not supported"
 #endif
+void lockThreadInfo(void) {
+	Mutex_acquire(&(PerThread_context->dataLock));
+	return;
+}
+void unlockThreadInfo(void) {
+	Mutex_release(&(PerThread_context->dataLock));
+	return;
+}
+void lockFSInfo(void) {
+	Mutex_acquire(&(PerThread_context->fsinfo->dataLock));
+	return;
+}
+void unlockFSInfo(void) {
+	Mutex_release(&(PerThread_context->fsinfo->dataLock));
+	return;
+}
+#define errno (PerThread_context->errno)
+#define tid (PerThread_context->tid)
+#define ruid (PerThread_context->ruid)
+#define euid (PerThread_context->euid)
+#define suid (PerThread_context->suid)
+#define fsuid (PerThread_context->fsuid)
+#define cwd (PerThread_context->fsinfo->cwd)
+#define root (PerThread_context->fsinfo->root)
+#define umask (PerThread_context->fsinfo->umask)
+#define tgid (PerThreadgroup_context->tgid)
 #endif
