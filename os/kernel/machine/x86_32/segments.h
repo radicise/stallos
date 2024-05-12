@@ -26,8 +26,8 @@ void Seg_setDesc(uintptr base, uintptr limit, int g, int dt, int exec, int ec, i
 	if ((dpl < 0) || (dpl >= 4)) {
 		bugCheckNum(0x0002 | FAILMASK_SEGMENTS);
 	}
-	seg->b5 = (((u8) dpl) << 5) | (dt ? 0x10 : 0x00) | (exec ? 0x08 : 0x00) | (ec ? 0x40 : 0x00) | (wr ? 0x20 : 0x00) | (a ? 0x01 : 0x00);
-	seg->b6 = (limit & 0x0f) | (g ? 0x80 : 0x00) | 0x70;
+	seg->b5 = (((u8) dpl) << 5) | (dt ? 0x10 : 0x00) | (exec ? 0x08 : 0x00) | (ec ? 0x04 : 0x00) | (wr ? 0x02 : 0x00) | (a ? 0x01 : 0x00);
+	seg->b6 = (limit & 0x0f) | (g ? 0x80 : 0x00) | 0x40;
 	limit >>= 4;
 	seg->b7 = base;
 	base >>= 8;
@@ -59,7 +59,7 @@ void TG_setDesc(u16 segSel, int pl, SegDesc* seg) {
 	seg->b7 = 0x00;
 	return;
 }
-void TS_setDesc(uintptr base, uintptr limit, int g, int dpl, SegDesc* seg) {
+void TS_setDesc(uintptr base, uintptr limit, int g, int dpl, int busy, SegDesc* seg) {
 	seg->b0 = limit;
 	limit >>= 8;
 	seg->b1 = limit;
@@ -73,7 +73,7 @@ void TS_setDesc(uintptr base, uintptr limit, int g, int dpl, SegDesc* seg) {
 	if ((dpl < 0) || (dpl >= 4)) {
 		bugCheckNum(0x0006 | FAILMASK_SEGMENTS);
 	}
-	seg->b5 = (((u8) dpl) << 5) | 0x09;
+	seg->b5 = (((u8) dpl) << 5) | (busy ? 0x02 : 0x00) | 0x09;
 	seg->b6 = (limit & 0x0f) | (g ? 0x80 : 0x00);
 	limit >>= 4;
 	seg->b7 = base;
@@ -100,8 +100,8 @@ void SSS_setDesc(uintptr base, uintptr limit, int g, int dpl, int type, SegDesc*
 	if ((type < 0) || (type >= 16)) {
 		bugCheckNum(0x0007 | FAILMASK_SEGMENTS);
 	}
-	seg->b5 = (((u8) dpl) << 5) | 0x10 | type;
-	seg->b6 = (limit & 0x0f) | (g ? 0x80 : 0x00) | 0x70;
+	seg->b5 = (((u8) dpl) << 5) | type;
+	seg->b6 = (limit & 0x0f) | (g ? 0x80 : 0x00) | 0x40;
 	limit >>= 4;
 	seg->b7 = base;
 	base >>= 8;
@@ -187,7 +187,7 @@ void TSSmk(u16 prev, u16 dseg, u16 cseg, uintptr eip, uintptr esp, int disableIr
 	tss->z8 = 0x00;
 	tss->gs = dseg;
 	tss->z9 = 0x00;
-	tss->ldt = 32;
+	tss->ldt = 8 * 8;
 	tss->z10 = 0x00;
 	tss->debugTrap = 0;
 	tss->z11 = 0x00;
@@ -217,8 +217,11 @@ void TSSmk(u16 prev, u16 dseg, u16 cseg, uintptr eip, uintptr esp, int disableIr
 	tss->data[22] = 0x00;
 	tss->data[23] = 0x00;
 }
-extern void setGDT(void);
-extern void setIDT(void);
+extern void loadGDT(unsigned long, unsigned long);
+extern void loadIDT(unsigned long, unsigned long);
+extern void loadTS(unsigned long);
+extern void loadLDT(unsigned long);
+extern void setNT(void);
 void initSegmentation(void) {
 	/*
 	 *
@@ -253,34 +256,45 @@ void initSegmentation(void) {
 	Seg_enable(GDT + 5);/* User-space code */
 	Seg_setDesc(0, 0xfffff, 1, 1, 0, 0, 1, 1, 3, GDT + 6);
 	Seg_enable(GDT + 6);/* User-space data */
-	TS_setDesc(0x0b00, 127, 0, 0, GDT + 7);
+	TS_setDesc(0x0b00, 127, 0, 0, 0, GDT + 7);
 	Seg_enable(GDT + 7);
 	SSS_setDesc(0x0828, 15, 0, 3, 0x2, GDT + 8);// TODO URGENT What value should the DPL of the LDT take?
 	Seg_enable(GDT + 8);
-	TS_setDesc(0x0b80, 127, 0, 0, GDT + 9);
+	TS_setDesc(0x0b80, 127, 0, 0, 0, GDT + 9);
 	Seg_enable(GDT + 9);
-	TS_setDesc(0x0c00, 127, 0, 0, GDT + 10);
+	TS_setDesc(0x0c00, 127, 0, 0, 0, GDT + 10);
 	Seg_enable(GDT + 10);
-	TS_setDesc(0x0c80, 127, 0, 0, GDT + 11);
+	TS_setDesc(0x0c80, 127, 0, 0, 0, GDT + 11);
 	Seg_enable(GDT + 11);
-	TS_setDesc(0x0d00, 127, 0, 0, GDT + 12);
+	TS_setDesc(0x0d00, 127, 0, 0, 0, GDT + 12);
 	Seg_enable(GDT + 12);
-	TS_setDesc(0x0c80, 127, 0, 0, GDT + 13);
+	TS_setDesc(0x0c80, 127, 0, 0, 1, GDT + 13);
 	Seg_enable(GDT + 13);
 	TSS* tssp = (TSS*) (((volatile char*) physicalZero) + 0xb00);
-	TSSmk(7 * 8, 4 * 8, 3 * 8, (uintptr) irupt_80h, 0x0007f7f4 - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp);
-	TSSmk(9 * 8, 4 * 8, 3 * 8, (uintptr) irupt_70h, 0x007fffff - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 1);
-	TSSmk(10 * 8, 4 * 8, 3 * 8, (uintptr) irupt_71h, 0x007fffff - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 2);
-	TSSmk(11 * 8, 4 * 8, 3 * 8, (uintptr) irupt_fail, 0x007fffff - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 3);
-	TSSmk(12 * 8, 4 * 8, 3 * 8, (uintptr) irupt_noprocess, 0x007fffff - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 4);
+	TSSmk(13 * 8, 4 * 8, 3 * 8, (uintptr) irupt_80h, 0x007ffff4 - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp);
+	TSSmk(9 * 8, 4 * 8, 3 * 8, (uintptr) irupt_70h, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 1);
+	TSSmk(10 * 8, 4 * 8, 3 * 8, (uintptr) irupt_71h, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 2);
+	TSSmk(11 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7dh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 3);
+	TSSmk(12 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7fh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 4);
 	SegDesc* IDT = (SegDesc*) (volatile char*) physicalZero;
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < 256; i++) {// TODO URGENT Move the IRQ stack area
 		TG_setDesc(11 * 8, 0, IDT + i);
-	}
+		Seg_enable(IDT + i);
+	}// TODO URGENT add guard-pages to both stack areas
 	TG_setDesc(7 * 8, 3, IDT + 0x80);
+	Seg_enable(IDT + 0x80);
 	TG_setDesc(9 * 8, 0, IDT + 0x70);
+	Seg_enable(IDT + 0x70);
 	TG_setDesc(10 * 8, 0, IDT + 0x71);
+	Seg_enable(IDT + 0x71);
 	TG_setDesc(12 * 8, 0, IDT + 0x7e);
+	Seg_enable(IDT + 0x7e);
 	TG_setDesc(12 * 8, 0, IDT + 0x7f);
+	Seg_enable(IDT + 0x7f);
+	loadGDT(0x800, (14 * 8) - 1);
+	loadIDT(0x000, 0x7ff);
+	loadLDT(8 * 8);
+	loadTS(7 * 8);
+	setNT();
 }
 #endif

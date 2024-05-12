@@ -22,20 +22,21 @@ l	0x0518	Physical address of beginning of main console # TODO implement
 LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT
 LIDTd32	0x000073fa	LIDT descriptor data
-STAKTOP	0x0007f7f4	Top-of-stack of the second-stage kernel during boot and when handling int $0x80 system calls
+STAKTOP	0x0007f7f4	(Appriximate) top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack
 l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
 l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes
-STAKTOP	0x00800000	(Appriximate) top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack
+STAKTOP	0x00800000	Top-of-stack of the second-stage kernel during boot and when handling int $0x80 system calls
+
 
 # Linear addresses of certain memory structures during the execution of the main kernel and during execution of user code
 Structure	Address		Notes
 IDT		0x00000000
 GDT		0x00000800
 LDT		0x00000828	Is backed by part of the GDT
-TSS		0x00000b00	TSS for interrupt 0x80
+TSS		0x00000b00	TSS for interrupt 0x80 and the second-stage kernel during boot
 TSS		0x00000b80	TSS for interrupt 0x70
 TSS		0x00000c00	TSS for interrupt 0x71
 TSS		0x00000c80	TSS for interrupts that should cause the system to issue a "bug check"
-TSS		0x00000d00	TSS for interrupts that should immediately return with no processing
+TSS		0x00000d00	TSS for IRQ 14 and IRQ 15
 TSS		0x00000d80	TSS for the currently-executing userspace program

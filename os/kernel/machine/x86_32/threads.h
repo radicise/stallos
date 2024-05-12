@@ -56,13 +56,13 @@ int Threads_findNext(uintptr suspect, uintptr u) {// Threads_threadManage must h
 #include "../../perThread.h"
 struct PerThreadgroup* volatile PerThreadgroup_context;
 struct PerThread* volatile PerThread_context;
-void Threads_nextThread(struct Thread_state* state, long irupt) {
+void Threads_nextThread(void) {
 	Mutex_acquire(&Threads_threadManage);
 	uintptr st = Map_fetch((uintptr) currentThread, ___taskMap___);
 	if (st == ((uintptr) (-1))) {
 		bugCheckNum(0x0002 | FAILMASK_THREADS);// The current thread seemingly does not exist
 	}
-	cpy(&(((struct Thread*) st)->state), state, sizeof(struct Thread_state));
+	// cpy(&(((struct Thread*) st)->state), state, sizeof(struct Thread_state));
 	uintptr u = pid_max;
 	Map_findByCompare((uintptr) &u, Threads_findNext, ___taskMap___);
 	if (u == (pid_max)) {
@@ -89,7 +89,7 @@ void Threads_nextThread(struct Thread_state* state, long irupt) {
 	cpy(&stt, &(thns->state), sizeof(struct Thread_state));
 	Mutex_release(&Threads_threadManage);
 	moveExv(((TSS*) (((volatile char*) physicalZero) + 0xb00)) + 5, &(stt.tss), sizeof(TSS));
-	TS_setDesc(0x0d80, 127, 0, 0, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	TS_setDesc(0x0d80, 127, 0, 0, 1, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	return;
 }

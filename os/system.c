@@ -359,62 +359,62 @@ void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 119
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
-	//bugCheck();
 	kbd8042_onIRQ(&kbdMain);
 	return;
 }
-void irupt_handler_72h(void) {// IRQ 2, this should not be triggered
+void irupt_handler_72h(void) {
 	bugCheckNum(0x0072 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_73h(void) {// IRQ 3
+void irupt_handler_73h(void) {
 	bugCheckNum(0x0073 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_74h(void) {// IRQ 4
+void irupt_handler_74h(void) {
 	bugCheckNum(0x0074 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_75h(void) {// IRQ 5
+void irupt_handler_75h(void) {
 	bugCheckNum(0x0075 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_76h(void) {// IRQ 6
+void irupt_handler_76h(void) {
 	bugCheckNum(0x0076 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_77h(void) {// IRQ 7
+void irupt_handler_77h(void) {
 	bugCheckNum(0x0077 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_78h(void) {// IRQ 8
+void irupt_handler_78h(void) {
 	bugCheckNum(0x0078 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_79h(void) {// IRQ 9
+void irupt_handler_79h(void) {
 	bugCheckNum(0x0079 | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_7ah(void) {// IRQ 10
+void irupt_handler_7ah(void) {
 	bugCheckNum(0x007a | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_7bh(void) {// IRQ 11
+void irupt_handler_7bh(void) {
 	bugCheckNum(0x007b | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_7ch(void) {// IRQ 12
+void irupt_handler_7ch(void) {
 	bugCheckNum(0x007c | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_7dh(void) {// IRQ 13
+void irupt_handler_7dh(void) {// Certain interrupts; THIS SHOULD NOT RETURN
 	bugCheckNum(0x007d | FAILMASK_SYSTEM);
 	return;
 }
-void irupt_handler_7eh(void) {// IRQ 14
-	return;// ATA IRQ
+void irupt_handler_7eh(void) {
+	bugCheckNum(0x007e | FAILMASK_SYSTEM);
+	return;
 }
-void irupt_handler_7fh(void) {// IRQ 15
+void irupt_handler_7fh(void) {// IRQ 14 and IRQ 15
 	return;// ATA IRQ
 }
 void PICInit(unsigned char mOff, unsigned char sOff) {
@@ -450,7 +450,10 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 }
 void* originalLopage;
 #include "kernel/object/elf.h"
+extern void irupt_80h_iret(void);
+extern void loadSegs(void);
 void systemEntry(void) {
+	loadSegs();
 	mem_barrier();
 	Mutex_initUnlocked(&kmsg);
 	initVGATerminal();
@@ -505,22 +508,24 @@ void systemEntry(void) {
 	kernelMsg("Initializing ATA driver . . . ");
 	initATA();
 	kernelMsg("done\n");
-	kernelMsg("Setting up system hardware-multitasking components . . . ");
+	//while (1) {}
+	kernelMsg("Initializing system call interface and setting up system hardware-multitasking components . . . ");
 	unsigned long* lpd = (originalLopage = alloc_lb());
 	for (int i = 0; i < 1024; i++) {
 		lpd[i] = readLongLinear(i << 2);
 	}
-	kernelMsg("done\n");
-	kernelMsg("Initializing system call interface . . . ");
 	initSystemCallInterface();
 	kernelMsg("done\n");
+	//while (1) {}
 	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
 	int_enable();
 	kernelMsg("done\n");
+	//while (1) {}
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
 	kernelMsg("done\n");
 	kernelMsg("Starting `init'\n");
+	//while (1) {}
 	Mutex_acquire(&Threads_threadManage);
 	struct Thread* th = alloc(sizeof(struct Thread));// Should this be declared `volatile'? It is conceivable that a thread may run on multiple CPU over time.
 	PerThread_context = &(th->thread);
@@ -539,13 +544,11 @@ void systemEntry(void) {
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
-	int errVal = runELF((const void*) 0x00010000, PerThread_context);
+	int errVal = runELF((const void*) (((uintptr) 0x00010000) - ((uintptr) RELOC)), PerThread_context);
 	if (errVal != 0) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
 	}
-	while (1) {
-	}
-	// TODO Execute program
-	bugCheck();
+	Threads_nextThread();
+	irupt_80h_iret();
 	return;
 }

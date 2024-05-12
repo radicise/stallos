@@ -5,6 +5,7 @@ extern void irupt_discall(void);
 extern void farRunELF(void);
 extern void irupt_hang(void);
 #define CHAR_BIT 8
+#define RELOC 0x00040000
 /* TODO Interrupt handler to fail the running program after divide-by zero exceptions &c */
 void set_irupt(void* base, unsigned int index, void(*func)(void), unsigned char trap, unsigned short seg) {
 	volatile unsigned char* pos = ((volatile unsigned char*) base) + (index * 8);
@@ -62,7 +63,7 @@ int executeSystem() {
 	*/
 	(*((volatile int*) 0x7f7fc)) = 0x00000008;
 	struct Thread_state state;
-	int i = runELF((void*) 0x00020000, (void*) 0x00040000, &state);
+	int i = runELF((void*) 0x00020000, (void*) RELOC, &state);
 	if (i) {
 		return i;
 	}

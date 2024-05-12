@@ -9,7 +9,7 @@ export TARGETNUM
 TARGETMACHINE ?= x86_32
 
 ASFLAGS ?= -march=i386
-LDFLAGS ?= --no-dynamic-linker -Ttext=0x0
+LDFLAGS ?= --no-dynamic-linker
 
 
 build Stallos/stallos.bin : build/stall.bin
@@ -36,7 +36,7 @@ build/init-ul.elf : os/init.c
 	${CCPRGM} -o build/init-ul.elf os/init.c
 
 build/kernel.elf : build/kernel-ul.elf build/kernel-asm.elf
-	${LDPRGM} ${LDFLAGS} -o build/kernel.elf build/kernel-ul.elf build/kernel-asm.elf -lgcc
+	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/kernel.elf build/kernel-ul.elf build/kernel-asm.elf -lgcc
 
 build/kernel-asm.elf : build/system-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/kernel-asm.elf build/system-comp.s
@@ -51,7 +51,7 @@ build/kernel-ul.elf : os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHIN
 	${CCPRGM} -o build/kernel-ul.elf os/system.c
 
 build/loader.bin : build/loader.o build/sysc.elf build/irupts.o
-	${LDPRGM} ${LDFLAGS} -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc
+	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc
 	cp build/loader.elf build/loader-copy.elf
 	${STRIPPRGM} build/loader-copy.elf	
 	${OBJCOPYPRGM} --dump-section .text=build/loader.bin build/loader.elf /dev/null
@@ -70,7 +70,7 @@ build/loader-comp.s : sys32.dhulb sys32/kern32.dhulb sys32/elfExec.dhulb
 	dhulbc 32 -tNGTw < build/kern32-comp.dhulb > build/loader-comp.s
 
 build/stall.elf : build/stall.o
-	${LDPRGM} ${LDFLAGS} -o build/stall.elf build/stall.o -lgcc
+	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/stall.elf build/stall.o -lgcc
 
 build/stall.o : build/stall-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/stall.o build/stall-comp.s

@@ -71,7 +71,14 @@ jz irupt_80h__noError
 notl %eax
 incl %eax
 irupt_80h__noError:
+xorl %ebx,%ebx
+subl $RELOC,%ebx
+addl $0xd80,%ebx
+movl %eax,0x28(%ebx)
+irupt_80h_iret:
+.globl irupt_80h_iret
 iret
+jmp irupt_80h
 /*
 addl $0x20,%esp
 popl %ebp
@@ -90,11 +97,13 @@ lret
 irupt_fail:
 .globl irupt_fail
 pushl $0x1badfa17
-call bugCheck
+call bugCheckNum
 iret
+jmp irupt_fail
 irupt_noprocess:
 .globl irupt_noprocess
 iret
+jmp irupt_noprocess
 writeLongLinear:# void writeLongLinear(u32 addr, unsigned long dat)
 .globl writeLongLinear
 movw $0x10,%ax
@@ -283,4 +292,12 @@ pushl %eax
 call strct
 movl %ebp,%esp
 popl %ebp
+ret
+loadSegs:# void loadSegs(void);
+.globl loadSegs
+movw %ds,%ax
+movw %ax,%ss
+movw %ax,%es
+movw %ax,%fs
+movw %ax,%gs
 ret

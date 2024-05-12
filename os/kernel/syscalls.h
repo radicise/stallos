@@ -496,12 +496,11 @@ void retDesc(int kfd) {
 	}
 	return;
 }
-unsigned int getMemOffset(void) {// TODO Utilise virtual memory pages properly
-	if (tid == ((pid_t) 1)) {// TODO Support for multiple userspace threads
-		return 0x800000 - RELOC;
+void* getUserMem(uintptr uptr) {
+	if (((void*) uptr) == NULL) {
+		return NULL;
 	}
-	bugCheck();
-	return 0;
+	bugCheck();// TODO Implement
 }
 void initSystemCallInterface(void) {
 	kmem_init();
@@ -811,7 +810,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		}
 		else {
 			kernelMsg(callname[nr]);
-		}
+		}// TODO Maybe note the name of calls to the "testcall"
 		// TODO Note the call number if the call is a "NOCALL"
 		kernelMsg("(");
 		kernelMsgULong_hex(arg1);
@@ -832,13 +831,13 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 #endif
 	switch (nr) {// TODO Authenticate memory access
 		case (3):
-			retVal = (unsigned long) read((int) arg1, (void*) (arg2 + getMemOffset()), (size_t) arg3);
+			retVal = (unsigned long) read((int) arg1, (void*) getUserMem(arg2), (size_t) arg3);
 			break;
 		case (4):
-			retVal = (unsigned long) write((int) arg1, (const void*) (arg2 + getMemOffset()), (size_t) arg3);
+			retVal = (unsigned long) write((int) arg1, (const void*) getUserMem(arg2), (size_t) arg3);
 			break;
 		case (13):
-			retVal = (unsigned long) time((time_t*) ((arg1 == 0) ? 0 : (arg1 + getMemOffset())));
+			retVal = (unsigned long) time((time_t*) getUserMem(arg1));
 			break;
 		case (19):
 			retVal = (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
@@ -850,14 +849,14 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			retVal = (unsigned long) getuid();
 			break;
 		case (25):
-			retVal = (unsigned long) stime((const time_t*) (arg1 + getMemOffset()));
+			retVal = (unsigned long) stime((const time_t*) getUserMem(arg1));
 			break;
 		case (49):
 			retVal = (unsigned long) geteuid();
 			break;
 #if LINUX_COMPAT_VERSION >= 0x10104600
 		case (140):// Prototype is sourced from Linux man-pages lseek64(3)
-			retVal = (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) (arg4 + getMemOffset()), (int) arg5);
+			retVal = (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) getUserMem(arg4), (int) arg5);
 			break;
 #endif
 #if LINUX_COMPAT_VERSION >= 0x20303900

@@ -1,6 +1,7 @@
 imply s32 sanc();
 imply u32 removeSeg(u32);
 imply u32 findSeg();
+#define RELOC 262144
 typealias Elf32_Addr u32;
 typealias Elf32_Half u16;
 typealias Elf32_Off u32;
@@ -250,7 +251,7 @@ lgdt (%eax)
 }
 int execELF(addr base, uint entry, *Thread_state state, addr stackAddr) {
 	u16 segB;
-	int i = makeMemseg(base, 0x00, segB$);/* TODO Set privilege level appropriately *//* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
+	int i = makeMemseg(base, 0x00, segB$);/* ERRORS CANNOT BE ISSUED AFTER CREATION OF THE LGDT ENTRY */
 	if (i != 0) {
 		return i;
 	}
@@ -340,7 +341,8 @@ int runELF(addr elf, addr memArea, *Thread_state state) {
 	}
 	s = s + 0x00200000 - memArea;
 	s = s - (s % 4);
-	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, s);
+	/*i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, s);*/
+	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, 0x7ffff4 - $$RELOC$$);
 	if (i != 0) {
 		return i;
 	}
