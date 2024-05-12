@@ -516,16 +516,13 @@ void systemEntry(void) {
 	}
 	initSystemCallInterface();
 	kernelMsg("done\n");
-	//while (1) {}
 	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
 	int_enable();
 	kernelMsg("done\n");
-	//while (1) {}
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
 	kernelMsg("done\n");
 	kernelMsg("Starting `init'\n");
-	//while (1) {}
 	Mutex_acquire(&Threads_threadManage);
 	struct Thread* th = alloc(sizeof(struct Thread));// Should this be declared `volatile'? It is conceivable that a thread may run on multiple CPU over time.
 	PerThread_context = &(th->thread);
@@ -544,7 +541,7 @@ void systemEntry(void) {
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
-	int errVal = runELF((const void*) (((uintptr) 0x00010000) - ((uintptr) RELOC)), PerThread_context);
+	int errVal = runELF((const void*) (((uintptr) 0x00010000) - ((uintptr) RELOC)), th);
 	if (errVal != 0) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
 	}

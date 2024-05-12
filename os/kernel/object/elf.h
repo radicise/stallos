@@ -75,7 +75,7 @@ int ELF_fillUser(uintptr dest, uintptr count, int userWritable, struct MemSpace*
 	MemSpace_mkFill(0x00, dest, count, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
-int loadSeg(Elf32_Phdr* seg, const void* fileBase, uintptr base, uintptr* stack, struct MemSpace* mem) {/* TODO Fail if base address alignment is insufficient */
+int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
 	Elf32_Word t = seg->p_type;
 	if ((t == 0) | (t == 4) | (t == 6)) {
 		return 0;
@@ -102,17 +102,17 @@ int loadSeg(Elf32_Phdr* seg, const void* fileBase, uintptr base, uintptr* stack,
 	if ((seg->p_filesz) > (seg->p_memsz)) {
 		return 24;/* Memory image is of smaller size than file image */
 	}
-	ELF_cpyUser((uintptr) (base + seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x02) ? 1 : 0, mem);
+	ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x02) ? 1 : 0, mem);
 	if ((seg->p_memsz) > (seg->p_filesz)) {
-		ELF_fillUser((uintptr) (base + (seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x02) ? 1 : 0, mem);
+		ELF_fillUser((uintptr) ((seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x02) ? 1 : 0, mem);
 	}
-	uintptr s = base + seg->p_vaddr + seg->p_memsz;
+	uintptr s = seg->p_vaddr + seg->p_memsz;
 	if (s > (*stack)) {
 		(*stack) = s;
 	}
 	return 0;
 }
-int loadELF(const Elf32_Ehdr* prgm, void* base, uintptr* s, struct MemSpace* mem) {
+int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 	if (prgm->e_ident != 0x7F) {
 		return 1;/* Invalid magic */
 	}
@@ -203,7 +203,7 @@ int loadELF(const Elf32_Ehdr* prgm, void* base, uintptr* s, struct MemSpace* mem
 	Elf32_Half pnum = prgm->e_phnum;
 	int res = 0;
 	while (pnum--) {
-		res = loadSeg(seg, prgm, base, s, mem);
+		res = loadSeg(seg, prgm, s, mem);
 		if (res != 0) {
 			return res;
 		}
@@ -217,7 +217,7 @@ void freePage(uintptr vAddr, void* addr, void* arb) {
 int runELF(const void* elf, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
 	thread->group->mem = MemSpace_create();
 	uintptr s = 0;
-	int i = loadELF((const Elf32_Ehdr*) elf, (void*) 0, &s, thread->group->mem);
+	int i = loadELF((const Elf32_Ehdr*) elf, &s, thread->group->mem);
 	if (i != 0) {
 		MemSpace_forEach(freePage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
@@ -236,7 +236,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 #endif
 #if TARGETNUM == 1
 	// x86_32
-	s = (void*) (((uintptr) s) - (((uintptr) s) % 4));
+	s = ((uintptr) s) - (((uintptr) s) % 4);
 	if (mapPageSpecificPrivilege((uintptr) 0, (void*) (0 - RELOC), 0, 1, thread->group->mem)) {
 		MemSpace_forEach(freePage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
