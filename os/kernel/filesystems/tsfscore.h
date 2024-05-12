@@ -25,7 +25,8 @@ available for external use
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
-FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, s64 curr_time) {
+FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size) {
+    s64 curr_time = (s64)(kernel_time(NULL));
     FSRet rv = {.err=EINVAL};
     if (p_size > 48) {
         kernelWarnMsg("PARTITION TOO BIG");
@@ -44,7 +45,7 @@ FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size, s64 curr_time) {
     rblock->partition_size = p_size;
     rblock->creation_time = *((u64*)(&curr_time));
     rblock->usedleft = 7;
-    u32 tblocks = (u32)((((u64)2)<<(rblock->partition_size-1)) / BLOCK_SIZE);
+    u32 tblocks = (u32)((((u64)1)<<(rblock->partition_size)) / BLOCK_SIZE);
     rblock->usedright = tblocks - 1;
     u32 center = tblocks/2;
     rblock->usedhalfleft = center-1;
@@ -282,21 +283,22 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     // printf("AFTER EARLY END CHECK\n");
     u64 np = ((u64)(block_no)) * ((u64)BLOCK_SIZE);
     // printf("AFTER CALC, NEW POS: %lx, NEW BLK: %u\n", np, tsfs_loc_to_block(np));
-    // TSFSStructBlock sblock = {0};
+    TSFSStructBlock sblock = {0};
     // TSFSStructNode snode = {0};
     TSFSStructBlock* blockptr = 0;
     TSFSStructNode* nodeptr = 0;
     block_seek(fs, (s32)ul, BSEEK_SET);
-    // read_structblock(fs, &sblock);
-    blockptr = tsfs_load_block(fs, 0);
+    read_structblock(fs, &sblock);
+    // blockptr = tsfs_load_block(fs, 0);
     // printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
     // _DBG_print_block(blockptr);
-    u64 comphash = hash_structblock(blockptr);
+    u64 comphash = hash_structblock(&sblock);
+    // u64 comphash = hash_structblock(blockptr);
     // printf("AFTER HASH\n");
     // printf("COMP HASH = %lx\n", comphash);
     // printf("PTRHASH = %lx\n", blockptr->checksum);
     // check if the final block is a struct block by reading it as one and seeing if the hash is correct
-    if (blockptr->checksum == comphash) { // struct block
+    if (sblock.checksum == comphash) { // struct block
         // printf("FREE BLOCK\n");
         // _DBG_print_block(blockptr);
         // loc_seek(fs, blockptr->disk_ref);
@@ -318,7 +320,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
         // _DBG_print_node(nodeptr);
         dmanip_null(fs, ul, 1);
         if (nodeptr->parent_loc) {
-            tsfs_unload(fs, blockptr);
+            // tsfs_unload(fs, blockptr);
             // loc_seek(fs, snode.parent_loc);
             // read_structblock(fs, &sblock);
             blockptr = tsfs_load_block(fs, nodeptr->parent_loc);
@@ -326,6 +328,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
             blockptr->disk_ref = block_no;
             seek(fs, -14, SEEK_CUR);
             write_structblock(fs, blockptr);
+            tsfs_unload(fs, blockptr);
         }
         block_seek(fs, (s32)block_no, BSEEK_SET);
         write_structnode(fs, nodeptr);
@@ -347,9 +350,130 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
         tsfs_unload(fs, pnp);
         tsfs_unload(fs, pbp);
     }
-    tsfs_unload(fs, blockptr);
+    // tsfs_unload(fs, blockptr);
     tsfs_unload(fs, nodeptr);
     return 0;
+}
+
+#define DYNFIELD_MAX_SIZE 2048
+
+/*
+dynamically sized bit field
+*/
+typedef struct DynBitField {
+    u32    cap;
+    u32    size;
+    char*  field;
+} DynBField;
+
+static DynBField* mk_bfield() {
+    DynBField* ptr = allocate(sizeof(DynBField));
+    ptr->size = 0;
+    ptr->cap = 4;
+    ptr->field = allocate(4);
+    ptr->field[0] = 0;
+    ptr->field[1] = 0;
+    ptr->field[2] = 0;
+    ptr->field[3] = 0;
+}
+static void rel_bfield(DynBField* ptr) {
+    deallocate(ptr->field, ptr->cap);
+    deallocate(ptr, sizeof(DynBField));
+}
+static void bfield_upsize(DynBField* ptr) {
+    u32 nc = ptr->cap * 2;
+    if (nc > DYNFIELD_MAX_SIZE) {
+        magic_smoke(FEALLOC|FEBIG);
+        return;
+    }
+    char* nb = allocate((size_t)nc);
+    awrite_buf(nb, ptr->field, ptr->size);
+    for (int i = ptr->size; i < nc; i ++) {
+        nb[i] = 0;
+    }
+    deallocate(ptr->field, ptr->cap);
+    ptr->field = nb;
+    ptr->cap = nc;
+}
+static void bfield_downsize(DynBField* ptr) {
+    u32 nc = ptr->cap / 2;
+    if (nc < 4 || nc <= ptr->size) {
+        magic_smoke(FEARG|FESMALL);
+        return;
+    }
+    char* nb = allocate((size_t)nc);
+    awrite_buf(nb, ptr->field, ptr->size);
+    for (int i = ptr->size; i < nc; i ++) {
+        nb[i] = 0;
+    }
+    deallocate(ptr->field, ptr->cap);
+    ptr->field = nb;
+    ptr->cap = nc;
+}
+static inline char bfield_get(DynBField* bf, u32 index) {
+    return bf->field[index];
+}
+static inline void bfield_set(DynBField* bf, u32 index, char value) {
+    bf->field[index] = value;
+}
+static inline char bfield_getbit(DynBField* bf, u32 index, char bit) {
+    return (bfield_get(bf, index)>>bit)&1;
+}
+static void bfield_setbit(DynBField* bf, u32 index, char bit, char value) {
+    value = value << bit;
+    char item = bfield_get(bf, index);
+    item = (item&(~(1<<bit)))|value;
+    bfield_set(bf, index, item);
+}
+static void bfield_push(DynBField* bf, char item) {
+    if ((bf->size+1) == bf->cap) {
+        bfield_upsize(bf);
+    }
+    bf->field[(bf->size)++] = item;
+}
+static char bfield_pop(DynBField* bf) {
+    char r = bf->field[--(bf->size)];
+    if (bf->cap > 4 && bf->size <= (bf->cap/4)) {
+        bfield_downsize(bf);
+    }
+    return r;
+}
+static void bfield_setsize(DynBField* ptr, u32 nc) {
+    char* nb = (nc)?allocate((size_t)nc):0;
+    for (int i = 0; i < nc; i ++) {
+        nb[i] = 0;
+    }
+    if (ptr->cap > 0) {
+        deallocate(ptr->field, ptr->cap);
+    }
+    ptr->cap = nc;
+    ptr->size = 0;
+    ptr->field = nb;
+}
+
+static inline char map_block_to_bit(u32 block) {return (char)(block%8);}
+static inline char get_bfield_block(DynBField* bf, u32 block) {
+    u32 quo = block / 8;
+    char rem = (char)(block % 8);
+    return bfield_getbit(bf, quo, rem);
+}
+static inline void set_bfield_block(DynBField* bf, u32 block, char val) {
+    u32 quo = block / 8;
+    char rem = (char)(block % 8);
+    bfield_setbit(bf, quo, rem, val);
+}
+
+static void bitfield_print(FileSystem* fs, DynBField* ptr) {
+    u32 startb = fs->rootblock->usedright+1;
+    u32 w = 8;
+    u32 h = ptr->size / w + ((ptr->size%w)>0?1:0);
+    for (u32 i = 0; i < h; i ++) {
+        for (u32 j = 0; j < w; j ++) {
+            u32 blk = (i*w+j);
+            printf("%lu:%u ", startb+blk, get_bfield_block(ptr, blk));
+        }
+        printf("\n");
+    }
 }
 
 /*
@@ -362,8 +486,40 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
     if (block_no <= ur) { // protect bounds
         return -1;
     }
-    return 0;
+    TSFSDataHeader dhtest;
+    block_seek(fs, block_no, BSEEK_SET);
+    read_dataheader(fs, &dhtest);
+    u64 comphash = hash_dataheader(&dhtest);
+    u32 oblk = block_no;
+    u32 tblocks = (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+    DynBField* bf = mk_bfield();
+    {
+        u32 used = tblocks-fs->rootblock->usedright-1;
+        u32 bfsize = (used)/8;
+        bfield_setsize(bf, bfsize + ((used%8>0)?1:0));
+    }
+    set_bfield_block(bf, oblk, 1);
+    int rcode = 0;
+    u32 removed = 1;
+    TSFSDataBlock crdb;
+    if (dhtest.checksum == comphash) {
+        block_seek(fs, dhtest.head, BSEEK_SET);
+    } else {
+        block_seek(fs, block_no, BSEEK_SET);
+    }
+    read_datablock(fs, &crdb);
+    while (crdb.next_block) {
+        set_bfield_block(bf, crdb.next_block, 1);
+        block_seek(fs, crdb.next_block, BSEEK_SET);
+        read_datablock(fs, &crdb);
+    }
+    bitfield_print(fs, bf);
+    cleanup:
+    rel_bfield(bf);
+    return rcode;
 }
+
+#undef DYNFIELD_MAX_SIZE
 
 /*
 gets the next data block, creating one if it does not exist
