@@ -17,6 +17,8 @@
  * MemSpace* MemSpace_kernel;// This is initialised within `initPaging'
  * void initPaging(void);
  * void MemSpace_forEach(void (*)(uintptr, void*, void*), void*, struct MemSpace*);
+ * int pinPage(uintptr, struct MemSpace*);// Increments the pinning level of a page; Returns 0 upon success; returns (-1) upon failing due to the page not being mapped
+ * void unpinPage(uintptr, struct MemSpace*);// Decrements the pinning level of a page that has a nonzero pinning level
  *
  */
 #define FAILMASK_PAGING 0x000d0000

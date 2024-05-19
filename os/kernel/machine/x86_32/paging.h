@@ -20,6 +20,25 @@ typedef u32 PGDEnt;
 #define PG_US ((PGDEnt) (u32) 0x00000004)
 #define PG_A ((PGDEnt) (u32) 0x00000020)
 #define PG_D ((PGDEnt) (u32) 0x00000040)
+#define PG_PINNED ((PGDEnt) (u32) 0x00000e00)
+void PGDPinAdj(volatile PGDEnt* ent, int dec) {
+	u32 val = AtomicULong_get((AtomicULong*) ent);
+	unsigned int pins = (val >> 9) & 0x00000007;// TODO Support more than 7 concurrent page pins
+	if (!dec) {
+		pins++;
+		pins &= 0x00000007;
+	}
+	if (!pins) {
+		bugCheckNum(0x0007 | FAILMASK_PAGING);
+	}
+	if (dec) {
+		pins--;
+	}
+	val &= (u32) 0xffff1ff;
+	val |= ((u32) pins) << 9;
+	AtomicULong_set((AtomicULong*) ent, val);
+	return;
+}
 int PGDTest(volatile PGDEnt* valptr, PGDEnt cond) {
 	return (((PGDEnt) AtomicULong_get((AtomicULong*) valptr)) & cond) ? 1 : 0;
 }
@@ -35,12 +54,13 @@ void PGDUnset(volatile PGDEnt* valptr, PGDEnt cond) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
+/*
 unsigned long PGDRead(volatile PGDEnt* valptr) {
 	PGDEnt p = (PGDEnt) AtomicULong_get((AtomicULong*) valptr);
 	return (((u32) p) >> 9) & ((u32) 0x00000007);
 }
 void PGDWrite(volatile PGDEnt* valptr, unsigned long datt) {
-	if (((u32) datt) & ((u32) 0x00000007)) {
+	if (((u32) datt) & ~((u32) 0x00000007)) {
 		bugCheckNum(0x0001 | FAILMASK_PAGING);
 	}
 	PGDEnt p = (PGDEnt) AtomicULong_get((AtomicULong*) valptr);
@@ -48,6 +68,7 @@ void PGDWrite(volatile PGDEnt* valptr, unsigned long datt) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
+*/
 void PGDSetAddr(volatile PGDEnt* valptr, uintptr ptr) {
 	u32 b = (u32) ((ptr) + ((uintptr) RELOC));
 	if (b & 0x00000fff) {
@@ -87,6 +108,26 @@ struct MemSpace {
 	volatile PGDEnt* dir;
 	Mutex lock;
 };
+volatile PGDEnt* findPage(uintptr vAddr, struct MemSpace* ms) {
+	Mutex_acquire(&(ms->lock));
+	u32 p = vAddr;
+	if (p & ((u32) 0x00000fff)) {
+		bugCheckNum(0x0006 | FAILMASK_PAGING);
+	}
+	int i = (p >> 22);
+	int j = ((p >> 12) & ((u32) 0x000003ff));
+	if (!(PGDTest((ms->dir) + i, PG_P))) {
+		Mutex_release(&(ms->lock));
+		return NULL;
+	}
+	volatile PGDEnt* tbl = PGDGetAddr((ms->dir) + i);
+	if (!(PGDTest(tbl + j, PG_P))) {
+		Mutex_release(&(ms->lock));
+		return NULL;
+	}
+	Mutex_release(&(ms->lock));
+	return tbl + j;
+}
 struct MemSpace* MemSpace_create(void) {
 	struct MemSpace* ms = alloc(sizeof(struct MemSpace));
 	Mutex_initUnlocked(&(ms->lock));
@@ -152,22 +193,51 @@ int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int pri
 int mapPage(uintptr vAddr, void* ptr, int userWritable, struct MemSpace* ms) {
 	return mapPageSpecificPrivilege(vAddr, ptr, userWritable, 0, ms);
 }
-int unmapPage(uintptr vAddr, struct MemSpace* ms) {
+int pinPage(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
+	volatile PGDEnt* ent = findPage(vAddr, ms);
+	if (ent == NULL) {
+		Mutex_release(&(ms->lock));
+		return (-1);
+	}
+	PGDPinAdj(ent, 0);
+	Mutex_release(&(ms->lock));
+	return 0;
+}
+void unpinPage(uintptr vAddr, struct MemSpace* ms) {
+	Mutex_acquire(&(ms->lock));
+	volatile PGDEnt* ent = findPage(vAddr, ms);
+	if (ent == NULL) {
+		bugCheckNum(0x0008 | FAILMASK_PAGING);
+	}
+	PGDPinAdj(ent, 1);
+	Mutex_release(&(ms->lock));
+	return;
+}
+int unmapPage(uintptr vAddr, struct MemSpace* ms) {
 	u32 p = vAddr;
 	if (p & ((u32) 0x00000fff)) {
 		bugCheckNum(0x0005 | FAILMASK_PAGING);
 	}
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
-	if (!(PGDTest((ms->dir) + i, PG_P))) {
+	volatile PGDEnt* tbl = NULL;
+	while (1) {
+		Mutex_acquire(&(ms->lock));
+		if (!(PGDTest((ms->dir) + i, PG_P))) {
+			Mutex_release(&(ms->lock));
+			return (-1);
+		}
+		tbl = PGDGetAddr((ms->dir) + i);
+		if (!(PGDTest(tbl + j, PG_P))) {
+			Mutex_release(&(ms->lock));
+			return (-1);
+		}
+		if (!(PGDTest(tbl + j, PG_PINNED))) {
+			break;
+		}
 		Mutex_release(&(ms->lock));
-		return (-1);
-	}
-	volatile PGDEnt* tbl = PGDGetAddr((ms->dir) + i);
-	if (!(PGDTest(tbl + j, PG_P))) {
-		Mutex_release(&(ms->lock));
-		return (-1);
+		Mutex_wait();
 	}
 	nullifyEntry(tbl + j);
 	for (int k = 0; k < 1024; k++) {
