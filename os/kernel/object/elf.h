@@ -67,12 +67,12 @@ typedef struct {
 	Elf32_Word p_flags;
 	Elf32_Word p_align;
 } Elf32_Phdr;
-int ELF_cpyUser(uintptr dest, const void* from, uintptr count, int userWritable, struct MemSpace* mem) {
-	MemSpace_mkData(from, dest, count, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
+int ELF_cpyUser(uintptr dest, const void* from, uintptr count, int userReadable, int userWritable, struct MemSpace* mem) {
+	MemSpace_mkData(from, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
-int ELF_fillUser(uintptr dest, uintptr count, int userWritable, struct MemSpace* mem) {
-	MemSpace_mkFill(0x00, dest, count, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
+int ELF_fillUser(uintptr dest, uintptr count, int userReadable, int userWritable, struct MemSpace* mem) {
+	MemSpace_mkFill(0x00, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
 int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
@@ -98,13 +98,13 @@ int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct 
 			return 23;/* Unrecognised segment type */
 		}
 	}
-	/* TODO Use p_flags for setting read and execute permissions */
+	/* TODO Use p_flags for setting execute permissions */
 	if ((seg->p_filesz) > (seg->p_memsz)) {
 		return 24;/* Memory image is of smaller size than file image */
 	}
-	ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x02) ? 1 : 0, mem);
+	ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
 	if ((seg->p_memsz) > (seg->p_filesz)) {
-		ELF_fillUser((uintptr) ((seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x02) ? 1 : 0, mem);
+		ELF_fillUser((uintptr) ((seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
 	}
 	uintptr s = seg->p_vaddr + seg->p_memsz;
 	if (s > (*stack)) {
@@ -237,7 +237,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 #if TARGETNUM == 1
 	// x86_32
 	s = ((uintptr) s) - (((uintptr) s) % 4);
-	if (mapPageSpecificPrivilege((uintptr) 0, (void*) (0 - RELOC), 0, 1, thread->group->mem)) {
+	if (mapPage((uintptr) 0, (void*) (0 - RELOC), 0, 0, thread->group->mem)) {
 		MemSpace_forEach(freePage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
 		return 29;// TODO Is this denial allowed?
@@ -248,12 +248,12 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 	uintptr m = PAGEOF(s);
 	sl = PAGEOF(sl + PAGE_SIZE);
 	while (m != sl) {
-		if (mapPage(m, alloc_lb_wiped(), 1, thread->group->mem)) {
+		if (mapPage(m, alloc_lb_wiped(), 1, 1, thread->group->mem)) {
 			bugCheckNum(0x0001 | FAILMASK_ELF);
 		}
 		m = PAGEOF(m - 1);
 	}
-	// TODO Do not allocate the entirety of the stack at once when on x86, maybe
+	// TODO Do not allocate the entirety of the stack at once when on x86
 	Threadstate_fill(s, ((const Elf32_Ehdr*) elf)->e_entry, thread->group->mem, &(thread->state));
 	return 0;
 }

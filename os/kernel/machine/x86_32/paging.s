@@ -10,3 +10,8 @@ orl $0x80000000,%eax
 andl $0xfffeffff,%eax
 movl %eax,%cr0
 ret
+TLBReload:#void TLBReload(void);
+.globl TLBReload
+movl %cr3,%eax
+movl %eax,%cr3
+ret

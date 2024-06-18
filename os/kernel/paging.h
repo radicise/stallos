@@ -3,21 +3,42 @@
 /*
  *
  * Defines:
+ *
  * PAGE_SIZE
- * // `PAGE_SIZE' must be a power of two and at least one
+ * // The value of `PAGE_SIZE' must be a power of two and at least one
+ *
+ * PAGE_LOMASK
+ * // The type of the value of `PAGE_LOMASK' is `uintptr'
+ *
+ * PAGE_BITS
+ * // The value of `PAGE_SIZE' is equal to the value of `(((uintptr) 0x1) << PAGE_BITS)'
+ *
  * PAGEOF(x)
+ * // The type of the value of `PAGEOF(x)' is `uintptr'
+ *
  * struct MemSpace
  * // struct MemSpace has an operations lock `lock' of type `Mutex' that is utilised appropriately
+ *
  * struct MemSpace* MemSpace_create(void);
+ *
  * void MemSpace_destroy(struct MemSpace*);// Does not attempt to use `dealloc' to free the memory backing the memory mappings
- * int mapPage(uintptr, void*, int, struct MemSpace*);// The argument of type `uintptr' represents a page-aligned address, the argument of type `void*' is a page-aligned address, the return value indicates the status: 0 represents success and (-1) represents failure due to the virtual address already having been mapped
- * void unmapPage(uintptr, struct MemSpace*);// Arguments must match with those of the corresponding `mapPage' call, the return value indicates the status: 0 represents success and (-1) represents failure due to the virtual address not already being mapped
+ *
+ * int mapPage(uintptr vPage, void* addr, int userReadable, int userWritable, struct MemSpace* mem);// The argument of type `uintptr' represents a page-aligned address, the argument of type `void*' is a page-aligned address, the return value indicates the status: 0 represents success and (-1) represents failure due to the virtual address already having been mapped
+ *
+ * void unmapPage(uintptr vPage, struct MemSpace* mem);// Arguments must match with those of the corresponding `mapPage' call, the return value indicates the status: 0 represents success and (-1) represents failure due to the virtual address not already being mapped
+ *
  * int pageExists(uintptr, struct MemSpace*);
+ *
  * void* pageMapping(uintptr, struct MemSpace*);// Returns `NULL' if the specified page is not mapped
+ *
  * MemSpace* MemSpace_kernel;// This is initialised within `initPaging'
+ *
  * void initPaging(void);
+ *
  * void MemSpace_forEach(void (*)(uintptr, void*, void*), void*, struct MemSpace*);
- * int pinPage(uintptr, struct MemSpace*);// Increments the pinning level of a page; Returns 0 upon success; returns (-1) upon failing due to the page not being mapped
+ *
+ * int pinPage(uintptr vPage, struct MemSpace* mem, int implyReadable, int implyWritable);// Increments the pinning level of a page; Returns 0 upon success; returns (-1) upon failing due to the page not being mapped or not having sufficient userspace privilege
+ *
  * void unpinPage(uintptr, struct MemSpace*);// Decrements the pinning level of a page that has a nonzero pinning level
  *
  */
@@ -30,7 +51,7 @@
 #else
 #error "Target is not supported"
 #endif
-void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesUserWritable, struct MemSpace* mem) {
+void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
 	if (len == 0) {
 		return;
 	}
@@ -39,7 +60,7 @@ void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesU
 		uintptr page = PAGEOF(target);
 		void* usrmem = pageMapping(page, mem);
 		if (usrmem == NULL) {
-			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserWritable, mem);
+			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
 				bugCheckNum(0x1001 | FAILMASK_PAGING);
 			}
@@ -57,7 +78,7 @@ void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesU
 	}
 	return;
 }
-void MemSpace_mkFill(char val, uintptr target, uintptr len, int newPagesUserWritable, struct MemSpace* mem) {
+void MemSpace_mkFill(char val, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
 	if (len == 0) {
 		return;
 	}
@@ -66,7 +87,7 @@ void MemSpace_mkFill(char val, uintptr target, uintptr len, int newPagesUserWrit
 		uintptr page = PAGEOF(target);
 		void* usrmem = pageMapping(page, mem);
 		if (usrmem == NULL) {
-			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserWritable, mem);
+			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
 				bugCheckNum(0x1001 | FAILMASK_PAGING);
 			}

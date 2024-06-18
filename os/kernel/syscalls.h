@@ -496,11 +496,116 @@ void retDesc(int kfd) {
 	}
 	return;
 }
-void* getUserMem(uintptr uptr) {
-	if (((void*) uptr) == NULL) {
-		return NULL;
+void* getUserMem(unsigned long upm, uintptr len, int implyReadable, int implyWritable) {
+	if (!len) {
+		return getUserMem(upm, 1, implyReadable, implyWritable);// TODO Is this correct? Moreover, is this correct specifically in the cases of calls to `read' and `write'?
 	}
-	bugCheck();// TODO Implement
+	uintptr uptr = (uintptr) upm;
+	if (!(implyReadable | implyWritable)) {
+		bugCheckNum(0x000f | FAILMASK_SYSCALLS);// TODO Are there any system calls that accept any memory pointers but do not require the userspace program to have either read or write rights for associated memory?
+	}
+	uintptr poff = uptr - PAGEOF(uptr);
+	uptr -= poff;
+	len += poff;
+	uintptr lm = len & PAGE_LOMASK;
+	if (lm) {
+		len ^= lm;
+		len += PAGE_SIZE;
+	}
+	lm = uptr;
+	uintptr ln = len;
+	while (ln) {
+		if (pinPage(lm, usermem, implyReadable, implyWritable)) {
+			while (lm != uptr) {
+				lm -= PAGE_SIZE;
+				unpinPage(lm, usermem);
+			}
+			errno = EFAULT;
+			return NULL;
+		}
+		lm += PAGE_SIZE;
+		ln -= PAGE_SIZE;
+	}
+	void* memArea = dedic_argblock(len);
+	uintptr mA = (uintptr) memArea;
+	ln = len;
+	while (ln) {
+		if (mapPage(mA, implyReadable ? (alloc_lb()) : (alloc_lb_wiped()), 0, 0, MemSpace_kernel)) {// TODO Decide whether driver implementations of system calls should be entrusted with ensuring that no kernel memory remnants are accessible to the userspace program and thus not need "wiping" of the allocated page backing memory when the page is implied to be readable
+			bugCheckNum(0x000a | FAILMASK_SYSCALLS);
+		}
+		ln -= PAGE_SIZE;
+		mA += PAGE_SIZE;
+	}
+	if (implyReadable) {
+		ln = len;
+		lm = uptr;
+		void* mea = memArea;
+		while (ln) {
+			void* backing = pageMapping(lm, usermem);
+			if (backing == NULL) {
+				bugCheckNum(0x000b | FAILMASK_SYSCALLS);
+			}
+			moveExv(mea, backing, PAGE_SIZE);
+			ln -= PAGE_SIZE;
+			lm += PAGE_SIZE;
+			mea = (void*) (((char*) mA) + PAGE_SIZE);
+		}
+	}
+	return (void*) (((char*) memArea) + poff);
+}
+void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
+	if (!olen) {
+		retUserMem(mem, upm, 1, rlen);
+		return;
+	}
+	uintptr uptr = upm;
+	uintptr poff = uptr - PAGEOF(uptr);
+	uintptr pmem = ((uintptr) mem) - poff;
+	uintptr plen = olen + poff;
+	uintptr lm = plen & PAGE_LOMASK;
+	if (lm) {
+		plen ^= lm;
+		plen += PAGE_SIZE;
+	}
+	if (rlen) {
+		void* mt = mem;
+		uintptr upt = uptr;
+		while (1) {
+			void* upm = pageMapping(PAGEOF(upt), usermem);
+			if (upm == NULL) {
+				bugCheckNum(0x000e | FAILMASK_SYSCALLS);
+			}
+			uintptr lfp = upt & PAGE_LOMASK;
+			if ((rlen + lfp) <= ((uintptr) PAGE_SIZE)) {
+				moveExv((void*) (((char*) upm) + lfp), mt, rlen);
+				break;
+			}
+			else {
+				moveExv((void*) (((char*) upm) + lfp), mt, PAGE_SIZE - lfp);
+				mt = (void*) (((char*) mt) + (PAGE_SIZE - lfp));
+				upt += PAGE_SIZE - lfp;
+				rlen -= PAGE_SIZE - lfp;
+			}
+		}
+	}
+	uintptr amem = pmem;
+	uptr -= poff;
+	while (lm) {
+		unpinPage(uptr, usermem);
+		void* mm = pageMapping(amem, MemSpace_kernel);
+		if (mm == NULL) {
+			bugCheckNum(0x000c | FAILMASK_SYSCALLS);
+		}
+		if (unmapPage(amem, MemSpace_kernel)) {
+			bugCheckNum(0x000d | FAILMASK_SYSCALLS);
+		}
+		dealloc_lb(mm);
+		lm -= PAGE_SIZE;
+		amem += PAGE_SIZE;
+		uptr += PAGE_SIZE;
+	}
+	undedic_argblock((void*) (((char*) mem) - poff), olen);
+	return;
 }
 void initSystemCallInterface(void) {
 	kmem_init();
@@ -829,15 +934,45 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		kernelMsg(")");
 	}
 #endif
-	switch (nr) {// TODO Authenticate memory access
+	switch (nr) {
 		case (3):
-			retVal = (unsigned long) read((int) arg1, (void*) getUserMem(arg2), (size_t) arg3);
+			{
+				void* mem1 = getUserMem(arg2, (size_t) arg3, 0, 1);
+				if (errno) {
+					retVal = (-1);
+					break;
+				}
+				ssize_t res = read((int) arg1, (void*) mem1, (size_t) arg3);// TODO Ensure that the `ssize_t' is always wide enough to accomodate for all resulting transfer sizes appropriately
+				if (res == ((ssize_t) (-1))) {
+					retUserMem(mem1, arg2, (size_t) arg3, 0);
+				}
+				else {
+					retUserMem(mem1, arg2, (size_t) arg3, res);
+				}
+				retVal = (unsigned long) res;
+			}
 			break;
 		case (4):
-			retVal = (unsigned long) write((int) arg1, (const void*) getUserMem(arg2), (size_t) arg3);
+			{
+				void* mem1 = getUserMem(arg2, (size_t) arg3, 1, 0);
+				if (errno) {
+					retVal = (-1);
+					break;
+				}
+				retVal = (unsigned long) write((int) arg1, (const void*) mem1, (size_t) arg3);
+				retUserMem(mem1, arg2, (size_t) arg3, 0);
+			}
 			break;
 		case (13):
-			retVal = (unsigned long) time((time_t*) getUserMem(arg1));
+			{
+				void* mem1 = getUserMem(arg1, sizeof(time_t), 0, 1);
+				if (errno) {
+					retVal = (-1);
+					break;
+				}
+				retVal = (unsigned long) time((time_t*) mem1);
+				retUserMem(mem1, arg1, sizeof(time_t), sizeof(time_t));
+			}
 			break;
 		case (19):
 			retVal = (unsigned long) lseek((int) arg1, (off_t) arg2, (int) arg3);
@@ -849,14 +984,36 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			retVal = (unsigned long) getuid();
 			break;
 		case (25):
-			retVal = (unsigned long) stime((const time_t*) getUserMem(arg1));
+			{
+				void* mem1 = getUserMem(arg1, sizeof(time_t), 1, 0);
+				if (errno) {
+					retVal = (-1);
+					break;
+				}
+				retVal = (unsigned long) stime((const time_t*) mem1);
+				retUserMem(mem1, arg1, sizeof(time_t), 0);
+			}
 			break;
 		case (49):
 			retVal = (unsigned long) geteuid();
 			break;
 #if LINUX_COMPAT_VERSION >= 0x10104600
 		case (140):// Prototype is sourced from Linux man-pages lseek64(3)
-			retVal = (unsigned long) _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) getUserMem(arg4), (int) arg5);
+			{
+				void* mem1 = getUserMem(arg4, sizeof(loff_t), 0, 1);
+				if (errno) {
+					retVal = (-1);// TODO Is the actual repositioning supposed to happen if the passed memory address is not properly-accessible to the user?
+					break;
+				}
+				int res = _llseek((int) arg1, (off_t) arg2, (off_t) arg3, (loff_t*) mem1, (int) arg5);
+				if (res == (-1)) {
+					retUserMem(mem1, arg4, sizeof(loff_t), 0);
+				}
+				else {
+					retUserMem(mem1, arg4, sizeof(loff_t), sizeof(loff_t));
+				}
+				retVal = (unsigned long) res;
+			}
 			break;
 #endif
 #if LINUX_COMPAT_VERSION >= 0x20303900

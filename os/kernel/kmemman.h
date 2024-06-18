@@ -17,18 +17,15 @@
 #define KMEM_LB_AMNTMEMBITMAPBYTES (KMEM_LB_AMNT / (KMEM_LB_BS * CHAR_BIT))
 #define KMEM_LB_AMNTMEMSPACES (KMEM_LB_AMNT / KMEM_LB_BS)
 #define KMEM_LB_DATSTART (KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES + KMEM_LB_BS - ((KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES - 1) % KMEM_LB_BS) - 1)
+#define ARGBLOCK_SIZE ((uintptr) 0x01000000)
+#define ARGBLOCK_AMNT 64UL
+#define ARGBLOCK_ADDR 0xc0000000
 #include "util.h"
 Mutex kmem_access;
 Mutex kmem_lb_access;
+SimpleMutex* argblockLock;
 volatile unsigned long long memAllocated = 0;
 volatile unsigned long long memAllocated_lb = 0;
-void kmem_init(void) {
-	set((void*) (KMEM_ADDR - RELOC), 0x00, KMEM_DATSTART - KMEM_ADDR);
-	set((void*) (KMEM_LB_ADDR - RELOC), 0x00, KMEM_LB_DATSTART - KMEM_LB_ADDR);
-	Mutex_initUnlocked(&kmem_access);
-	Mutex_initUnlocked(&kmem_lb_access);
-	return;
-}
 unsigned long long getMemUsage(void) {
 	unsigned long long n = KMEM_LB_DATSTART - KMEM_AMNT;
 	Mutex_acquire(&kmem_access);
@@ -123,5 +120,36 @@ void* alloc_lb_wiped(void) {
 	void* block = alloc_lb();
 	memset(block, 0x00, KMEM_LB_BS);
 	return block;
+}
+void* dedic_argblock(uintptr len) {
+	if (len > ARGBLOCK_SIZE) {
+		bugCheckNum(0x16414a4a);
+	}
+	unsigned long off = 0;
+	while (1) {
+		if (SimpleMutex_tryAcquire(argblockLock + off)) {
+			return (void*) ((ARGBLOCK_ADDR - RELOC) + (off * ARGBLOCK_SIZE));
+		}
+		off++;
+		if (off == ARGBLOCK_AMNT) {
+			off = 0;
+		}
+	}
+}
+void undedic_argblock(void* block, uintptr len) {
+	long off = (((uintptr) block) - ((uintptr) (ARGBLOCK_ADDR - RELOC))) / ARGBLOCK_SIZE;
+	SimpleMutex_release(argblockLock + off);
+	return;
+}
+void kmem_init(void) {
+	set((void*) (KMEM_ADDR - RELOC), 0x00, KMEM_DATSTART - KMEM_ADDR);
+	set((void*) (KMEM_LB_ADDR - RELOC), 0x00, KMEM_LB_DATSTART - KMEM_LB_ADDR);
+	Mutex_initUnlocked(&kmem_access);
+	Mutex_initUnlocked(&kmem_lb_access);
+	argblockLock = alloc(ARGBLOCK_AMNT * sizeof(Mutex));
+	for (unsigned long i = 0; i < ARGBLOCK_AMNT; i++) {
+		SimpleMutex_initUnlocked(argblockLock + i);
+	}
+	return;
 }
 #endif

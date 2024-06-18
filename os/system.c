@@ -2,7 +2,9 @@
 #error "`TARGET' is not set"
 #endif
 #define __STALLOS__ 1
+#define MACHINE_SUPPORT_WRONLYMEM 0
 #define RELOC 0x00040000
+// The value of `RELOC' MUST be a positive integer multiple of the value of `PAGE_SIZE'
 #define physicalZero ((volatile void*) (((uintptr) 0) - ((uintptr) RELOC)))
 // TODO URGENT Ensure that pointer underflow acts as expected
 extern void irupt_70h(void);

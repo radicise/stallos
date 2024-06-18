@@ -51,4 +51,5 @@ void unlockFSInfo(void) {
 #define root (PerThread_context->fsinfo->root)
 #define umask (PerThread_context->fsinfo->umask)
 #define tgid (PerThreadgroup_context->tgid)
+#define usermem (PerThreadgroup_context->mem)
 #endif

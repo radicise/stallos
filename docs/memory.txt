@@ -4,5 +4,8 @@ Memory
 
 "Userspace pages": A userspace page is any virtual memory page accessible to a threadgroup. The backing memory for userspace pages is generally allocated with `alloc_lb_wiped'.
 
-"Userspace page pinning": Any userspace page may be pinned by the kernel. During pins, the userspace pages shall not be remapped and shall not be unmapped and shall not have permissions changed. Due to the nature of pinning, multiple kernel threads may hold concurrent pins on the same userspace page. Because of this, a userspace page is considered pinned if and only if at least one kernel thread holds a pin on the page.
+"Userspace page pinning": Any userspace page may be pinned by the kernel. During pins, the userspace pages shall not be remapped and shall not be unmapped and shall not have permissions changed such that the new permissions are more restrictive to the userspace program. Due to the nature of pinning, multiple kernel threads may hold concurrent pins on the same userspace page. Because of this, a userspace page is considered pinned if and only if at least one kernel thread holds a pin on the page.
+
+
+
 

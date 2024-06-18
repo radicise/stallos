@@ -15,6 +15,9 @@
 #error "Target is not supported"
 #endif
 /*
+ * TODO URGENT ensure that `uintptr'-typed values are consistent between casts from the different pointer types
+ */
+/*
  *
  * Definitions for Linux kernel-userspace interface types
  *
