@@ -80,7 +80,7 @@ _cahh:
     ret
 _cann:
     # doc:
-    # Saves %ax, %bx, %cx, %si, %di, %ds, and %es in the stack before calling the service specified in %ds, popping the saved registers back afterwards
+    # Saves %ax, %bx, %cx, %si, %di, %ds, and %es in the stack before calling the service specified in %dx, popping the saved registers back afterwards
     # Does not make service call if the service number is not valid
     # Does not check if the service is loaded in memory
     # %dx=0x0001 - bootedDiskette144_service
@@ -184,6 +184,10 @@ _diwr:
 .byte 0x55
 .byte 0xaa
 _seac:
+    
+    movw $0x0004,%dx
+    jmp _cann
+
     jmp shesh
     inpc:
     .byte 0

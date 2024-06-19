@@ -590,6 +590,7 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 	}
 	uintptr amem = pmem;
 	uptr -= poff;
+	lm = plen;
 	while (lm) {
 		unpinPage(uptr, usermem);
 		void* mm = pageMapping(amem, MemSpace_kernel);
@@ -604,7 +605,7 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 		amem += PAGE_SIZE;
 		uptr += PAGE_SIZE;
 	}
-	undedic_argblock((void*) (((char*) mem) - poff), olen);
+	undedic_argblock((void*) (((char*) mem) - poff), plen);
 	return;
 }
 void initSystemCallInterface(void) {
@@ -909,30 +910,28 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 	Mutex_acquire(&(PerThread_context->dataLock));
 	unsigned long retVal = 0;
 #if __TESTING__ == 1
-	if (nr != 13) {
-		if (nr > SYSCALL_HIGH) {
-			kernelMsg("NOCALL");
-		}
-		else {
-			kernelMsg(callname[nr]);
-		}// TODO Maybe note the name of calls to the "testcall"
-		// TODO Note the call number if the call is a "NOCALL"
-		kernelMsg("(");
-		kernelMsgULong_hex(arg1);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg2);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg3);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg4);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg5);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg6);
-		kernelMsg(", ");
-		kernelMsgULong_hex(arg7);
-		kernelMsg(")");
+	if (nr > SYSCALL_HIGH) {
+		kernelMsg("NOCALL");
 	}
+	else {
+		kernelMsg(callname[nr]);
+	}// TODO Maybe note the name of calls to the "testcall"
+	// TODO Note the call number if the call is a "NOCALL"
+	kernelMsg("(");
+	kernelMsgULong_hex(arg1);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg2);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg3);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg4);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg5);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg6);
+	kernelMsg(", ");
+	kernelMsgULong_hex(arg7);
+	kernelMsg(")");
 #endif
 	switch (nr) {
 		case (3):
@@ -965,13 +964,22 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			break;
 		case (13):
 			{
-				void* mem1 = getUserMem(arg1, sizeof(time_t), 0, 1);
-				if (errno) {
-					retVal = (-1);
-					break;
+				void* uptr = (void*) ((uintptr) arg1);
+				void* mem1;
+				if (uptr != NULL) {
+					mem1 = getUserMem(arg1, sizeof(time_t), 0, 1);
+					if (errno) {
+						retVal = (-1);
+						break;
+					}
+				}
+				else {
+					mem1 = NULL;
 				}
 				retVal = (unsigned long) time((time_t*) mem1);
-				retUserMem(mem1, arg1, sizeof(time_t), sizeof(time_t));
+				if (uptr != NULL) {
+					retUserMem(mem1, arg1, sizeof(time_t), sizeof(time_t));
+				}
 			}
 			break;
 		case (19):
@@ -1041,13 +1049,11 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 			break;
 	}
 #if __TESTING__ == 1
-	if (nr != 13) {
-		kernelMsg(" = ");
-		kernelMsgULong_hex(retVal);
-		kernelMsg("; `errno': ");
-		kernelMsgULong_hex(errno);
-		kernelMsg("\n");
-	}
+	kernelMsg(" = ");
+	kernelMsgULong_hex(retVal);
+	kernelMsg("; `errno': ");
+	kernelMsgULong_hex(errno);
+	kernelMsg("\n");
 #endif
 	Mutex_release(&(PerThread_context->dataLock));// THIS ADDITIONALLY SERVES AS A MEMORY BARRIER
 	return retVal;

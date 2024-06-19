@@ -42,6 +42,7 @@ extern void bugCheck(void);
 extern void bugCheckNum(unsigned long);
 void bugMsg(uintptr addr) {
 	int_disable();
+	// while (1) {}
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}

@@ -7,49 +7,7 @@ call systemEntry
 lret
 irupt_80h:# NOTE: This is under the assumption that %edx can never be used to return anything, which is contrary to the `syscall' Linux man-pages page; TODO resolve this conflict
 .globl irupt_80h
-/*
-movl 12(%esp),%eax
-pushw %es
-pushw %fs
-pushw %gs
-pushl %eax
-pushl %ebx
-pushl %edx
-movw %ss,%dx
-roll $0x10,%edx
-movw %ds,%dx
-movl %cs:(0x0007f7f4 - RELOC),%ebx
-movl %esp,%cs:-4(%ebx)
-movl %edx,%cs:-8(%ebx)
-movl %ecx,%cs:-12(%ebx)
-popl %ecx
-movl %ecx,%cs:-16(%ebx)
-popl %ecx
-movl %ecx,%cs:-20(%ebx)
-popl %ecx
-movl %ecx,%cs:-24(%ebx)
-movl %cs:-12(%ebx),%ecx
-subl $0x18,%ebx
-movw %cs,%ax
-addw $0x08,%ax
-movw %ax,%ds
-movw %ax,%ss
-movl %ebx,%esp
-popl %eax
-popl %ebx
-movl (%esp),%edx
-pushl %ebp
-pushl %eax
-pushl $0x00
-pushl %ebp
-xorl %ebp,%ebp
-pushl %edi
-pushl %esi
-pushl %edx
-pushl %ecx
-pushl %ebx
-*/
-cld
+cld# Preventing some consequences of malicious / bad drivers
 call mem_barrier
 xorl %eax,%eax
 subl $RELOC,%eax
@@ -64,10 +22,11 @@ pushl 0x2c(%eax)
 pushl 0x34(%eax)
 call system_call# TODO URGENT Normalise argument structure if it had been re-formatted to fit the ABI
 addl $32,%esp
-movl PerThread_context,%eax
-movl (%eax),%eax
-testl %eax,%eax
+movl PerThread_context,%ebx
+movl (%ebx),%ebx
+testl %ebx,%ebx
 jz irupt_80h__noError
+movl %ebx,%eax
 notl %eax
 incl %eax
 irupt_80h__noError:

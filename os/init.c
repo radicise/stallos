@@ -59,7 +59,7 @@ void _start() {
 	time_t timeNow;
 	while (1) {
 #if __TESTING__ == 1
-		testcall(0);
+		//testcall(0);
 #endif
 		while ((timeNow = time(NULL)) == timeOld) {
 		}

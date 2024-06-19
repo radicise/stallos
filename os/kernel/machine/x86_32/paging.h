@@ -31,7 +31,10 @@ void PGDPinAdj(volatile PGDEnt* ent, int dec) {
 		pins &= 0x00000007;
 	}
 	if (!pins) {
-		bugCheckNum(0x0007 | FAILMASK_PAGING);
+		if (dec) {
+			bugCheckNum(0x0007 | FAILMASK_PAGING);
+		}
+		bugCheckNum(0x0009 | FAILMASK_PAGING);
 	}
 	if (dec) {
 		pins--;
@@ -109,6 +112,7 @@ void initEntry(volatile PGDEnt* ent, int userWritable, int privileged, volatile 
 struct MemSpace {
 	volatile PGDEnt* dir;
 	Mutex lock;
+	uintptr offset;
 };
 struct MemSpace* MemSpace_kernel;
 void TLBFlush(struct MemSpace* ms) {
@@ -133,12 +137,16 @@ volatile PGDEnt* findPage(uintptr vAddr, struct MemSpace* ms) {
 	}
 	return tbl + j;
 }
-struct MemSpace* MemSpace_create(void) {
+struct MemSpace* MemSpace_createOffset(uintptr off) {// The value of `off' MUST be an integer multiple of the value of `PAGE_SIZE'
 	struct MemSpace* ms = alloc(sizeof(struct MemSpace));
 	Mutex_initUnlocked(&(ms->lock));
+	ms->offset = off;
 	(ms->dir) = alloc_lb();
 	initPageTable(ms->dir);
 	return ms;
+}
+struct MemSpace* MemSpace_create(void) {
+	return MemSpace_createOffset((uintptr) 0);
 }
 void MemSpace_destroy(struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
@@ -162,7 +170,7 @@ void MemSpace_forEach(void (*operation)(uintptr, void*, void*), void* obj, struc
 			for (int j = 0; j < 1024; j++) {
 				if (PGDTest(tbl + j, PG_P)) {
 					void* addr = PGDGetAddr(tbl + j);
-					operation((((uintptr) i) << 22) | (((uintptr) j) << 12), addr, obj);
+					operation(((((uintptr) i) << 22) | (((uintptr) j) << 12)) - ((uintptr) (mem->offset)), addr, obj);
 				}
 			}
 		}
@@ -172,6 +180,7 @@ void MemSpace_forEach(void (*operation)(uintptr, void*, void*), void* obj, struc
 }
 int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int privileged, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
+	vAddr += ms->offset;
 	u32 p = vAddr;
 	if (p & ((u32) 0x00000fff)) {
 		bugCheckNum(0x0004 | FAILMASK_PAGING);
@@ -179,6 +188,13 @@ int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int pri
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
 	if (!(PGDTest((ms->dir) + i, PG_P))) {
+		
+		//kernelMsgULong((unsigned long) i);
+		//kernelMsg("\n");
+		//kernelMsgULong((unsigned long) j);
+		//kernelMsg("\n");
+		//kernelMsg("\n");
+
 		volatile PGDEnt* tbl = alloc_lb();
 		initPageTable(tbl);
 		initEntry((ms->dir) + i, 1, 0, tbl);
@@ -197,7 +213,10 @@ int mapPageSpecificPrivilege(uintptr vAddr, void* ptr, int userWritable, int pri
 	Mutex_release(&(ms->lock));
 	return 0;
 }
-int mapPage(uintptr vAddr, void* ptr, int userReadable, int userWritable, struct MemSpace* ms) {
+int mapPage(uintptr vAddr, void* ptr, int userReadable, int userWritable, struct MemSpace* ms) {// TODO URGENT Distinguish between userspace-held pages with no permissions and kernel-held pages
+	//kernelWarnMsgCode("", (unsigned long) ptr);
+	//kernelWarnMsgCode("", (unsigned long) vAddr);
+	//kernelMsg("\n");
 	if (userReadable) {
 		return mapPageSpecificPrivilege(vAddr, ptr, userWritable, 0, ms);
 	}
@@ -208,6 +227,10 @@ int mapPage(uintptr vAddr, void* ptr, int userReadable, int userWritable, struct
 }
 int pinPage(uintptr vAddr, struct MemSpace* ms, int implyReadable, int implyWritable) {
 	Mutex_acquire(&(ms->lock));
+
+	// kernelMsgCode("Pin: ", vAddr);
+
+	vAddr += ms->offset;
 	volatile PGDEnt* ent = findPage(vAddr, ms);
 	if (ent == NULL) {
 		Mutex_release(&(ms->lock));
@@ -231,6 +254,10 @@ int pinPage(uintptr vAddr, struct MemSpace* ms, int implyReadable, int implyWrit
 }
 void unpinPage(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
+
+	// kernelMsgCode("Unpin: ", vAddr);
+
+	vAddr += ms->offset;
 	volatile PGDEnt* ent = findPage(vAddr, ms);
 	if (ent == NULL) {
 		bugCheckNum(0x0008 | FAILMASK_PAGING);
@@ -239,16 +266,18 @@ void unpinPage(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_release(&(ms->lock));
 	return;
 }
-int unmapPage(uintptr vAddr, struct MemSpace* ms) {
-	u32 p = vAddr;
-	if (p & ((u32) 0x00000fff)) {
+int unmapPage(uintptr vA, struct MemSpace* ms) {
+	if (((u32) vA) & ((u32) 0x00000fff)) {
 		bugCheckNum(0x0005 | FAILMASK_PAGING);
 	}
-	int i = (p >> 22);
-	int j = ((p >> 12) & ((u32) 0x000003ff));
+	int i;
+	int j;
 	volatile PGDEnt* tbl = NULL;
 	while (1) {
 		Mutex_acquire(&(ms->lock));
+		u32 p = (u32) (vA + (ms->offset));
+		i = (p >> 22);
+		j = ((p >> 12) & ((u32) 0x000003ff));
 		if (!(PGDTest((ms->dir) + i, PG_P))) {
 			Mutex_release(&(ms->lock));
 			return (-1);
@@ -283,6 +312,7 @@ int unmapPage(uintptr vAddr, struct MemSpace* ms) {
 }
 int pageExists(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
+	vAddr += ms->offset;
 	u32 p = vAddr;
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
@@ -300,6 +330,7 @@ int pageExists(uintptr vAddr, struct MemSpace* ms) {
 }
 void* pageMapping(uintptr vAddr, struct MemSpace* ms) {
 	Mutex_acquire(&(ms->lock));
+	vAddr += ms->offset;
 	u32 p = vAddr;
 	int i = (p >> 22);
 	int j = ((p >> 12) & ((u32) 0x000003ff));
@@ -317,12 +348,12 @@ void* pageMapping(uintptr vAddr, struct MemSpace* ms) {
 	return b;
 }
 // TODO URGENT Make TLB flushing work on multi-processor systems
-// TODO Use `invlpg'
+// TODO Use `invlpg' appropriately
 void initPaging(void) {
-	MemSpace_kernel = MemSpace_create();
-	uintptr m = 0;
-	while (m < amntMem) {
-		if (mapPageSpecificPrivilege(m, (void*) (m - RELOC), 0, 1, MemSpace_kernel)) {// TODO URGENT Ensure that casting an underflowed `uintptr' to a `void*' works as it was taken to work
+	MemSpace_kernel = MemSpace_createOffset((uintptr) RELOC);
+	uintptr m = ((uintptr) 0) - ((uintptr) RELOC);
+	while (m != (amntMem - ((uintptr) RELOC))) {
+		if (mapPage(m, (void*) m, 0, 0, MemSpace_kernel)) {// TODO URGENT Ensure that casting an underflowed `uintptr' to a `void*' works as it was taken to work
 			bugCheckNum(0x0003 | FAILMASK_PAGING);
 		}
 		m += PAGE_SIZE;
