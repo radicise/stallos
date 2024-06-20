@@ -34,10 +34,13 @@ xorl %ebx,%ebx
 subl $RELOC,%ebx
 addl $0xd80,%ebx
 movl %eax,0x28(%ebx)
-irupt_80h_iret:
-.globl irupt_80h_iret
+irupt_80h__iret:
 iret
 jmp irupt_80h
+irupt_80h_sequenceEntry:
+.globl irupt_80h_sequenceEntry
+xorl %ebp,%ebp
+jmp irupt_80h__iret
 /*
 addl $0x20,%esp
 popl %ebp
@@ -158,17 +161,41 @@ movl %eax,___currentTime___# TODO Ensure atomic memory writes
 ret
 bugCheck:# void bugCheck(void)
 .globl bugCheck
-movl (%esp),%eax
-pushl %eax
-call bugCheckWrapped
-ret
+popl %eax
+pushl $0xffffffff
+pushl %eax# TODO dec
 bugCheckNum:# void bugCheckNum(unsigned long)
 .globl bugCheckNum
-movl (%esp),%eax
-movl 4(%esp),%edx
+pushl %ebp
+movl %esp,%ebp
+movl $12,%ecx
+movl %esp,%edx
+bugCheckNum__frameCheck:
+testl %edx,%edx
+jz bugCheckNum__framesFinished
+pushl 4(%edx)
+movl (%edx),%edx
+loop bugCheckNum__frameCheck
+bugCheckNum__framesFinished:
+jecxz bugCheckNum__traceFinished
+bugCheckNum__frameFiller:
+pushl $0xffffffff
+loop bugCheckNum__frameFiller
+bugCheckNum__traceFinished:
+pushl %esp
+movl 8(%ebp),%eax
 pushl %eax
-pushl %edx
 call bugCheckNumWrapped
+movl 8(%ebp),%eax
+movl %ebp,%esp
+popl %ebp
+notl %eax
+testl %eax,%eax
+jnz bugCheckNum__noAdjustment
+popl %eax
+addl $4,%esp
+pushl %eax
+bugCheckNum__noAdjustment:
 ret
 Thread_restore:# void Thread_restore(struct Thread_state*, long)
 .globl Thread_restore# Only invoke this from interrupt handlers called because of IRQ interrupts

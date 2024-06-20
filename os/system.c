@@ -40,7 +40,7 @@ extern void int_enable(void);
 extern void int_disable(void);
 extern void bugCheck(void);
 extern void bugCheckNum(unsigned long);
-void bugMsg(uintptr addr) {
+void bugMsg(uintptr* trace) {
 	int_disable();
 	// while (1) {}
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
@@ -64,32 +64,36 @@ void bugMsg(uintptr addr) {
 	(*((volatile unsigned short*) (0xb801e - RELOC))) = 0x4752;
 	(*((volatile unsigned short*) (0xb8020 - RELOC))) = 0x474f;
 	(*((volatile unsigned short*) (0xb8022 - RELOC))) = 0x4752;
-	(*((volatile unsigned short*) (0xb80a0 - RELOC))) = 0x4741;
-	(*((volatile unsigned short*) (0xb80a2 - RELOC))) = 0x4774;
-	(*((volatile unsigned short*) (0xb80a4 - RELOC))) = 0x4720;
-	(*((volatile unsigned short*) (0xb80a6 - RELOC))) = 0x4761;
-	(*((volatile unsigned short*) (0xb80a8 - RELOC))) = 0x4764;
-	(*((volatile unsigned short*) (0xb80aa - RELOC))) = 0x4764;
-	(*((volatile unsigned short*) (0xb80ac - RELOC))) = 0x4772;
-	(*((volatile unsigned short*) (0xb80ae - RELOC))) = 0x4765;
-	(*((volatile unsigned short*) (0xb80b0 - RELOC))) = 0x4773;
-	(*((volatile unsigned short*) (0xb80b2 - RELOC))) = 0x4773;
-	(*((volatile unsigned short*) (0xb80b4 - RELOC))) = 0x4720;
-	(*((volatile unsigned short*) (0xb80b6 - RELOC))) = 0x4730;
-	(*((volatile unsigned short*) (0xb80b8 - RELOC))) = 0x4778;
-	for (volatile unsigned char* i = (void*) (0xb80b8 - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb80b8 - RELOC); i -= 2) {
-		if ((addr & 0x0f) < 10) {
-			*i = ((addr & 0x0f) + 0x30);
-		}
-		else {
-			*i = ((addr & 0x0f) + 0x37);
-		}
-		addr >>= 4;
-	}	
-}
-void bugCheckWrapped(uintptr addr) {// Fatal kernel errors
-	bugMsg(addr);
+	(*((volatile unsigned short*) (0xb80a0 - RELOC))) = 0x4754;
+	(*((volatile unsigned short*) (0xb80a2 - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb80a4 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb80a6 - RELOC))) = 0x4743;
+	(*((volatile unsigned short*) (0xb80a8 - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb80aa - RELOC))) = 0x473a;
+	int j = 11;
 	while (1) {
+		uintptr addr = trace[j];
+		if (addr == ((uintptr) 0xffffffff)) {
+			return;
+		}
+		if (j == 0) {
+			(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - RELOC))) = 0x472e;
+			(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - RELOC))) = 0x472e;
+			(*((volatile unsigned short*) (0xb8144 + (0xa0 * 11) - RELOC))) = 0x472e;
+			return;
+		}
+		(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4730;
+		(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4778;
+		for (volatile unsigned char* i = (void*) (0xb813e + (0xa0 * 11) - (0xa0 * j) - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC); i -= 2) {
+			if ((addr & 0x0f) < 10) {
+				*i = ((addr & 0x0f) + 0x30);
+			}
+			else {
+				*i = ((addr & 0x0f) + 0x37);
+			}
+			addr >>= 4;
+		}
+		j--;
 	}
 	return;
 }
@@ -113,17 +117,17 @@ const char hex[] = {0x30,
 long handlingIRQ = 0;// Have this be volatile if system calls may be interrupted
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Threads_nextThread' or not during kernel-space operation
 #include "kernel/util.h"
-void bugCheckNum_u32(u32 num, uintptr addr) {
+void bugCheckNum_u32(u32 num, uintptr* addr) {
 	bugMsg(addr);
-	(*((volatile unsigned char*) (0xb8140 - RELOC))) = 0x49;
-	(*((volatile unsigned char*) (0xb8142 - RELOC))) = 0x4e;
-	(*((volatile unsigned char*) (0xb8144 - RELOC))) = 0x46;
-	(*((volatile unsigned char*) (0xb8146 - RELOC))) = 0x4f;
-	(*((volatile unsigned char*) (0xb8148 - RELOC))) = 0x3a;
-	(*((volatile unsigned char*) (0xb814a - RELOC))) = 0x20;
-	(*((volatile unsigned char*) (0xb814c - RELOC))) = 0x30;
-	(*((volatile unsigned char*) (0xb814e - RELOC))) = 0x78;
-	volatile unsigned char* place = (volatile unsigned char*) (0xb814e - RELOC);
+	(*((volatile unsigned char*) (0xb8b40 - RELOC))) = 0x49;
+	(*((volatile unsigned char*) (0xb8b42 - RELOC))) = 0x4e;
+	(*((volatile unsigned char*) (0xb8b44 - RELOC))) = 0x46;
+	(*((volatile unsigned char*) (0xb8b46 - RELOC))) = 0x4f;
+	(*((volatile unsigned char*) (0xb8b48 - RELOC))) = 0x3a;
+	(*((volatile unsigned char*) (0xb8b4a - RELOC))) = 0x20;
+	(*((volatile unsigned char*) (0xb8b4c - RELOC))) = 0x30;
+	(*((volatile unsigned char*) (0xb8b4e - RELOC))) = 0x78;
+	volatile unsigned char* place = (volatile unsigned char*) (0xb8b4e - RELOC);
 	for (volatile unsigned char* i = place + 16; i != place; i -= 2) {
 		if ((num & 0x0f) < 10) {
 			*i = ((num & 0x0f) + 0x30);
@@ -135,8 +139,9 @@ void bugCheckNum_u32(u32 num, uintptr addr) {
 	}
 	while (1) {
 	}
+	return;
 }
-void bugCheckNumWrapped(unsigned long num, uintptr addr) {// Fatal kernel errors
+void bugCheckNumWrapped(unsigned long num, uintptr* addr) {// Fatal kernel errors
 	bugCheckNum_u32(num, addr);
 }
 #include "kernel/driver/VGATerminal.h"
@@ -453,7 +458,7 @@ void substitute_irupt_address_vector(unsigned char iruptNum, void (*addr)(void),
 }
 void* originalLopage;
 #include "kernel/object/elf.h"
-extern void irupt_80h_iret(void);
+extern void irupt_80h_sequenceEntry(void);
 extern void loadSegs(void);
 void systemEntry(void) {
 	loadSegs();
@@ -476,7 +481,7 @@ void systemEntry(void) {
 	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
-	kernelMsg("Stallos v0.0.2.0-dev\n");
+	kernelMsg("Stallos v0.0.2.0\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
@@ -549,6 +554,6 @@ void systemEntry(void) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
 	}
 	Threads_nextThread();
-	irupt_80h_iret();
+	irupt_80h_sequenceEntry();
 	return;
 }
