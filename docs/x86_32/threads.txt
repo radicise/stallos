@@ -1,0 +1,10 @@
+Threads on x86_32
+
+
+
+On x86_32, hardware-based task-switching is accomplished using task-gates. Hardware interrupts cause task-switches to the appropriate handlers, and system calls cause task switches to the code that reads registers states from the appropriate TSS and pass that along to the architecture-independent system call function.
+
+All program threads share the same set of two TSS. One of these represents the state of the userspace execution of the thread and the other represents the state of the kernel's system-call interface for the thread. The contents of these TSS are changed to represent the state of a different program thread when the task scheduler deems it appropriate. The task scheduler also determines which program thread should be switched to.
+
+
+

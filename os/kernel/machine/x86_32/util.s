@@ -199,6 +199,6 @@ ret
 mem_barrier:
 .globl mem_barrier
 subl $4,%esp
-lock xchgl %eax,(%esp)# TODO Change for 80486 and newer
+lock xchgl %eax,(%esp)# TODO URGENT Verify memory semantics for 80386 and change operation for 80486 and newer
 popl %eax
 ret

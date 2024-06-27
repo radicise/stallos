@@ -83,6 +83,9 @@ void TS_setDesc(uintptr base, uintptr limit, int g, int dpl, int busy, SegDesc* 
 	}
 	return;
 }
+int TS_isBusy(SegDesc* seg) {
+	return (seg->b5 & 0x02) ? 1 : 0;
+}
 void SSS_setDesc(uintptr base, uintptr limit, int g, int dpl, int type, SegDesc* seg) {
 	seg->b0 = limit;
 	limit >>= 8;
@@ -220,6 +223,7 @@ void TSSmk(u16 prev, u16 dseg, u16 cseg, uintptr eip, uintptr esp, int disableIr
 extern void loadGDT(unsigned long, unsigned long);
 extern void loadIDT(unsigned long, unsigned long);
 extern void loadTS(unsigned long);
+extern unsigned long storeTS(void);
 extern void loadLDT(unsigned long);
 extern void setNT(void);
 void initSegmentation(void) {
@@ -277,7 +281,7 @@ void initSegmentation(void) {
 	TSSmk(11 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7dh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 3);
 	TSSmk(12 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7fh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 4);
 	SegDesc* IDT = (SegDesc*) (volatile char*) physicalZero;
-	for (int i = 0; i < 256; i++) {// TODO URGENT Move the IRQ stack area
+	for (int i = 250; i < 256; i++) {// TODO URGENT Move the IRQ stack area
 		TG_setDesc(11 * 8, 0, IDT + i);
 		Seg_enable(IDT + i);
 	}// TODO URGENT add guard-pages to both stack areas
@@ -295,6 +299,5 @@ void initSegmentation(void) {
 	loadIDT(0x000, 0x7ff);
 	loadLDT(8 * 8);
 	loadTS(7 * 8);
-	setNT();
 }
 #endif

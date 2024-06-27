@@ -19,6 +19,11 @@ loadTS:# void loadTS(unsigned long);
 movw 4(%esp),%ax
 ltr %ax
 ret
+storeTS:# unsigned long storeTS(void);
+.globl storeTS
+xorl %eax,%eax
+str %ax
+ret
 loadLDT:# void loadLDT(unsigned long);
 .globl loadLDT
 movw 4(%esp),%ax

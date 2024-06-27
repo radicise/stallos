@@ -46,6 +46,13 @@ void printLine(void) {
 }
 void _start() {
 	/*
+	char jee;
+	while (1) {
+		read(0, &jee, 1);
+		write(1, &jee, 1);
+	}
+	*/
+	/*
 	unsigned long i = 0;
 	while (1) {
 		printLong(i);

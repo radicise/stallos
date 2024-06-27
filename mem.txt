@@ -29,14 +29,26 @@ IDT	0x0007f800	IDT, 2048 bytes
 STAKTOP	0x00800000	Top-of-stack of the second-stage kernel during boot and when handling int $0x80 system calls
 
 
-# Linear addresses of certain memory structures during the execution of the main kernel and during execution of user code
+# Linear addresses of certain memory structures during the execution of the main kernel and execution of user code
 Structure	Address		Notes
 IDT		0x00000000
 GDT		0x00000800
 LDT		0x00000828	Is backed by part of the GDT
-TSS		0x00000b00	TSS for interrupt 0x80 and the second-stage kernel during boot
+TSS		0x00000b00	TSS for interrupt 0x80 for the currently-scheduled program task and, during boot, the second-stage kernel
 TSS		0x00000b80	TSS for interrupt 0x70
 TSS		0x00000c00	TSS for interrupt 0x71
 TSS		0x00000c80	TSS for interrupts that should cause the system to issue a "bug check"
 TSS		0x00000d00	TSS for IRQ 14 and IRQ 15
 TSS		0x00000d80	TSS for the currently-executing userspace program
+TSS		0x00000e00	TSS for exception 14
+
+# Linear addresses of certain memory structures during the execution of the main kernel
+Address(es)		Description
+0xb0000000-0xb0000fff	Guard page to prevent stack overflow
+0xb0001000-0xbffff000	Stack
+0xbffff000-0xbfffffff	Guard page to prevent stack underflow
+0xc0000000-0xffffffff	Memory area for userspace memory used in system calls to be placed / taken from
+
+
+
+

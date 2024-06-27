@@ -481,7 +481,7 @@ void systemEntry(void) {
 	//AtomicULong_set(&(mainTerm.xctrl), 1);// Keep disabled because of possible deadlocking when echoing is enabled
 	mainTerm.cursor = 1;
 	/* End-of-style */
-	kernelMsg("Stallos v0.0.2.0\n");
+	kernelMsg("Stallos v0.0.2.1-dev\n");
 	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
@@ -524,13 +524,16 @@ void systemEntry(void) {
 	}
 	initSystemCallInterface();
 	kernelMsg("done\n");
+	// while (1) {}
 	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
 	int_enable();
 	kernelMsg("done\n");
+	// while (1) {}
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
 	kernelMsg("done\n");
 	kernelMsg("Starting `init'\n");
+	// while (1) {}
 	Mutex_acquire(&Threads_threadManage);
 	struct Thread* th = alloc(sizeof(struct Thread));// Should this be declared `volatile'? It is conceivable that a thread may run on multiple CPU over time.
 	PerThread_context = &(th->thread);
@@ -553,7 +556,11 @@ void systemEntry(void) {
 	if (errVal != 0) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
 	}
-	Threads_nextThread();
+	moveExv(((TSS*) (((volatile char*) physicalZero) + 0xb00)) + 5, &(th->state.tss), sizeof(TSS));
+	TS_setDesc(0x0d80, 127, 0, 0, 1, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	setNT();
+	// while (1) {}
 	irupt_80h_sequenceEntry();
 	return;
 }

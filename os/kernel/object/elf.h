@@ -253,7 +253,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 		}
 		m = PAGEOF(m - 1);
 	}
-	// TODO Do not allocate the entirety of the stack at once when on x86
+	// TODO URGENT Do not allocate the entirety of the stack at once when on x86
 	Threadstate_fill(s, ((const Elf32_Ehdr*) elf)->e_entry, thread->group->mem, &(thread->state));
 	return 0;
 }
