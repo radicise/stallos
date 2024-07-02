@@ -52,4 +52,11 @@ void unlockFSInfo(void) {
 #define umask (PerThread_context->fsinfo->umask)
 #define tgid (PerThreadgroup_context->tgid)
 #define usermem (PerThreadgroup_context->mem)
+void Scheduler_yield(void) {// To only be called from interrupts, when IRQ are disabled
+	if (!handlingIRQ) {
+		bugCheckNum(0x0101 | FAILMASK_THREADS);
+	}
+	Threads_nextThread();
+	return;
+}
 #endif

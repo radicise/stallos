@@ -1,15 +1,18 @@
 SimpleMutex_acquire:# void SimpleMutex_acquire(SimpleMutex* mutex)
 .globl SimpleMutex_acquire
-movl 4(%esp),%edx
+pushl %ebp
+movl %esp,%ebp
+movl 8(%ebp),%edx
 xorb %al,%al
 incb %al
 SimpleMutex_acquire__loop1:
 lock xchgb %al,(%edx)
 testb %al,%al
 jz SimpleMutex_acquire__end
-nop
+call yield
 jmp SimpleMutex_acquire__loop1
 SimpleMutex_acquire__end:
+popl %ebp
 ret
 SimpleMutex_release:# void SimpleMutex_release(SimpleMutex* mutex)
 .globl SimpleMutex_release

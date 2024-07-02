@@ -811,7 +811,7 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have 
 		kbd->avail++;
 	}
 }
-void kbd8042_onIRQ(struct Keyboard8042* kbd) {
+void kbd8042_onIRQ(struct Keyboard8042* kbd) {// TODO URGENT Do not need to acquire any locks during IRQ handling
 	int service = Mutex_tryAcquire(&(kbd->bufLock));
 	if (!service) {
 		return;//TODO URGENT Set timer to service the IRQ when it can

@@ -1,14 +1,17 @@
 SimpleMutex_acquire:# void SimpleMutex_acquire(SimpleMutex* mutex)
 .globl SimpleMutex_acquire
+pushq %rbp
+movq %rsp,%rbp
 xorb %al,%al
 incb %al
 SimpleMutex_acquire__loop1:
 lock xchgb %al,(%rdi)
 testb %al,%al
 jz SimpleMutex_acquire__end
-nop
+call yield
 jmp SimpleMutex_acquire__loop1
 SimpleMutex_acquire__end:
+popq %rbp
 ret
 SimpleMutex_release:# void SimpleMutex_release(SimpleMutex* mutex)
 .globl SimpleMutex_release

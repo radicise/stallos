@@ -1,0 +1,6 @@
+Assumptions
+
+It it assumed that
+- structures desclared equivalently have equivalent packings
+- string literals are in ASCII and are NUL-terminated
+- signed integers are in two's complement form

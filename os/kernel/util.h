@@ -50,7 +50,8 @@ void Mutex_acquire(Mutex* mutex) {
 		}
 		else if ((mutex->ownerThread) != id) {
 			SimpleMutex_release(&(mutex->stateLock));
-			SimpleMutex_wait();
+			yield();
+			SimpleMutex_wait();// TODO Remove the need for this
 			continue;
 		}
 		(mutex->acquires)++;
@@ -93,7 +94,7 @@ int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 
 void Mutex_wait(void) {// Wastes enough time to let at least one other thread acquire a Mutex in that time span if it is already executing Mutex_acquire, assuming that the thread attempting to acquire is not interrupted
 	SimpleMutex_wait();
 	return;
-}
+}// TODO Remove Mutex_wait and SimpleMutex_wait
 void Mutex_initUnlocked(Mutex* mutex) {// Acts as a memory barrier
 	(mutex->ownerThread) = (pid_t) 0;
 	(mutex->acquires) = 0;

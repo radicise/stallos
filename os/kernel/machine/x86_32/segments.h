@@ -274,14 +274,17 @@ void initSegmentation(void) {
 	Seg_enable(GDT + 12);
 	TS_setDesc(0x0c80, 127, 0, 0, 1, GDT + 13);
 	Seg_enable(GDT + 13);
+	TS_setDesc(0x0e00, 127, 0, 0, 0, GDT + 14);
+	Seg_enable(GDT + 14);
 	TSS* tssp = (TSS*) (((volatile char*) physicalZero) + 0xb00);
 	TSSmk(13 * 8, 4 * 8, 3 * 8, (uintptr) irupt_80h, 0x007ffff4 - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp);
 	TSSmk(9 * 8, 4 * 8, 3 * 8, (uintptr) irupt_70h, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 1);
 	TSSmk(10 * 8, 4 * 8, 3 * 8, (uintptr) irupt_71h, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 2);
 	TSSmk(11 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7dh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 3);
 	TSSmk(12 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7fh, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 4);
+	TSSmk(14 * 8, 4 * 8, 3 * 8, (uintptr) irupt_yield, 0x007f7f4 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 6);// TODO Is it acceptable to disable interrupts during the CPU yielding sequence?
 	SegDesc* IDT = (SegDesc*) (volatile char*) physicalZero;
-	for (int i = 250; i < 256; i++) {// TODO URGENT Move the IRQ stack area
+	for (int i = 0; i < 256; i++) {// TODO URGENT Move the IRQ stack area
 		TG_setDesc(11 * 8, 0, IDT + i);
 		Seg_enable(IDT + i);
 	}// TODO URGENT add guard-pages to both stack areas
@@ -295,7 +298,9 @@ void initSegmentation(void) {
 	Seg_enable(IDT + 0x7e);
 	TG_setDesc(12 * 8, 0, IDT + 0x7f);
 	Seg_enable(IDT + 0x7f);
-	loadGDT(0x800, (14 * 8) - 1);
+	TG_setDesc(14 * 8, 0, IDT + 0x40);
+	Seg_enable(IDT + 0x40);
+	loadGDT(0x800, (15 * 8) - 1);
 	loadIDT(0x000, 0x7ff);
 	loadLDT(8 * 8);
 	loadTS(7 * 8);

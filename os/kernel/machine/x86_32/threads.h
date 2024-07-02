@@ -57,6 +57,9 @@ int Threads_findNext(uintptr suspect, uintptr u) {
 struct PerThreadgroup* volatile PerThreadgroup_context;
 struct PerThread* volatile PerThread_context;
 void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS CLEARED
+	if (!handlingIRQ) {
+		bugCheckNum(0x0005 | FAILMASK_THREADS);
+	}
 	Mutex_acquire(&Threads_threadManage);// TODO URGENT Prevent dealocking due to the scheduler trying to switch tasks while a thread is being added from happening
 	uintptr st = Map_fetch((uintptr) currentThread, ___taskMap___);
 	if (st == ((uintptr) (-1))) {
@@ -110,8 +113,5 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	mem_barrier();
 	return;
-}
-void yield(void) {
-	bugCheck();// TODO URGENT Implement
 }
 #endif

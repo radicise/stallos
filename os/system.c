@@ -24,6 +24,7 @@ extern void irupt_7dh(void);
 extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
+extern void irupt_yield(void);
 extern void irupt_fail(void);
 extern void irupt_noprocess(void);
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
@@ -40,9 +41,10 @@ extern void int_enable(void);
 extern void int_disable(void);
 extern void bugCheck(void);
 extern void bugCheckNum(unsigned long);
+extern void yield_iruptCall(void);
+extern u32 getEFL(void);
 void bugMsg(uintptr* trace) {
 	int_disable();
-	// while (1) {}
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}
@@ -84,7 +86,7 @@ void bugMsg(uintptr* trace) {
 		}
 		(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4730;
 		(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4778;
-		for (volatile unsigned char* i = (void*) (0xb813e + (0xa0 * 11) - (0xa0 * j) - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC); i -= 2) {
+		for (volatile unsigned char* i = (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC); i -= 2) {
 			if ((addr & 0x0f) < 10) {
 				*i = ((addr & 0x0f) + 0x30);
 			}
@@ -114,9 +116,8 @@ const char hex[] = {0x30,
 	0x45,
 	0x46};
 #define FAILMASK_SYSTEM 0x00010000
-long handlingIRQ = 0;// Have this be volatile if system calls may be interrupted
+long handlingIRQ = 0;// Signifies whether an IRQ may interrupt the executing code
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Threads_nextThread' or not during kernel-space operation
-#include "kernel/util.h"
 void bugCheckNum_u32(u32 num, uintptr* addr) {
 	bugMsg(addr);
 	(*((volatile unsigned char*) (0xb8b40 - RELOC))) = 0x49;
@@ -144,6 +145,15 @@ void bugCheckNum_u32(u32 num, uintptr* addr) {
 void bugCheckNumWrapped(unsigned long num, uintptr* addr) {// Fatal kernel errors
 	bugCheckNum_u32(num, addr);
 }
+void yield(void) {// Not to be called when `handlingIRQ' is nonzero
+	bugCheckNum(0x0003);
+	if (handlingIRQ) {
+		bugCheckNum(0x0006 | FAILMASK_SYSTEM);
+	}
+	yield_iruptCall();
+	return;
+}
+#include "kernel/util.h"
 #include "kernel/driver/VGATerminal.h"
 size_t strlen(const char* str) {
 	const char* n = str;
@@ -359,6 +369,7 @@ extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 #include "kernel/perThreadgroup.h"
 #include "kernel/perThread.h"
 //extern int runELF(void*, void*, struct Thread_state*);
+#define SCHED_INCR_PICOS 0x2540E3C33ULL
 void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
@@ -424,6 +435,10 @@ void irupt_handler_7eh(void) {
 }
 void irupt_handler_7fh(void) {// IRQ 14 and IRQ 15
 	return;// ATA IRQ
+}
+void irupt_handler_yield(void) {
+	Scheduler_yield();
+	return;
 }
 void PICInit(unsigned char mOff, unsigned char sOff) {
 	if ((mOff & 0x07) || (sOff & 0x07)) {
@@ -561,6 +576,6 @@ void systemEntry(void) {
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	setNT();
 	// while (1) {}
-	irupt_80h_sequenceEntry();
+	irupt_80h_sequenceEntry();// TODO Use a generic non-allocated stack area for system call handling and add a guard page for the limit of the other stacks
 	return;
 }

@@ -197,6 +197,7 @@ addl $4,%esp
 pushl %eax
 bugCheckNum__noAdjustment:
 ret
+/*
 Thread_restore:# void Thread_restore(struct Thread_state*, long)
 .globl Thread_restore# Only invoke this from interrupt handlers called because of IRQ interrupts
 movl $0x00000000,handlingIRQ
@@ -236,6 +237,8 @@ outb %al,$0x20
 popl %eax
 movl %eax,12(%esp)
 lret
+*/
+/*
 Thread_run:# void Thread_run(struct Thread_state*)
 .globl Thread_run# Do NOT invoke this from interrupt handlers called because of IRQ interrupts
 movl 4(%esp),%ebx
@@ -268,6 +271,7 @@ popl %ecx
 popl %ebx
 popl %eax
 lret
+*/
 strconcat:# const char* strconcat()
 .globl strconcat# Returns a const char* `a' that can deallocated with `dealloc(strlen(a) + 1)'
 pushl %ebp
@@ -286,4 +290,21 @@ movw %ax,%ss
 movw %ax,%es
 movw %ax,%fs
 movw %ax,%gs
+ret
+irupt_yield:
+.globl irupt_yield
+movl $0x00000001,handlingIRQ
+cld
+call irupt_handler_yield
+movl $0x00000000,handlingIRQ
+iret
+jmp irupt_yield
+yield_iruptCall:# void yield_iruptCall(void)
+.globl yield_iruptCall
+int $0x40
+ret
+getEFL:# u32 getEFL(void)
+.globl getEFL
+pushfl# TODO URGENT Confirm mnemonic
+popl %eax
 ret
