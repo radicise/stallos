@@ -146,7 +146,7 @@ void kmem_init(void) {
 	set((void*) (KMEM_LB_ADDR - RELOC), 0x00, KMEM_LB_DATSTART - KMEM_LB_ADDR);
 	Mutex_initUnlocked(&kmem_access);
 	Mutex_initUnlocked(&kmem_lb_access);
-	argblockLock = alloc(ARGBLOCK_AMNT * sizeof(Mutex));
+	argblockLock = alloc(ARGBLOCK_AMNT * sizeof(SimpleMutex));
 	for (unsigned long i = 0; i < ARGBLOCK_AMNT; i++) {
 		SimpleMutex_initUnlocked(argblockLock + i);
 	}
