@@ -11,6 +11,7 @@
 #include "os/kernel/FileDriver.h"
 #include "os/kernel/filesystems/fsmacros.h"
 #include "os/kernel/filesystems/external.h"
+#include "./fstutils/input.h"
 
 void kernelWarnMsg(const char* msg) {
     puts(msg);
@@ -63,7 +64,7 @@ int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff
 #undef fsflush
 #define fsflush(fs) fflush(fp)
 
-#define MDISK_SIZE 23
+#define MDISK_SIZE 21
 // #define MDISK_SIZE 1024*1024*4
 
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
@@ -204,19 +205,6 @@ int manip_test(struct FileDriver* fdrive, int fd, char kind) {
     return 0;
 }
 
-int stringcmp(const char* s1, const char* s2) {
-    int c = 0;
-    char c1;
-    char c2;
-    while ((c1 = s1[c]) != 0 && (c2 = s2[c]) != 0) {
-        if (c1 != c2) {
-            return 0;
-        }
-        c ++;
-    }
-    return 1;
-}
-
 int fmt_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
     FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
@@ -297,10 +285,90 @@ int magic_test(struct FileDriver* fdrive, int kf, char flags) {
     return 0;
 }
 
-int harness(char flag, int(*tst)(struct FileDriver*, int, char)) {
+int list_test(struct FileDriver* fdrive, int fd, char f) {
+    FileSystem* s = (loadFS(fdrive, fd)).retptr;
+    // TSFSStructBlock sb = {0};
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    TSFSStructNode topdir = {0};
+    read_structnode(s, &topdir);
+    // u64 x = topdir.parent_loc;
+    // longseek(s, x, SEEK_SET);
+    // read_structblock(s, &sb);
+    TSFSStructBlock* sb = tsfs_load_block(s, topdir.parent_loc);
+    TSFSStructNode sd = {0};
+    block_seek(s, tsfs_resolve_path(s, "/happy"), BSEEK_SET);
+    read_structnode(s, &sd);
+    TSFSStructBlock* sb2 = tsfs_load_block(s, sd.parent_loc);
+    printf("OPTR: %p\n", (void*)sb);
+    printf("OPTR2: %p\n", (void*)sb2);
+    tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
+    tsfs_sbcs_foreach(s, sb2, _fstest_sbcs_fe_do, 0);
+    tsfs_unload(s, sb);
+    tsfs_unload(s, sb2);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
+int full_test(struct FileDriver* fdrive, int fd, char flags) {
+    FileSystem* s = 0;
+    if (flags) {
+        printf("REGEN\n");
+        regen_mock(fd);
+        s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
+    }
+    if (s == 0) {
+        s = (loadFS(fdrive, 0)).retptr;
+    }
+    if (s->rootblock == 0) {
+        printf("ERROR LOADING FS\n");
+        free(s);
+        return 0;
+    }
+    if (s->rootblock->breakver == 0) {
+        printf("BAD CHECKSUM\n");
+        goto dealloc;
+    }
+    printf("FS CREATE/LOAD OK\nSTARTING CLI\n");
+    char* cwd = (char*)malloc(2);
+    cwd[0] = '/';
+    cwd[1] = 0;
+    while (1) {
+        CLIData clidata = clihelper();
+        int clicode = clidata.clicode;
+        if (clicode < 0) {
+            printf("ERROR: %d\n", clicode);
+            break;
+        }
+        if (clicode == 0) {
+            break;
+        } else if (clicode == 1) {
+            cwd = strmove(clidata.data);
+            free(clidata.data);
+        } else if (clicode < 4) {
+            char* name = strmove(clidata.data);
+            free(clidata.data);
+            TSFSStructNode* par = tsfs_load_node(s, tsfs_resolve_path(s, cwd));
+            if (clicode == 2) {
+                TSFSStructBlock blk = {0};
+                tsfs_mk_dir(s, par, name, &blk);
+            } else {
+                tsfs_mk_file(s, par, name);
+            }
+            tsfs_unload(s, par);
+        }
+    }
+    dealloc:
+    free(s->rootblock);
+    free(s);
+    return 0;
+}
+
+int harness(const char* fpath, char flag, int(*tst)(struct FileDriver*, int, char)) {
     int retc = 0;
     int fd;
-    if ((fd=open("FSMOCKFILE.mock", O_RDWR | O_CREAT)) == -1) {
+    printf("%s\n", fpath);
+    if ((fd=open(fpath, O_RDWR | O_CREAT)) == -1) {
         printf("ERROR\n");
         goto bottom;
     }
@@ -323,6 +391,16 @@ int generic_test(char f1, char f2) {
         case -1:
             printf("%sRED\n%sGRN\n%sYEL%s\n", TSFS_ANSI_RED, TSFS_ANSI_GRN, TSFS_ANSI_YEL, TSFS_ANSI_NUN);
             break;
+        case -2:
+            printf("> ");
+            char* str = readline();
+            if (str == NULL) {
+                printf("BAD STR PTR\n");
+                break;
+            }
+            printf("ECHO: %s\n", str);
+            free(str);
+            break;
         default:
             printf("BAD FLAG\n");
             break;
@@ -332,7 +410,8 @@ int generic_test(char f1, char f2) {
 
 int main(int argc, char** argv) {
     char flags[] = {0, 0};
-    for (int i = 1; i < argc; i ++) {
+    char* fpath = argv[1];
+    for (int i = 2; i < argc; i ++) {
         if (stringcmp(argv[i], "-regen")) {
             flags[1] = 1;
         } else if (stringcmp(argv[i], "data")) {
@@ -353,27 +432,41 @@ int main(int argc, char** argv) {
             flags[1] = 2;
         } else if (stringcmp(argv[i], "palette")) {
             flags[0] = -1;
+        } else if (stringcmp(argv[i], "meta-readline")) {
+            flags[0] = -2;
+        } else if (stringcmp(argv[i], "full")) {
+            flags[0] = 6;
+        } else if (stringcmp(argv[i], "list")) {
+            flags[0] = 7;
         }
     }
+    printf("{%d, %d}\n", flags[0], flags[1]);
     if (flags[0] < 0) {
         generic_test(flags[0], flags[1]);
         return 0;
     }
+    // char* fpath = "FSMOCKFILE.mock";
     switch (flags[0]) {
         case 1:
-            harness(flags[1], data_test);
+            harness(fpath, flags[1], data_test);
             break;
         case 2:
-            harness(flags[1], manip_test);
+            harness(fpath, flags[1], manip_test);
             break;
         case 3:
-            harness(flags[1], fmt_test);
+            harness(fpath, flags[1], fmt_test);
             break;
         case 4:
-            harness(flags[1], struct_test);
+            harness(fpath, flags[1], struct_test);
             break;
         case 5:
-            harness(flags[1], magic_test);
+            harness(fpath, flags[1], magic_test);
+            break;
+        case 6:
+            harness(fpath, flags[1], full_test);
+            break;
+        case 7:
+            harness(fpath, flags[1], list_test);
             break;
         default:
             printf("bad args\n");
