@@ -32,4 +32,11 @@ typedef unsigned int _kernel_mode_t;
 typedef _kernel_u32 _kernel_kdev_t;
 typedef _kernel_u16 _kernel_udev_old_t;
 typedef _kernel_u32 _kernel_udev_new_t;
+
+// copied from the x86_64 ktypes to make arm64 compile - Tristan
+// NOTE: these types are of unknown compatibility with Arm64 architecture
+//       their sole purpose here is to make the file system testing code compile for Arm
+//       additionally, that code currently makes no use whatsoever of these types, directly or indirectly
+typedef volatile unsigned char _kernel_SimpleMutex;
+typedef volatile unsigned long _kernel_AtomicULong;
 #endif
