@@ -6,6 +6,7 @@ extern ssize_t write(int, const void*, size_t);
 extern ssize_t read(int, void*, size_t);
 extern time_t time(time_t*);
 extern int stime(const time_t*);
+extern unsigned long TNN(void);
 unsigned char hex[] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66};
 void printLong(long n) {
 	if (n == 0) {
@@ -45,6 +46,12 @@ void printLine(void) {
 	return;
 }
 void _start() {
+	// TNN();
+	/*
+	while (1) {
+		time(NULL);
+	}
+	*/
 	/*
 	char jee;
 	while (1) {

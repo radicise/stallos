@@ -45,6 +45,7 @@ extern void yield_iruptCall(void);
 extern u32 getEFL(void);
 void bugMsg(uintptr* trace) {
 	int_disable();
+	// while (1) {}// NRW
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}
@@ -375,6 +376,12 @@ void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 119
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
 	}
+	/*
+	if (Mutex_tryAcquire(&(mainTerm.accessLock))) {
+		kernelMsgULong_hex(*((unsigned long*) (((unsigned char*) physicalZero) + 0xb24)));kernelMsg("\n");
+		Mutex_release(&(mainTerm.accessLock));
+	}
+	*/ // NRW
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
@@ -475,7 +482,7 @@ void* originalLopage;
 #include "kernel/object/elf.h"
 extern void irupt_80h_sequenceEntry(void);
 extern void loadSegs(void);
-void systemEntry(void) {
+void systemEntry(void) {// TODO URGENT Ensure that the system has enough contiguous memory in the appropriate place(s)
 	loadSegs();
 	mem_barrier();
 	Mutex_initUnlocked(&kmsg);
@@ -558,6 +565,7 @@ void systemEntry(void) {
 	currentThread = Threads_addThread(th);
 	Mutex_acquire(&Threads_threadManage);
 	tgid = currentThread;
+	Mutex_initUnlocked(&(PerThreadgroup_context->breakLock));
 	tid = tgid;
 	ruid = 0;
 	euid = 0;

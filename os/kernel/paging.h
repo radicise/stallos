@@ -29,7 +29,7 @@
  *
  * int pageExists(uintptr, struct MemSpace*);
  *
- * void* pageMapping(uintptr, struct MemSpace*);// Returns `NULL' if the specified page is not mapped
+ * void* pageMapping(uintptr, struct MemSpace*);// Returns `NULL' if the specified page is not mapped; a return value of `NULL' does not imply that the specified page is not mapped
  *
  * MemSpace* MemSpace_kernel;// This is initialised within `initPaging'
  *
@@ -41,6 +41,7 @@
  *
  * void unpinPage(uintptr, struct MemSpace*);// Decrements the pinning level of a page that has a nonzero pinning level
  *
+ * int chprot(uintptr vPage, int read, int write, int execute, struct MemSpace* mem);// Applies the given protection to the page specified in `vPage'; `vPage' represents a page-aligned address; Returns 0 upon success; returns (-1) upon failure due to the page not being allocated to the user; returns (-2) upon failure due to the user not having sufficient privilege to perform the specified protection change
  */
 #define FAILMASK_PAGING 0x000d0000
 #ifndef TARGETNUM
@@ -51,18 +52,34 @@
 #else
 #error "Target is not supported"
 #endif
-void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
+void freeUserPage(uintptr vAddr, void* addr, void* arb) {
+	uintptr adui = (uintptr) addr;
+	if ((adui < (KMEM_LB_DATSTART - RELOC)) || (adui >= (KMEM_LB_DATSTART + KMEM_LB_AMNT - RELOC))) {
+		return;
+	}
+	subPageRef(addr);
+}
+void userPageDealloc(void* obj) {
+	dealloc_lb(obj);
+	return;
+}
+void MemSpace_mkUserData(const void* ptr, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
 	if (len == 0) {
 		return;
 	}
 	Mutex_acquire(&(mem->lock));
 	while (1) {
 		uintptr page = PAGEOF(target);
-		void* usrmem = pageMapping(page, mem);
-		if (usrmem == NULL) {
-			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserReadable, newPagesUserWritable, mem);
+		void* usrmem;
+		if (pageExists(page, mem)) {
+			usrmem = pageMapping(page, mem);
+		}
+		else {
+			usrmem = alloc_lb_wiped();
+			initPageRef(1, userPageDealloc, usrmem);
+			int r = mapPage(page, usrmem, newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
-				bugCheckNum(0x1001 | FAILMASK_PAGING);
+				bugCheckNum(0x0101 | FAILMASK_PAGING);
 			}
 		}
 		uintptr avail = page + PAGE_SIZE - target;
@@ -78,18 +95,23 @@ void MemSpace_mkData(const void* ptr, uintptr target, uintptr len, int newPagesU
 	}
 	return;
 }
-void MemSpace_mkFill(char val, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
+void MemSpace_mkUserFill(char val, uintptr target, uintptr len, int newPagesUserReadable, int newPagesUserWritable, struct MemSpace* mem) {
 	if (len == 0) {
 		return;
 	}
 	Mutex_acquire(&(mem->lock));
 	while (1) {
 		uintptr page = PAGEOF(target);
-		void* usrmem = pageMapping(page, mem);
-		if (usrmem == NULL) {
-			int r = mapPage(page, usrmem = (alloc_lb_wiped()), newPagesUserReadable, newPagesUserWritable, mem);
+		void* usrmem;
+		if (pageExists(page, mem)) {
+			usrmem = pageMapping(page, mem);
+		}
+		else {
+			usrmem = alloc_lb_wiped();
+			initPageRef(1, userPageDealloc, usrmem);
+			int r = mapPage(page, usrmem, newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
-				bugCheckNum(0x1001 | FAILMASK_PAGING);
+				bugCheckNum(0x0102 | FAILMASK_PAGING);
 			}
 		}
 		uintptr avail = page + PAGE_SIZE - target;

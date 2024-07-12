@@ -62,7 +62,7 @@ void Mutex_acquire(Mutex* mutex) {
 		return;
 	}
 }
-void Mutex_release(Mutex* mutex) {// Acts as a memory barrier
+void Mutex_release(Mutex* mutex) {// Performs a memory barrier
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	SimpleMutex_acquire(&(mutex->stateLock));
 	if ((mutex->ownerThread) != id) {
@@ -74,7 +74,7 @@ void Mutex_release(Mutex* mutex) {// Acts as a memory barrier
 	(mutex->acquires)--;
 	SimpleMutex_release(&(mutex->stateLock));
 }
-int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0; acts as a memory barrier
+int Mutex_tryAcquire(Mutex* mutex) {// Returns 1 if acquired, otherwise returns 0; performs a memory barrier
 	pid_t id = handlingIRQ ? (~currentThread) : currentThread;
 	SimpleMutex_acquire(&(mutex->stateLock));
 	if (mutex->acquires == 0) {
@@ -95,7 +95,7 @@ void Mutex_wait(void) {// Wastes enough time to let at least one other thread ac
 	SimpleMutex_wait();
 	return;
 }// TODO Remove Mutex_wait and SimpleMutex_wait
-void Mutex_initUnlocked(Mutex* mutex) {// Acts as a memory barrier
+void Mutex_initUnlocked(Mutex* mutex) {// Performs a memory barrier
 	(mutex->ownerThread) = (pid_t) 0;
 	(mutex->acquires) = 0;
 	SimpleMutex_initUnlocked(&(mutex->stateLock));

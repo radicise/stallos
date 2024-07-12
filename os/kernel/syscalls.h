@@ -541,10 +541,10 @@ void* getUserMem(unsigned long upm, uintptr len, int implyReadable, int implyWri
 		lm = uptr;
 		void* mea = memArea;
 		while (ln) {
-			void* backing = pageMapping(lm, usermem);
-			if (backing == NULL) {
+			if (!(pageExists(lm, usermem))) {
 				bugCheckNum(0x000b | FAILMASK_SYSCALLS);
 			}
+			void* backing = pageMapping(lm, usermem);
 			moveExv(mea, backing, PAGE_SIZE);
 			ln -= PAGE_SIZE;
 			lm += PAGE_SIZE;
@@ -571,10 +571,10 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 		void* mt = mem;
 		uintptr upt = uptr;
 		while (1) {
-			void* upm = pageMapping(PAGEOF(upt), usermem);
-			if (upm == NULL) {
+			if (!(pageExists(PAGEOF(upt), usermem))) {
 				bugCheckNum(0x000e | FAILMASK_SYSCALLS);
 			}
+			void* upm = pageMapping(PAGEOF(upt), usermem);
 			uintptr lfp = upt & PAGE_LOMASK;
 			if ((rlen + lfp) <= ((uintptr) PAGE_SIZE)) {
 				moveExv((void*) (((char*) upm) + lfp), mt, rlen);
@@ -593,10 +593,10 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 	lm = plen;
 	while (lm) {
 		unpinPage(uptr, usermem);
-		void* mm = pageMapping(amem, MemSpace_kernel);
-		if (mm == NULL) {
+		if (!(pageExists(amem, MemSpace_kernel))) {
 			bugCheckNum(0x000c | FAILMASK_SYSCALLS);
 		}
+		void* mm = pageMapping(amem, MemSpace_kernel);
 		if (unmapPage(amem, MemSpace_kernel)) {
 			bugCheckNum(0x000d | FAILMASK_SYSCALLS);
 		}
@@ -806,6 +806,56 @@ pid_t getpid(void) {
 pid_t gettid(void) {// Introduced in Linux 2.4.11
 	return tid;
 }
+uintptr brk(uintptr rb) {
+	Mutex_acquire(&(PerThreadgroup_context->breakLock));
+	uintptr pb = PerThreadgroup_context->userBreak;
+	if (!rb) {
+		Mutex_release(&(PerThreadgroup_context->breakLock));
+		return pb;
+	}
+	if (PAGEOF(rb - (uintptr) 1) == PAGEOF(pb - (uintptr) 1)) {// TODO URGENT What exactly does it mean for the requested break to be "reasonable"? Correctly determine whether the requested break is "reasonable"
+		if (pb != rb) {
+			PerThreadgroup_context->userBreak = rb;
+			Mutex_release(&(PerThreadgroup_context->breakLock));
+			return rb;
+		}
+		Mutex_release(&(PerThreadgroup_context->breakLock));
+		return pb;
+	}
+	if (rb < pb) {
+		uintptr lle = PAGEOF(rb - (uintptr) 1);
+		for (uintptr ple = PAGEOF(pb - (uintptr) 1); ple != lle; ple -= PAGE_SIZE) {
+			Mutex_acquire(&(usermem->lock));
+			if (pageExists(ple, usermem)) {
+				freeUserPage(ple, pageMapping(ple, usermem), NULL);
+			}
+			Mutex_release(&(usermem->lock));
+		}
+		PerThreadgroup_context->userBreak = rb;
+		Mutex_release(&(PerThreadgroup_context->breakLock));
+		return rb;
+	}
+	Mutex_acquire(&(usermem->lock));
+	uintptr nla = PAGEOF(rb - (uintptr) 1);
+	uintptr ola = PAGEOF(pb - (uintptr) 1);
+	for (uintptr chk = nla; chk != ola; chk -= PAGE_SIZE) {
+		if (pageExists(chk, usermem)) {
+			Mutex_release(&(usermem->lock));
+			Mutex_release(&(PerThreadgroup_context->breakLock));
+			return pb;
+		}
+	}
+	nla += PAGE_SIZE;
+	for (uintptr pmem = ola + PAGE_SIZE; pmem != nla; pmem += PAGE_SIZE) {
+		void* pmp = alloc_lb_wiped();
+		initPageRef(1, userPageDealloc, pmp);
+		if (mapPage(pmem, pmp, 1, 1, usermem)) {// TODO Set heap execution, reading, and writing permissions appropriately
+			bugCheckNum(0x0010 | FAILMASK_SYSCALLS);
+		}
+	}
+	Mutex_release(&(usermem->lock));
+	Mutex_release(&(PerThreadgroup_context->breakLock));
+}
 int close(int fd) {
 	// TODO Implement
 	bugCheck();
@@ -861,11 +911,13 @@ int open(char* path, int flg, mode_t mode) {// `path' is not of type `const char
 }
 */
 
-
+/*
 int mount(const char* source, const char* target, const char* filesystemtype, unsigned long mountflags, const void* data) {
 	bugCheck();
 	return 0;// TODO Implement
 }
+*/
+/*
 void* mmap(void* addr, size_t len, int p, int flg, int fd, off_t off) {
 	bugCheck();
 	return NULL;//TODO Implement
@@ -879,7 +931,7 @@ void* mmap(void* addr, size_t len, int p, int flg, int fd, off_t off) {
 	}
 
 }
-
+*/
 
 #if __TESTING__ == 1
 #define TESTCALL_NUMBER 1025
@@ -908,6 +960,7 @@ unsigned long testcall(unsigned long val) {
 unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls have "nr" values allocated for them as needed
 	errno = 0;
 	Mutex_acquire(&(PerThread_context->dataLock));
+	// kernelMsg("en\n");// NRW
 	unsigned long retVal = 0;
 #if __TESTING__ == 1
 	if (nr > SYSCALL_HIGH) {
@@ -1002,6 +1055,9 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 				retUserMem(mem1, arg1, sizeof(time_t), 0);
 			}
 			break;
+		case (45):
+			retVal = (unsigned long) brk((uintptr) arg1);
+			break;
 		case (49):
 			retVal = (unsigned long) geteuid();
 			break;
@@ -1055,6 +1111,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 	kernelMsgULong_hex(errno);
 	kernelMsg("\n");
 #endif
+	// kernelMsg("ex\n");// NRW
 	Mutex_release(&(PerThread_context->dataLock));// THIS ADDITIONALLY SERVES AS A MEMORY BARRIER
 	return retVal;
 }// TODO Allow returning of values wider than the `long' type

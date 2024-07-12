@@ -17,10 +17,12 @@
 #define KMEM_LB_AMNTMEMBITMAPBYTES (KMEM_LB_AMNT / (KMEM_LB_BS * CHAR_BIT))
 #define KMEM_LB_AMNTMEMSPACES (KMEM_LB_AMNT / KMEM_LB_BS)
 #define KMEM_LB_DATSTART (KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES + KMEM_LB_BS - ((KMEM_LB_ADDR + KMEM_LB_AMNTMEMBITMAPBYTES - 1) % KMEM_LB_BS) - 1)
+#define KMEM_LB_REFS_ADDR (KMEM_LB_DATSTART + KMEM_LB_AMNT)
 #define ARGBLOCK_SIZE ((uintptr) 0x01000000)
-#define ARGBLOCK_AMNT 64UL
+#define ARGBLOCK_COUNT 64UL
 #define ARGBLOCK_ADDR 0xc0000000
 #include "util.h"
+#define FAILMASK_KMEMMAN 0x00150000
 Mutex kmem_access;
 Mutex kmem_lb_access;
 SimpleMutex* argblockLock;
@@ -88,6 +90,11 @@ void dealloc(volatile void* obj, size_t siz) {
 		k++;
 	}
 }
+typedef struct {
+	unsigned long refs;
+	void (*onDeath)(void*);
+	Mutex lock;
+} PageDesc;
 void* alloc_lb(void) {// Allocated memory is guaranteed to not be at NULL and to not be at (void*) (-1) and to not be at (uintptr*) (-1); avoidance of deadlock must be sure
 	uintptr k = 0;
 	Mutex_acquire(&kmem_lb_access);
@@ -111,10 +118,76 @@ void dealloc_lb(volatile void* obj) {
 		return;
 	}
 	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+#if __TESTING__ == 1
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs) {
+		bugCheckNum(0x0004 | FAILMASK_KMEMMAN);
+	}
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+#endif
 	Mutex_acquire(&kmem_lb_access);
 	((volatile char*) (volatile void*) (KMEM_LB_ADDR - RELOC))[k / CHAR_BIT] &= (~(0x01 << (k % CHAR_BIT)));
 	memAllocated_lb -= KMEM_LB_BS;
 	Mutex_release(&kmem_lb_access);
+}
+void chgPageRef(void* obj, int sub) {
+	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+#if __TESTING__ == 1
+	Mutex_acquire(&kmem_lb_access);
+	if (!(((volatile char*) (volatile void*) (KMEM_LB_ADDR - RELOC))[k / CHAR_BIT] & (0x01 << (k % CHAR_BIT)))) {
+		bugCheckNum(0x0001 | FAILMASK_KMEMMAN);
+	}
+	Mutex_release(&kmem_lb_access);
+#endif
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	unsigned long rfs = ((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs;
+	if (!sub) {
+		if (!rfs) {
+			bugCheckNum(0x0005 | FAILMASK_KMEMMAN);
+		}
+		rfs++;
+	}
+	if (!rfs) {
+		bugCheckNum(0x0002 | FAILMASK_KMEMMAN);
+	}
+	if (sub) {
+		rfs--;
+	}
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs = rfs;
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	if (!rfs) {
+		((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].onDeath(obj);
+	}
+	return;
+}
+void initPageRef(unsigned long rfs, void (*func)(void*), void* obj) {// `rfs' as passed must have a nonzero value
+	if (!rfs) {
+		bugCheckNum(0x0006 | FAILMASK_KMEMMAN);
+	}
+	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+#if __TESTING__ == 1
+	Mutex_acquire(&kmem_lb_access);
+	if (!(((volatile char*) (volatile void*) (KMEM_LB_ADDR - RELOC))[k / CHAR_BIT] & (0x01 << (k % CHAR_BIT)))) {
+		bugCheckNum(0x0003 | FAILMASK_KMEMMAN);
+	}
+	Mutex_release(&kmem_lb_access);
+#endif
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs) {
+		bugCheckNum(0x0007 | FAILMASK_KMEMMAN);
+	}
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs = rfs;
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].onDeath = func;
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	return;
+}
+void addPageRef(void* obj) {
+	chgPageRef(obj, 0);
+	return;
+}
+void subPageRef(void* obj) {
+	chgPageRef(obj, 1);
+	return;
 }
 void* alloc_lb_wiped(void) {
 	void* block = alloc_lb();
@@ -131,7 +204,7 @@ void* dedic_argblock(uintptr len) {
 			return (void*) ((ARGBLOCK_ADDR - RELOC) + (off * ARGBLOCK_SIZE));
 		}
 		off++;
-		if (off == ARGBLOCK_AMNT) {
+		if (off == ARGBLOCK_COUNT) {
 			off = 0;
 		}
 	}
@@ -146,9 +219,18 @@ void kmem_init(void) {
 	set((void*) (KMEM_LB_ADDR - RELOC), 0x00, KMEM_LB_DATSTART - KMEM_LB_ADDR);
 	Mutex_initUnlocked(&kmem_access);
 	Mutex_initUnlocked(&kmem_lb_access);
-	argblockLock = alloc(ARGBLOCK_AMNT * sizeof(SimpleMutex));
-	for (unsigned long i = 0; i < ARGBLOCK_AMNT; i++) {
+	argblockLock = alloc(ARGBLOCK_COUNT * sizeof(SimpleMutex));
+	for (unsigned long i = 0; i < ARGBLOCK_COUNT; i++) {
 		SimpleMutex_initUnlocked(argblockLock + i);
+	}
+	{
+		PageDesc* pdscBase = (PageDesc*) (KMEM_LB_REFS_ADDR - RELOC);
+		for (unsigned long k = 0; k < KMEM_LB_AMNTMEMSPACES; k++) {
+			PageDesc* pdsc = pdscBase + k;
+			pdsc->refs = 0;
+			pdsc->onDeath = NULL;
+			Mutex_initUnlocked(&(pdsc->lock));
+		}
 	}
 	return;
 }
