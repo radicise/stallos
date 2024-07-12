@@ -114,7 +114,7 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
     return 0;
 }
 
-size_t strlen(const char* s) {
+size_t tsfs_strlen(const char* s) {
     size_t o = 0;
     while (s[o++]);
     return o;

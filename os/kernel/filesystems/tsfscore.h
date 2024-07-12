@@ -35,7 +35,7 @@ RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     s64 curr_time = (s64)(kernel_time(NULL));
-    FSRet rv = {.err=EINVAL};
+    FSRet rv = {.err=EINVAL,.retptr=0};
     if (p_size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("PARTITION TOO BIG");
         return rv;
@@ -135,6 +135,7 @@ FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t size) {
     }
     u64 comphash = hash_rootblock(rblock);
     if (comphash != rblock->checksum) {
+        printf("EH: %llx\nAH: %llx\n", comphash, rblock->checksum);
         kernelWarnMsg("DATA CORRUPT");
         goto err;
     }
@@ -366,7 +367,7 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
         // read_structblock(fs, &pblock);
         pbp = tsfs_load_block(fs, pnp->parent_loc);
         char buf[17];
-        tsfs_mk_ce_name(buf, nodeptr->name, strlen(nodeptr->name)+1);
+        tsfs_mk_ce_name(buf, nodeptr->name, tsfs_strlen(nodeptr->name)+1);
         awriteu32be(((unsigned char*)buf)+9, block_no);
         tsfs_sbcs_foreach(fs, pbp, _tsfs_free_struct_sbcsfe_do, buf);
         tsfs_unload(fs, pnp);

@@ -190,7 +190,7 @@ WARNING: THIS FUNCTION RELEASES THE [sn] RESOURCE
 */
 int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
     char buf[17];
-    tsfs_mk_ce_name(buf, sn->name, strlen(sn->name)+1);
+    tsfs_mk_ce_name(buf, sn->name, tsfs_strlen(sn->name)+1);
     TSFSStructNode* pn = tsfs_load_node(fs, sn->pnode);
     TSFSStructBlock* pb = tsfs_load_block(fs, pn->parent_loc);
     // _DBG_print_node(sn);
@@ -275,7 +275,7 @@ wrapper around [tsfs_exists] that accepts a name
 */
 int tsfs_name_exists(FileSystem* fs, TSFSStructBlock* sb, char const* name) {
     char tn[9];
-    tsfs_mk_ce_name(tn, name, strlen(name)+1);
+    tsfs_mk_ce_name(tn, name, tsfs_strlen(name)+1);
     return tsfs_exists(fs, sb, tn);
 }
 
@@ -326,14 +326,14 @@ unsigned char tsfs_sf_to_cf(unsigned char sf) {
 
 int tsfs_add_sn(FileSystem* fs, TSFSStructBlock* parent, TSFSStructNode* sn) {
     TSFSSBChildEntry ce = {.flags=tsfs_sf_to_cf(sn->storage_flags),.dloc=sn->disk_loc};
-    tsfs_mk_ce_name(ce.name, sn->name, ((sn->name)[254]) ? 256 : strlen(sn->name)+1);
+    tsfs_mk_ce_name(ce.name, sn->name, ((sn->name)[254]) ? 256 : tsfs_strlen(sn->name)+1);
     return tsfs_add_sbce(fs, parent, &ce);
 }
 
 int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSStructBlock* nsb) {
     TSFSStructBlock* sb = tsfs_load_block(fs, parent->parent_loc); // parent block
     char tname[9];
-    tsfs_mk_ce_name(tname, name, strlen(name)+1);
+    tsfs_mk_ce_name(tname, name, tsfs_strlen(name)+1);
     if (tsfs_exists(fs, sb, tname)) {
         tsfs_unload(fs, sb);
         return EEXIST;
@@ -341,7 +341,7 @@ int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSSt
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 2);
     TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+1,.pnode=parent->disk_loc,.inum=aquire_itable_slot(fs, ac1+1)};
-    awrite_buf(sn.name, name, strlen(name));
+    awrite_buf(sn.name, name, tsfs_strlen(name));
     nsb->flags = TSFS_CF_DIRE;
     nsb->disk_ref = sn.disk_loc;
     nsb->disk_loc = ac1;
@@ -357,7 +357,7 @@ int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSSt
 int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
     TSFSStructBlock* sb = tsfs_load_block(fs, parent->parent_loc); // parent block
     char tname[9];
-    tsfs_mk_ce_name(tname, name, strlen(name)+1);
+    tsfs_mk_ce_name(tname, name, tsfs_strlen(name)+1);
     if (tsfs_exists(fs, sb, tname)) {
         tsfs_unload(fs, sb);
         return EEXIST;
@@ -365,7 +365,7 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 1);
     TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.data_loc=0,.inum=aquire_itable_slot(fs, ac1)};
-    awrite_buf(sn.name, name, strlen(name));
+    awrite_buf(sn.name, name, tsfs_strlen(name));
     block_seek(fs, ac1, BSEEK_SET);
     write_structnode(fs, &sn);
     tsfs_add_sn(fs, sb, &sn);
@@ -403,7 +403,7 @@ u32 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
     void* p = allocate(9+sizeof(u32)+sizeof(void*));
     *((u32*)(((char*)p)+9)) = 0;
     printf("NAME: %s\n", name);
-    tsfs_mk_ce_name(p, name, strlen(name)+1);
+    tsfs_mk_ce_name(p, name, tsfs_strlen(name)+1);
     *((const void**)(((char*)p)+13)) = name;
     TSFSStructBlock sb;
     block_seek(fs, par->parent_loc, BSEEK_SET);

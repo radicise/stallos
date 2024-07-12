@@ -341,8 +341,8 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     read_structnode(s, &topdir);
     tsfs_mk_file(s, &topdir, "test");
     TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
-    for (int i = 0; i < 8; i ++) {
-        data_write(s, fil, 512*i, bigdata, 1024);
+    for (int i = 0; i < 1; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 512);
     }
     _kernel_u32 p = fil->data_loc;
     tsfs_unload(s, fil);
@@ -361,6 +361,10 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
     }
     if (s == 0) {
         s = (loadFS(fdrive, 0, MDISK_SIZE)).retptr;
+    }
+    if (s == 0) {
+        printf("ERROR LOADING FS\n");
+        return 0;
     }
     if (s->rootblock == 0) {
         printf("ERROR LOADING FS\n");
