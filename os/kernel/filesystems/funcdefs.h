@@ -14,9 +14,9 @@ typedef struct FSReturn FSRet;
 #define SB TSFSStructBlock
 #define DH TSFSDataHeader
 #define CE TSFSSBChildEntry
-FSRet createFS(struct FileDriver*, int, u8);
+FSRet createFS(struct FileDriver*, int, loff_t);
 void releaseFS(FSP);
-FSRet loadFS(struct FileDriver*, int);
+FSRet loadFS(struct FileDriver*, int, loff_t);
 u32 aquire_itable_slot(FSP, u32);
 int release_itable_slot(FSP, u32);
 u32 allocate_blocks(FSP, u8, u16);

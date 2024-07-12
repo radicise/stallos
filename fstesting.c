@@ -65,8 +65,9 @@ int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff
 #undef fsflush
 #define fsflush(fs) fflush(fp)
 
-#define MDISK_SIZE 21
+// #define MDISK_SIZE 21
 // #define MDISK_SIZE 1024*1024*4
+#define MDISK_SIZE 4096
 
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
     if (ce->flags != TSFS_CF_EXTT) {
@@ -109,7 +110,7 @@ int data_test(struct FileDriver* fdrive, int fd, char regen) {
         s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
     }
     if (s == 0) {
-        s = (loadFS(fdrive, 0)).retptr;
+        s = (loadFS(fdrive, 0, MDISK_SIZE)).retptr;
     }
     if (s->rootblock == 0) {
         printf("ERROR LOADING FS\n");
@@ -299,7 +300,7 @@ int magic_test(struct FileDriver* fdrive, int kf, char flags) {
 }
 
 int list_test(struct FileDriver* fdrive, int fd, char f) {
-    FileSystem* s = (loadFS(fdrive, fd)).retptr;
+    FileSystem* s = (loadFS(fdrive, fd, MDISK_SIZE)).retptr;
     // TSFSStructBlock sb = {0};
     block_seek(s, s->rootblock->top_dir, BSEEK_SET);
     TSFSStructNode topdir = {0};
@@ -359,7 +360,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
         s = (createFS(fdrive, 0, MDISK_SIZE)).retptr;
     }
     if (s == 0) {
-        s = (loadFS(fdrive, 0)).retptr;
+        s = (loadFS(fdrive, 0, MDISK_SIZE)).retptr;
     }
     if (s->rootblock == 0) {
         printf("ERROR LOADING FS\n");

@@ -21,18 +21,22 @@ char* strcpy(char* dst, const char* src) {
 #define TSFS_CORE_LPROTECT 7
 
 u32 partition_blocks(FileSystem* fs) {
-    return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+    // return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+    return fs->rootblock->partition_size;
 }
+
+#define TSFS_MAX_PSIZE 2147483648
 
 /*
 available for external use
+[p_size] is the size in blocks
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
-FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size) {
+FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     s64 curr_time = (s64)(kernel_time(NULL));
     FSRet rv = {.err=EINVAL};
-    if (p_size > 48) {
+    if (p_size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("PARTITION TOO BIG");
         return rv;
     }
@@ -46,10 +50,11 @@ FSRet createFS(struct FileDriver* fdr, int kfd, u8 p_size) {
     fs -> rootblock = rblock;
     rblock->breakver = VERNOBN;
     strcpy(rblock->version, TSFSVERSION);
-    rblock->partition_size = p_size;
+    rblock->partition_size = (u32)p_size;
     rblock->creation_time = *((u64*)(&curr_time));
     rblock->usedleft = 7;
-    u32 tblocks = (u32)((((u64)1)<<(rblock->partition_size)) / BLOCK_SIZE);
+    // u32 tblocks = (u32)((((u64)1)<<(rblock->partition_size)) / BLOCK_SIZE);
+    u32 tblocks = (u32)p_size;
     rblock->usedright = tblocks - 1;
     u32 center = tblocks/2;
     rblock->usedhalfleft = center-1;
@@ -108,8 +113,13 @@ available for external use
 ON ERROR:
 returns a filesystem object with a null rootblock or a rootblock with zero breakver
 */
-FSRet loadFS(struct FileDriver* fdr, int kfd) {
+FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t size) {
     kernelWarnMsg("WARNING: itable reorganization not implemented yet");
+    FSRet rv = {.err=EINVAL};
+    if (size > TSFS_MAX_PSIZE) {
+        kernelWarnMsg("ERROR: INVALID PARTITION SIZE");
+        return rv;
+    }
     FileSystem* fs = (FileSystem*) allocate(sizeof(FileSystem));
     fs -> fdrive = fdr;
     fs -> kfd = kfd;
@@ -118,19 +128,25 @@ FSRet loadFS(struct FileDriver* fdr, int kfd) {
     fdr->lseek(kfd, 0, SEEK_SET);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
-    FSRet rv = {.err=EINVAL};
     read_rootblock(fs, rblock);
     if (rblock->breakver != VERNOBN) {
         kernelWarnMsg("VERSION INCOMPAT");
-        releaseFS(fs);
-        return rv;
+        goto err;
     }
     u64 comphash = hash_rootblock(rblock);
     if (comphash != rblock->checksum) {
         kernelWarnMsg("DATA CORRUPT");
-        releaseFS(fs);
-        return rv;
+        goto err;
     }
+    if (rblock->partition_size != size) {
+        kernelWarnMsg("PARTITION SIZE MISMATCH");
+        goto err;
+    }
+    goto ok;
+    err:
+    releaseFS(fs);
+    return rv;
+    ok:
     rv.err = 0;
     rv.retptr = fs;
     return rv;
@@ -161,7 +177,8 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
         goto end;
     }
     if (area == 2) {
-        u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+        // u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+        u32 center = fs->rootblock->partition_size/2;
         if ((center-uhl) == (uhr-center)) {
             ret = uhl;
             uhl -= 1;
@@ -198,7 +215,8 @@ int tsfs_free_centered(FileSystem* fs, u32 block_no) {
     u32 ur = fs->rootblock->usedright;
     u32 uhl = fs->rootblock->usedhalfleft;
     u32 uhr = fs->rootblock->usedhalfright;
-    u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+    // u32 center = ((u32)((((u64)2)<<(fs->rootblock->partition_size-1)) / BLOCK_SIZE))/2;
+    u32 center = fs->rootblock->partition_size/2;
     u32 dl = (center-uhl); 
     u32 dr = (uhr-center);
     if (block_no <= uhl || block_no > uhr) return -1; // bounds check

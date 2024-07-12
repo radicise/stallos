@@ -16,8 +16,8 @@ typedef struct {
 // 	struct FSReturn (*link)(const char*, const char*);// Arguments: ("old", "new"); Returns: "return"; The paths passed are guaranteed to be relative to the mount point
 // };
 
-FSRet tsfs_fsinit(struct FileDriver* fdr, int kfd, u8 size) {
-    FSRet r = loadFS(fdr, kfd);
+FSRet tsfs_fsinit(struct FileDriver* fdr, int kfd, loff_t size) {
+    FSRet r = loadFS(fdr, kfd, size);
     return r;
 }
 void tsfs_fsclose(void* fso) {

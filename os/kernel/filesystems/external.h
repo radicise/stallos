@@ -37,8 +37,8 @@ extern void write_datablock(FileSystem*, TSFSDataBlock*);
 extern void write_dataheader(FileSystem*, TSFSDataHeader*);
 extern void write_structblock(FileSystem*, TSFSStructBlock*);
 extern void write_structnode(FileSystem*, TSFSStructNode*);
-extern FSRet createFS(struct FileDriver*, int, _kernel_u8);
-extern FSRet loadFS(struct FileDriver*, int);
+extern FSRet createFS(struct FileDriver*, int, _kernel_loff_t);
+extern FSRet loadFS(struct FileDriver*, int, _kernel_loff_t);
 extern void releaseFS(FileSystem*);
 extern _kernel_size_t data_write(FileSystem*, TSFSStructNode*, _kernel_u64, const void*, _kernel_size_t);
 extern _kernel_size_t data_read(FileSystem*, TSFSStructNode*, _kernel_u64, void*, _kernel_size_t);
@@ -75,6 +75,7 @@ extern void _magic_smoke(unsigned long, long, const char*, const char*);
 extern void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
 extern void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
 extern void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
+extern void __DBG_print_data(TSFSDataBlock*, long, const char*, const char*);
 extern void __DBG_print_cename(char const*, long, const char*, const char*);
 extern void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
 extern void __DBG_here(long, const char*, const char*);
@@ -84,6 +85,7 @@ extern void __DBG_here(long, const char*, const char*);
 #define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)
 #define _DBG_print_child(ce) __DBG_print_child(ce, __LINE__, __FILE__, __func__)
 #define _DBG_print_head(dh) __DBG_print_head(dh, __LINE__, __FILE__, __func__)
+#define _DBG_print_data(db) __DBG_print_data(db, __LINE__, __FILE__, __func__)
 #define _DBG_here() __DBG_here(__LINE__, __FILE__, __func__)
 
 #endif

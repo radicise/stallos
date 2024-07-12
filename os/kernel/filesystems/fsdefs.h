@@ -148,7 +148,7 @@ typedef struct {
     pygen-mk-rw: rootblock
     */
     u16   breakver;
-    u8    partition_size;
+    u32   partition_size;
     u64   creation_time;
     char  version[16];
     // u64   block_size;
@@ -436,7 +436,7 @@ int longseek(FileSystem* fs, loff_t offset, int whence) {
     //     offset += fs->partition_start;
     // }
     if (whence == SEEK_END) {
-        offset = fs->rootblock->partition_size - offset;
+        offset = ((loff_t)fs->rootblock->partition_size)*BLOCK_SIZE - offset;
         whence = SEEK_SET;
     }
     return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
