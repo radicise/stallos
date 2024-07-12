@@ -523,6 +523,21 @@ void tsfs_dummy_flush(FileSystem* fs) {}
 #define fsflush(fs) fs->fdrive->fsync(fs->kfd);
 #endif
 
+void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
+void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
+void __DBG_print_cename(char const*, long, const char*, const char*);
+void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
+void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
+void __DBG_print_data(TSFSDataBlock*, long, const char*, const char*);
+void __DBG_here(long, const char*, const char*);
+#define _DBG_print_block(sb) __DBG_print_block(sb, __LINE__, __FILE__, __func__)
+#define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
+#define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)
+#define _DBG_print_child(ce) __DBG_print_child(ce, __LINE__, __FILE__, __func__)
+#define _DBG_print_head(dh) __DBG_print_head(dh, __LINE__, __FILE__, __func__)
+#define _DBG_print_data(db) __DBG_print_data(db, __LINE__, __FILE__, __func__)
+#define _DBG_here() __DBG_here(__LINE__, __FILE__, __func__)
+
 #include "./funcdefs.h"
 #include "./diskmanip.h"
 #include "./tsfs_magic.h"

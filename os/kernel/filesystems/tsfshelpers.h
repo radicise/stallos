@@ -1,18 +1,20 @@
 #ifndef __TSFS_HELPERS_H__
 #define __TSFS_HELPERS_H__ 1
 #include "./fsdefs.h"
-void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
-void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
-void __DBG_print_cename(char const*, long, const char*, const char*);
-void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
-void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
-void __DBG_here(long, const char*, const char*);
-#define _DBG_print_block(sb) __DBG_print_block(sb, __LINE__, __FILE__, __func__)
-#define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
-#define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)
-#define _DBG_print_child(ce) __DBG_print_child(ce, __LINE__, __FILE__, __func__)
-#define _DBG_print_head(dh) __DBG_print_head(dh, __LINE__, __FILE__, __func__)
-#define _DBG_here() __DBG_here(__LINE__, __FILE__, __func__)
+// void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
+// void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
+// void __DBG_print_cename(char const*, long, const char*, const char*);
+// void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
+// void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
+// void __DBG_print_data(TSFSDataBlock*, long, const char*, const char*);
+// void __DBG_here(long, const char*, const char*);
+// #define _DBG_print_block(sb) __DBG_print_block(sb, __LINE__, __FILE__, __func__)
+// #define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
+// #define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)
+// #define _DBG_print_child(ce) __DBG_print_child(ce, __LINE__, __FILE__, __func__)
+// #define _DBG_print_head(dh) __DBG_print_head(dh, __LINE__, __FILE__, __func__)
+// #define _DBG_print_data(db) __DBG_print_data(db, __LINE__, __FILE__, __func__)
+// #define _DBG_here() __DBG_here(__LINE__, __FILE__, __func__)
 struct PosDat {
     TSFSDataBlock bloc;
     u32   poff; // how far the start of the data of the block is into the entity
@@ -134,6 +136,10 @@ void __DBG_print_node(TSFSStructNode* sn, long l, const char* f, const char* fid
 void __DBG_print_head(TSFSDataHeader* dh, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
     printf("DATA HEADER {\nDISK_LOC: 0x%x,\nREF_C: %hu,\nHEAD: 0x%x,\nBLOCKS: %u,\nSIZE: %lu,\nMAGIC_NO: %lu\n}%s\n", dh->disk_loc, dh->refcount, dh->head, dh->blocks, dh->size, dh->magicno, TSFS_ANSI_NUN);
+}
+void __DBG_print_data(TSFSDataBlock* db, long l, const char* f, const char* fid) {
+    printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
+    printf("DATA BLOCK {\nDISK_LOC: 0x%x,REF_C: %hu,\nTERM_BLKS: %u,\nNEXT: %x,\nPREV: %x,\nLENGTH: %hu,\nFLAGS: %x\n}%s\n", db->disk_loc, db->rc, db->blocks_to_terminus, db->next_block, db->prev_block, db->data_length, db->storage_flags, TSFS_ANSI_NUN);
 }
 void __DBG_print_cename(char const* name, long l, const char* f, const char* fid) {
     if (l) {
