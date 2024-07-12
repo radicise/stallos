@@ -6,7 +6,6 @@
 #if TARGETNUM > 4
 #error "Target is not supported"
 #endif
-
 /*
  *
  * This driver is for systems that have 32-bit `int' and pack them consecutively in structs and have `CHAR_BIT' equal to 8; TODO relax the aforementioned requirements

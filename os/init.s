@@ -43,3 +43,10 @@ movl $0x401,%eax
 int $0x80
 popl %ebx
 ret
+TNN:
+.globl TNN
+xorl %ebx,%ebx
+tnnd:
+movl $13,%eax
+int $0x80
+jmp tnnd

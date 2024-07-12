@@ -2,8 +2,10 @@
 #define __MACHINE_X86_32_PAGING_H__ 1
 #define PAGE_SIZE 4096
 #define PAGE_LOMASK ((uintptr) 0x00000fff)
-#define PAGEOF(x) ((uintptr) ((((uintptr) x) / PAGE_SIZE) * PAGE_SIZE))
+#define PAGEOF(x) ((uintptr) ((((uintptr) (x)) / PAGE_SIZE) * PAGE_SIZE))
 const uintptr amntMem = 64 * 1024 * 1024;// The value of `amntMem' must be an integer multiple of the value of `PAGE_SIZE'
+#define USERMEMHIGH (((uintptr) 0) - ((uintptr) 1))
+// TODO URGENT Ensure that `uintptr' wrap-around works as expected
 #include "../../kmemman.h"
 #if KMEM_LB_BS != PAGE_SIZE
 #error "Incompatible large-block memory allocation block size"
@@ -361,6 +363,9 @@ void initPaging(void) {
 	CR3Load(((u32) (MemSpace_kernel->dir)) + ((u32) RELOC));
 	WPPGSetup();
 	return;
+}
+int chprot(uintptr vPage, int read, int write, int execute, struct MemSpace* ms) {
+	bugCheckNum(0x000a | FAILMASK_PAGING);// TODO URGENT Implement
 }
 #undef NAMESPACE_PG
 #endif

@@ -68,11 +68,11 @@ typedef struct {
 	Elf32_Word p_align;
 } Elf32_Phdr;
 int ELF_cpyUser(uintptr dest, const void* from, uintptr count, int userReadable, int userWritable, struct MemSpace* mem) {
-	MemSpace_mkData(from, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
+	MemSpace_mkUserData(from, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
 int ELF_fillUser(uintptr dest, uintptr count, int userReadable, int userWritable, struct MemSpace* mem) {
-	MemSpace_mkFill(0x00, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
+	MemSpace_mkUserFill(0x00, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
 int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
@@ -102,13 +102,19 @@ int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct 
 	if ((seg->p_filesz) > (seg->p_memsz)) {
 		return 24;/* Memory image is of smaller size than file image */
 	}
+	uintptr s = seg->p_vaddr + seg->p_memsz;
+	if (seg->p_memsz > USERMEMHIGH) {
+		return 26;/* Illegal segment size */
+	}
+	if (s < seg->p_vaddr) {// TODO Is this denial allowed?
+		return 25;/* Segment wraps around address space */
+	}
+	if (s > (*stack)) {
+		(*stack) = s;
+	}
 	ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
 	if ((seg->p_memsz) > (seg->p_filesz)) {
 		ELF_fillUser((uintptr) ((seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
-	}
-	uintptr s = seg->p_vaddr + seg->p_memsz;
-	if (s > (*stack)) {
-		(*stack) = s;
 	}
 	return 0;
 }
@@ -211,22 +217,22 @@ int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 	}
 	return 0;
 }
-void freePage(uintptr vAddr, void* addr, void* arb) {
-	dealloc_lb(addr);
-}
 int runELF(const void* elf, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
 	thread->group->mem = MemSpace_create();
 	uintptr s = 0;
 	int i = loadELF((const Elf32_Ehdr*) elf, &s, thread->group->mem);
 	if (i != 0) {
-		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
 		return i;
 	}
-	uintptr sl = s;
+	Mutex_acquire(&(thread->group->breakLock));
+	thread->group->userBreak = PAGEOF(s + ((s - PAGEOF(s)) ? PAGE_SIZE : ((uintptr) 0)));
+	Mutex_release(&(thread->group->breakLock));
+	uintptr sl = s + (uintptr) 0x00100000;
 	s += ((uintptr) 0x00200000);// TODO How much space should be given to the stack?
 	if (s < (uintptr) 0x00200000) {// TODO Ensure that there is at least one available page in the stack
-		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
 		return 28;// TODO Is this denial allowed?
 	}
@@ -238,7 +244,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 	// x86_32
 	s = ((uintptr) s) - (((uintptr) s) % 4);
 	if (mapPage((uintptr) 0, (void*) (0 - RELOC), 0, 0, thread->group->mem)) {
-		MemSpace_forEach(freePage, NULL, thread->group->mem);
+		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
 		return 29;// TODO Is this denial allowed?
 	}

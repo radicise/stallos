@@ -30,6 +30,19 @@ movl %ebx,%eax
 notl %eax
 incl %eax
 irupt_80h__noError:
+
+/*
+nop
+nop
+nop
+nop
+nop
+incl %ebx
+cmpl $0x07ffffff,%ebx
+jnz irupt_80h__noError
+*/# NRW
+
+
 xorl %ebx,%ebx
 subl $RELOC,%ebx
 addl $0xd80,%ebx
