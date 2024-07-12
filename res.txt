@@ -15,6 +15,21 @@ radicise
 tsj845
 +
 os/kernel/filesystems/.*
+/pygen\.py
+/leaks/.*
+/fsutils/.*
+/fstesting\.c
+/unifscc\.sh
+/unifsrun\.sh
+/tsfs_info\.txt
+/tsfsfmt\.txt
+/tsfsleaks\.txt
+/fstesting\.sh
+/cfst\.sh
+/fsverify\.py
+/leakso\.py
+/leaks_oref\.py
+/bigdata\.txt
 
 vihaan842
 +
