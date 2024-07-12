@@ -28,3 +28,4 @@ else
     export TARGET=$TAR
     ./cfst.sh 0
 fi
+exit

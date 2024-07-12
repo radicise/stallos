@@ -11,3 +11,4 @@ else
     gcc -D TARGET=x86_64 -D TARGETNUM=3 -D __TESTING__=0 -O0 -std=c99 -pedantic ./fstesting.c ./bin/tsfs.out -o ./bin/fstesting.bin
     #-march=x86-64 -mabi=sysv
 fi
+exit
