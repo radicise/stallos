@@ -26,15 +26,15 @@ void tsfs_fsclose(void* fso) {
     releaseFS(fs);
 }
 FSRet tsfs_iopen(const char* fileName, int flags, mode_t mode, void* fs) {
-    FSRet r = {.err=EOPNOTSUPP};
+    FSRet r = {.err=ENOSYS};
     return r;
 }
 FSRet tsfs_ichmod(const char* path, mode_t mode) {
-    FSRet r = {.err=EOPNOTSUPP};
+    FSRet r = {.err=ENOSYS};
     return r;
 }
 FSRet tsfs_ilink(const char* old, const char* new) {
-    FSRet r = {.err=EOPNOTSUPP};
+    FSRet r = {.err=ENOSYS};
     return r;
 }
 
