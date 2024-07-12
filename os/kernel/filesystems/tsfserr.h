@@ -10,26 +10,27 @@ x = c ^ e
 c ^ x == e
 */
 #ifndef __MOCKTEST
-#define PUTS(...) ;
+#define PUTS(...) printf(__VA_ARGS__)
 #else
 #include <stdio.h>
 int PUTS(const char* c) {while (*c){putchar((int)*c);c++;}return 0;}
 #endif
 #include "../errno.h"
 #include "./fsdefs.h"
-#define FEWAND 0x1
+#define FEWAND  0x1
 #define FEALLOC 0x2
-#define FEFULL 0x4
-#define FEBIG 0x8
+#define FEFULL  0x4
+#define FEBIG   0x8
 #define FESMALL 0x10
-// coolaid
-#define FEDRIVE 0xc001a1d0
-#define FEINVL 0x20
-#define FEARG 0x40
-#define FETEST 0x80
-#define FEIMPL 0x100
-#define FEDATA 0x200
-#define FEOP   0x400
+// // coolaid
+// #define FEDRIVE 0xc001a1d0
+#define FEDRIVE 0x800
+#define FEINVL  0x20
+#define FEARG   0x40
+#define FETEST  0x80
+#define FEIMPL  0x100
+#define FEDATA  0x200
+#define FEOP    0x400
 int magic_check(unsigned long code, long err) {
     // long x = code ^ err;
     // return ((code ^ x) == err);
