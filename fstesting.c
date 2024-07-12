@@ -99,7 +99,7 @@ int regen_mock(int fd) {
     ftruncate(fd, MDISK_SIZE*1024);
     return 0;
 }
-_kernel_time_t kernel_time(_kernel_time_t* t) {
+_kernel_time_t fetch_time(_kernel_time_t* t) {
     return (_kernel_time_t)time((time_t*)t);
 }
 int data_test(struct FileDriver* fdrive, int fd, char regen) {

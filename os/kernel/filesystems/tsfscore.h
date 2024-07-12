@@ -34,7 +34,7 @@ DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
-    s64 curr_time = (s64)(kernel_time(NULL));
+    s64 curr_time = (s64)(fetch_time(NULL));
     FSRet rv = {.err=EINVAL,.retptr=0};
     if (p_size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("PARTITION TOO BIG");

@@ -27,5 +27,5 @@ extern u16 bus_in_u16(unsigned long);
 extern u32 bus_in_u32(unsigned long);
 extern void bugCheckNum(unsigned long);
 extern int kernelWarnMsg(const char*);
-extern time_t kernel_time(time_t*);
+extern time_t fetch_time(time_t*);
 #endif
