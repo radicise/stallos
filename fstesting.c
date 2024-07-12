@@ -96,7 +96,7 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
 
 int regen_mock(int fd) {
     ftruncate(fd, 0);
-    ftruncate(fd, 2<<(MDISK_SIZE-1));
+    ftruncate(fd, MDISK_SIZE*1024);
     return 0;
 }
 _kernel_time_t kernel_time(_kernel_time_t* t) {
