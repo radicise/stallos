@@ -38,7 +38,7 @@ FSRet tsfs_ilink(const char* old, const char* new) {
     return r;
 }
 
-struct FSInterface FS_TSFS_FUNCS = {
+struct FSInterface FS_TSFS = {
     .FSInit=tsfs_fsinit,
     .FSClose=tsfs_fsclose,
     .open=tsfs_iopen,
