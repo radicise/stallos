@@ -57,7 +57,7 @@ void dalloc(void* p, size_t s) {
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 9
+#define VERNOBN 10
 
 /*
 PYGENSTART

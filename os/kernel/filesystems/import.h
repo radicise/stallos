@@ -4,5 +4,5 @@
 use this to gain access to the file system interface
 */
 #include "../fsiface.h"
-extern struct FSInterface FS_FUNCS;
+extern struct FSInterface FS_TSFS_FUNCS;
 #endif

@@ -66,8 +66,8 @@ int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff
 #define fsflush(fs) fflush(fp)
 
 // #define MDISK_SIZE 21
-// #define MDISK_SIZE 1024*1024*4
-#define MDISK_SIZE 4096
+#define MDISK_SIZE 1024*1024*4
+// #define MDISK_SIZE 4096
 
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
     if (ce->flags != TSFS_CF_EXTT) {

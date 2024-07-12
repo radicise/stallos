@@ -29,13 +29,18 @@ u32 partition_blocks(FileSystem* fs) {
 
 /*
 available for external use
-[p_size] is the size in blocks
+[p_size] is the size in bytes
 DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     s64 curr_time = (s64)(fetch_time(NULL));
     FSRet rv = {.err=EINVAL,.retptr=0};
+    if (p_size % BLOCK_SIZE != 0) {
+        kernelWarnMsg("INVALID PARTITION SIZE");
+        return rv;
+    }
+    p_size /= BLOCK_SIZE;
     if (p_size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("PARTITION TOO BIG");
         return rv;
@@ -116,6 +121,11 @@ returns a filesystem object with a null rootblock or a rootblock with zero break
 FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t size) {
     kernelWarnMsg("WARNING: itable reorganization not implemented yet");
     FSRet rv = {.err=EINVAL};
+    if (size % BLOCK_SIZE != 0) {
+        kernelWarnMsg("INVALID PARTITION SIZE");
+        return rv;
+    }
+    size /= BLOCK_SIZE;
     if (size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("ERROR: INVALID PARTITION SIZE");
         return rv;
