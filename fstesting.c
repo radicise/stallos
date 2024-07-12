@@ -29,6 +29,7 @@ void dealloc(void* ptr, _kernel_size_t size) {
 }
 
 FILE* fp;
+char* bigdata[1024];
 
 _kernel_ssize_t fdrive_write(int _, const void* data, _kernel_size_t len) {
     if (len % 16 == 0) {
@@ -74,7 +75,19 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
         TSFSStructNode sn = {0};
         read_structnode(s, &sn);
-        printf("@ %u : %s\n", ce->dloc, sn.name);
+        char tc = 'i';
+        if (sn.storage_flags == TSFS_KIND_DIR) {
+            tc = 'd';
+        } else if (sn.storage_flags == TSFS_KIND_FILE) {
+            tc = 'f';
+        } else if (sn.storage_flags == TSFS_KIND_HARD) {
+            tc = 'h';
+        } else if (sn.storage_flags == TSFS_KIND_LINK) {
+            tc = 'l';
+        } else {
+            tc = 'i';
+        }
+        printf("@ %u : -%c- %s\n", ce->dloc, tc, sn.name);
         loc_seek(s, l);
     }
     return 0;
@@ -310,6 +323,34 @@ int list_test(struct FileDriver* fdrive, int fd, char f) {
     return 0;
 }
 
+extern int tsfs_free_data(FileSystem*, _kernel_u32);
+
+int delete_test(struct FileDriver* fdrive, int fd, char f) {
+    regen_mock(fd);
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    int dfd = open("bigdata.txt", O_RDONLY);
+    if (dfd == -1) {
+        goto rel;
+    }
+    read(dfd, bigdata, 1024);
+    close(dfd);
+    // TSFSStructBlock sb = {0};
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    TSFSStructNode topdir = {0};
+    read_structnode(s, &topdir);
+    tsfs_mk_file(s, &topdir, "test");
+    TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
+    for (int i = 0; i < 8; i ++) {
+        data_write(s, fil, 512*i, bigdata, 1024);
+    }
+    _kernel_u32 p = fil->data_loc;
+    tsfs_unload(s, fil);
+    tsfs_free_data(s, p);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
 int full_test(struct FileDriver* fdrive, int fd, char flags) {
     FileSystem* s = 0;
     if (flags) {
@@ -356,6 +397,13 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                 tsfs_mk_file(s, par, name);
             }
             tsfs_unload(s, par);
+        } else if (clicode == 4) {
+            TSFSStructNode dir = {0};
+            block_seek(s, tsfs_resolve_path(s, cwd), BSEEK_SET);
+            read_structnode(s, &dir);
+            TSFSStructBlock* sb = tsfs_load_block(s, dir.parent_loc);
+            tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
+            tsfs_unload(s, sb);
         }
     }
     dealloc:
@@ -438,6 +486,8 @@ int main(int argc, char** argv) {
             flags[0] = 6;
         } else if (stringcmp(argv[i], "list")) {
             flags[0] = 7;
+        } else if (stringcmp(argv[i], "delete")) {
+            flags[0] = 8;
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);
@@ -467,6 +517,9 @@ int main(int argc, char** argv) {
             break;
         case 7:
             harness(fpath, flags[1], list_test);
+            break;
+        case 8:
+            harness(fpath, flags[1], delete_test);
             break;
         default:
             printf("bad args\n");

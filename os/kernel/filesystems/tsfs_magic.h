@@ -197,6 +197,19 @@ void _tsmagic_dehead(FileSystem* fs, DH* head) {
     // deallocate(head, sizeof(DH));
 }
 
+void _tsm_dbp_void(void* ptr) {
+    u8 id = *((u8*)(ptr)+sizeof(size_t)+sizeof(u32)+sizeof(u16));
+    if (id == 0) {
+        _DBG_print_node((TSFSStructNode*)ptr);
+    } else if (id == 1) {
+        _DBG_print_block((TSFSStructBlock*)ptr);
+    } else if (id == 2) {
+        _DBG_print_data((TSFSDataBlock*)ptr);
+    } else if (id == 3) {
+        _DBG_print_head((TSFSDataHeader*)ptr);
+    }
+}
+
 /*
 check for interned object
 */
@@ -207,6 +220,7 @@ void* _tsm_cintern(Magic* m, u32 pos) {
         void* ptr = m->ptr[i++];
         printf("INTERN PTR: %p\n", ptr);
         if (ptr == 0) continue;
+        _tsm_dbp_void(ptr);
         u32 tp = *((u32*)(((char*)ptr)+sizeof(size_t)));
         printf("INTERNCHECK: t:{%x} == %x?\n", tp, pos);
         if (tp == pos) {

@@ -2,7 +2,6 @@
 #define __INPUT_H__ 1
 #include <stdio.h>
 #include <stdlib.h>
-#include "./dynstr.h"
 #include "strops.h"
 
 char* readline(void) {
@@ -112,6 +111,9 @@ CLIData clihelper(void) {
             }
             strcopy(dst, ret.data);
             printf("RB: %s\n", ret.data);
+        // string is "list"
+        } else if (stringcmp(ptr, "list")) { // 4
+            r = 4;
         }
         end:
         free(ptr);

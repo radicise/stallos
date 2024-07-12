@@ -234,12 +234,19 @@ int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
             u32 pos = dh->disk_loc;
             _tsmagic_force_release(fs, dh);
             // DELETE THE DATA
+            tsfs_free_data(fs, pos);
             magic_smoke(FEOP | FEIMPL);
-            return 0;
+            goto done;
         }
         tsfs_unload(fs, dh);
-        return 0;
+        goto done;
+    } else {
+        goto err;
     }
+    done:
+    _tsfs_delnode(fs, sn);
+    return 0;
+    err:
     return -1;
 }
 

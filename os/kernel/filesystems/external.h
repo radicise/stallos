@@ -9,9 +9,9 @@ lots of extern statements for interfacing with the FS
 
 typedef struct FSReturn FSRet;
 
-#ifndef PROCPRINTF
-int printf(const char*__restrict s, ...) {}
-#endif
+// #ifndef PROCPRINTF
+// int printf(const char*__restrict s, ...) {}
+// #endif
 
 extern void awrite_buf(void*, const void*, _kernel_size_t);
 extern int bufcmp(void const*, void const*, int);

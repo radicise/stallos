@@ -1,7 +1,7 @@
 #ifndef __TSFSCORE_H__
 #define __TSFSCORE_H__ 1
-
 #include "./fsdefs.h"
+// extern int printf(const char*, ...);
 // #include "./tsfsmanage.h"
 // #include <string.h>
 // #undef __MOCKTEST
@@ -19,6 +19,10 @@ char* strcpy(char* dst, const char* src) {
 // #endif
 
 #define TSFS_CORE_LPROTECT 7
+
+u32 partition_blocks(FileSystem* fs) {
+    return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+}
 
 /*
 available for external use
@@ -375,6 +379,7 @@ static DynBField* mk_bfield() {
     ptr->field[1] = 0;
     ptr->field[2] = 0;
     ptr->field[3] = 0;
+    return ptr;
 }
 static void rel_bfield(DynBField* ptr) {
     deallocate(ptr->field, ptr->cap);
@@ -467,6 +472,8 @@ static void bitfield_print(FileSystem* fs, DynBField* ptr) {
     u32 startb = fs->rootblock->usedright+1;
     u32 w = 8;
     u32 h = ptr->size / w + ((ptr->size%w)>0?1:0);
+    printf("PRINTING\n");
+    printf("%u, %u\n", w, h);
     for (u32 i = 0; i < h; i ++) {
         for (u32 j = 0; j < w; j ++) {
             u32 blk = (i*w+j);
@@ -477,13 +484,16 @@ static void bitfield_print(FileSystem* fs, DynBField* ptr) {
 }
 
 /*
-frees all data blocks starting from the given one
+frees all data blocks starting from the given dataheader
 !!WARNING!!
 cleanup MUST be complete BEFORE freeing data blocks
 */
 int tsfs_free_data(FileSystem* fs, u32 block_no) {
     u32 ur = fs->rootblock->usedright;
-    if (block_no <= ur) { // protect bounds
+    u32 tblocks = partition_blocks(fs);
+    if (block_no < ur || block_no >= tblocks) { // protect bounds
+        printf("BLKNO: %u\nMAXB: %u\nMINB: %u\n", block_no, tblocks, ur);
+        magic_smoke(FEDRIVE | FEARG | FEINVL);
         return -1;
     }
     TSFSDataHeader dhtest;
@@ -491,11 +501,12 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
     read_dataheader(fs, &dhtest);
     u64 comphash = hash_dataheader(&dhtest);
     u32 oblk = block_no;
-    u32 tblocks = (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+    // u32 tblocks = (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
     DynBField* bf = mk_bfield();
     {
         u32 used = tblocks-fs->rootblock->usedright-1;
         u32 bfsize = (used)/8;
+        printf("USED: %u\nBFSIZE: %u\n", used, bfsize);
         bfield_setsize(bf, bfsize + ((used%8>0)?1:0));
     }
     set_bfield_block(bf, oblk, 1);
@@ -531,9 +542,7 @@ void getcreat_databloc(FileSystem* fs, u32 loc, u32 pos, TSFSDataBlock* db, int*
     // magic_smoke(FEIMPL | FEDRIVE | FEDATA | FEOP);
     if (pos == 0) {
         (*count) ++;
-        TSFSDataBlock odb = {0};
-        block_seek(fs, loc, 0);
-        read_datablock(fs, &odb);
+        TSFSDataBlock* odb = tsfs_load_data(fs, loc);
         u32 blk = allocate_blocks(fs, 1, 1);
         db->disk_loc = blk;
         db->data_length = 0;
@@ -541,14 +550,15 @@ void getcreat_databloc(FileSystem* fs, u32 loc, u32 pos, TSFSDataBlock* db, int*
         db->next_block = 0;
         db->prev_block = loc;
         db->storage_flags = TSFS_SF_FINAL_BLOCK|TSFS_SF_LIVE;
-        odb.storage_flags &= ~TSFS_SF_FINAL_BLOCK;
-        odb.next_block = blk;
+        odb->storage_flags &= ~TSFS_SF_FINAL_BLOCK;
+        odb->next_block = blk;
         seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
-        write_datablock(fs, &odb);
-        block_seek(fs, blk, 0);
+        write_datablock(fs, odb);
+        tsfs_unload(fs, odb);
+        block_seek(fs, blk, BSEEK_SET);
         write_datablock(fs, db);
     } else {
-        block_seek(fs, pos, 0);
+        block_seek(fs, pos, BSEEK_SET);
         read_datablock(fs, db);
     }
 }
