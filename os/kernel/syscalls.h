@@ -449,9 +449,14 @@ int getDesc(pid_t pIdent, int fd) {
 	return i;
 }
 #include "FileDriver.h"
+#include "fsiface.h"
 #include "driver/VGATerminal.h"
 #include "driver/ATA.h"
 struct Map* kfdDriverMap;
+struct {
+	struct FSInterface* fs;
+	void* obj;
+} FSDesc;
 struct Map* FSDriverMap;
 struct FileDriver* resolveFileDriver(int kfd) {
 	uintptr drvr = Map_fetch(kfd, kfdDriverMap);
@@ -611,7 +616,7 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 void initSystemCallInterface(void) {
 	kmem_init();
 	kfdDriverMap = Map_create();// Map, int "kfd" -> struct FileDriver* "driver"
-	FSDriverMap = Map_create();// Map, const char* "Filesystem name" -> struct FSInterface* "Filesystem driver"; "Filesystem name" only ends with '/' if it is "/"
+	FSDriverMap = Map_create();// Map, const char* "Filesystem name" -> struct FSDesc* "Filesystem driver"; "Filesystem" only ends with '/' if it is "/"
 	KFDStatus = Map_create();// Map, int "kfd" -> struct KFDInfo* "status"
 	Map_add(1, (uintptr) &FileDriver_VGATerminal, kfdDriverMap);// "/dev/tty1"
 	Map_add(2, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hda"
@@ -689,6 +694,30 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 	// TODO Remove entries from `kfdDriverMap' that are not held by other processes and are associated with the `kfd' values that were the values of key-value pairs removed from `FileKeyKfdMap'
 	return;
 }
+
+
+
+#define FAILMASK_MOUNTINGTSFS 0x00ff0000
+extern struct FSInterface FS_TSFS;
+void testing_mount_tsfs(void) {
+	struct FileDriver* drvr = resolveFileDriver(2);
+	if (drvr == NULL) {
+		bugCheckNum(0x1111);
+	}
+	struct FSReturn fsr = FS_TSFS.FSInit(drvr, 2, 4 * 1024 * 1024);
+	if (fsr.err != 0) {
+		kernelMsg("Filesystem initialisation failed with err=");
+		kernelMsgULong_hex(fsr.err);
+		kernelMsg("\n");
+		while (1) {}
+	}
+	kernelMsg("Filesystem initialisation succeeded\n");
+	// add to filedriver mapping
+	return;
+}// NRW
+
+
+
 #include "std.h"
 /*
  *

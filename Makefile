@@ -35,8 +35,8 @@ build/init-asm.elf : os/init.s
 build/init-ul.elf : os/init.c
 	${CCPRGM} -o build/init-ul.elf os/init.c
 
-build/kernel.elf : build/kernelbase-ul.elf build/kernel-asm.elf build/tsfs.out
-	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/kernel.elf build/kernelbase-ul.elf build/kernel-asm.elf -lgcc
+build/kernel.elf : build/kernelbase-ul.elf build/kernel-asm.elf build/tsfs-ul.elf
+	${LDPRGM} ${LDFLAGS} -Ttext=0x1000 -o build/kernel.elf build/kernelbase-ul.elf build/kernel-asm.elf build/tsfs-ul.elf -lgcc
 
 build/kernel-asm.elf : build/system-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/kernel-asm.elf build/system-comp.s
@@ -46,11 +46,8 @@ build/system-comp.s : os/system.s os/irupt_generic.s os/kernel/machine/${TARGETM
 	awk '1{gsub(/NUM/, thenum, $$0);print($$0);}' thenum=70 os/irupt_generic.s thenum=71 os/irupt_generic.s thenum=72 os/irupt_generic.s thenum=73 os/irupt_generic.s thenum=74 os/irupt_generic.s thenum=75 os/irupt_generic.s thenum=76 os/irupt_generic.s thenum=77 os/irupt_generic.s thenum=78 os/irupt_generic.s thenum=79 os/irupt_generic.s thenum=7a os/irupt_generic.s thenum=7b os/irupt_generic.s thenum=7c os/irupt_generic.s thenum=7d os/irupt_generic.s thenum=7e os/irupt_generic.s thenum=7f os/irupt_generic.s >> build/system-comp.s
 	cat os/kernel/machine/${TARGETMACHINE}/*.s >> build/system-comp.s # TODO Have this not fail if there are no /*.s/ files present for the machine
 
-build/tsfs.out : os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h os/kernel/obj/*.h os/kernel/object/*.h os/kernel/filesystems/*
-	${CCPRGM} -o build/tsfs.out os/kernel/filesystems/tsfs.c
-
 build/kernelbase-ul.elf : os/system.c os/kernel/*.h os/kernel/machine/${TARGETMACHINE}/*.h os/kernel/driver/*.h os/kernel/obj/*.h os/kernel/object/*.h
-	${CCPRGM} -o build/kernelbase-ul.elf os/system.c
+	${CCPRGM} -D __STALLOS__=1 -o build/kernelbase-ul.elf os/system.c
 
 build/loader.bin : build/loader.o build/sysc.elf build/irupts.o
 	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc
@@ -90,6 +87,6 @@ clean :
 	rm -f build/*
 	rm -f bin/*
 
-build/tsfs-ul.elf : os/kernel/filesystems/tsfs.c os/kernel/filesystems/*.h
+build/tsfs-ul.elf : os/kernel/filesystems/tsfs.c os/kernel/filesystems/*.h os/kernel/FileDriver.h os/kernel/fsiface.h os/kernel/types.h os/kernel/machine/${TARGETMACHINE}/types.h os/kernel/ktypes.h os/kernel/machine/${TARGETMACHINE}/ktypes.h
 	# TODO Revise "tsfs" file organisation
-	${CCPRGM} -o build/tsfs-ul.elf os/kernel/filesystems/tsfs.c
+	${CCPRGM} -D __STALLOS__=1 -o build/tsfs-ul.elf os/kernel/filesystems/tsfs.c

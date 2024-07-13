@@ -25,7 +25,7 @@ if [ $TAR = 3 ]
 then
     ./cfst.sh 1
 else
-    export TARGET=$TAR
+    export TARGETNUM=$TAR
     ./cfst.sh 0
 fi
 exit

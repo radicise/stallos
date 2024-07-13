@@ -27,6 +27,9 @@ pid_t fetch_tgid(void) {
 int reserve_kfd(void) {
 	return makeKfd();
 }
+time_t fetch_time(void) {
+	return timeFetch();
+}
 #include "syscalls.h"
 void associate_kfd(int kfd, struct FileDriver* driver, int statusflags, int userspacefd) {
 	struct KFDInfo* fi = alloc(sizeof(struct KFDInfo));

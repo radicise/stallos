@@ -1,7 +1,6 @@
 #ifndef TARGET
 #error "`TARGET' is not set"
 #endif
-#define __STALLOS__ 1
 #define MACHINE_SUPPORT_WRONLYMEM 0
 #define RELOC 0x00040000
 // The value of `RELOC' MUST be a positive integer multiple of the value of `PAGE_SIZE'
@@ -182,7 +181,7 @@ const char* strct(const char** c) {// Does not check for string size overflow
 	(*m) = 0x00;
 	return s;
 }
-extern const char* strconcat();
+extern const char* strconcat(const char*, ...);
 struct VGATerminal mainTerm;
 Mutex kmsg;
 int kernelMsg(const char* msg) {
@@ -194,6 +193,13 @@ int kernelMsg(const char* msg) {
 	}
 	Mutex_release(&kmsg);
 	return 0;
+}
+int printf(const char* fmt, ...) {// TODO URGENT fix
+	int len = strlen(fmt);
+	if (kernelMsg(fmt)) {
+		return 0;
+	}
+	return len;
 }
 int kernelWarnMsg(const char* msg) {
 	int w = 0;
@@ -575,6 +581,7 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
+	testing_mount_tsfs();// NRW
 	int errVal = runELF((const void*) (((uintptr) 0x00010000) - ((uintptr) RELOC)), th);
 	if (errVal != 0) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
