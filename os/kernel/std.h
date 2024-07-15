@@ -24,13 +24,13 @@ kuid_t fetch_euid(void) {
 pid_t fetch_tgid(void) {
 	return tgid;
 }
-int reserve_kfd(void) {
-	return makeKfd();
-}
 time_t fetch_time(void) {
 	return timeFetch();
 }
 #include "syscalls.h"
+int reserve_kfd(void) {
+	return makeKfd();
+}
 void associate_kfd(int kfd, struct FileDriver* driver, int statusflags, int userspacefd) {
 	struct KFDInfo* fi = alloc(sizeof(struct KFDInfo));
 	fi->status = statusflags;

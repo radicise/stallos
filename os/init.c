@@ -2,12 +2,41 @@
 #if __TESTING__ == 1
 extern unsigned long testcall(unsigned long);
 #endif
+extern void _exit(int);
 extern ssize_t write(int, const void*, size_t);
 extern ssize_t read(int, void*, size_t);
 extern time_t time(time_t*);
 extern int stime(const time_t*);
+extern void* brk(void*);
+size_t strlen(const char* s) {
+	size_t l = 0;
+	while (s[l++]) {
+	}
+	return l - 1;
+}
 extern unsigned long TNN(void);
 unsigned char hex[] = {0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66};
+void printULong_hex(unsigned long n) {
+	int i;
+	char buf[i = sizeof(unsigned long) * 2];
+	while (1) {
+		i--;
+		int c = n & 0xf;
+		if (c > 9) {
+			c += 0x57;
+		}
+		else {
+			c += 0x30;
+		}
+		buf[i] = c;
+		if (!i) {
+			break;
+		}
+		n >>= 4;
+	}
+	write(1, buf, sizeof(unsigned long) * 2);
+	return;
+}
 void printLong(long n) {
 	if (n == 0) {
 		write(1, "0", 1);
@@ -45,7 +74,32 @@ void printLine(void) {
 	write(1, "\n", 1);
 	return;
 }
+void print(const char* d) {
+	write(1, d, strlen(d));
+	return;
+}
 void _start() {
+	_exit(0xdeadc0de);
+	int i = 0;
+	while (i < 200) {
+		char c[1];
+		read(3, c, 1);
+		write(1, c, 1);
+		i += 1;
+	}
+	while (1) {}
+	void* bm = brk(NULL);
+	printULong_hex(bm);
+	print("\n");
+	// while (1) {}
+	while (1) {
+		print("0x");
+		printULong_hex(bm = brk((void*) (((char*) bm) + 4096 * 4)));
+		print("\n");
+		printLong(*(((char*) bm) - 1));
+		print("\n");
+		print("\n");
+	}
 	// TNN();
 	/*
 	while (1) {
