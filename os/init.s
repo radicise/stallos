@@ -1,5 +1,13 @@
 .text
-write:# TODO Capture errors of all of the kernel wrapper functions
+_exit:# void _exit(int)
+.globl _exit
+pushl %ebx
+movl 8(%esp),%ebx
+movl $1,%eax
+int $0x80
+popl %ebx
+ret
+write:
 .globl write
 pushl %ebx
 movl 8(%esp),%ebx
@@ -32,6 +40,14 @@ stime:
 pushl %ebx
 movl 8(%esp),%ebx
 movl $25,%eax
+int $0x80
+popl %ebx
+ret
+brk:# void* brk(void*)
+.globl brk
+pushl %ebx
+movl 8(%esp),%ebx
+movl $45,%eax
 int $0x80
 popl %ebx
 ret

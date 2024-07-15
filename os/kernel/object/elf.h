@@ -227,9 +227,9 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 		return i;
 	}
 	Mutex_acquire(&(thread->group->breakLock));
-	thread->group->userBreak = PAGEOF(s + ((s - PAGEOF(s)) ? PAGE_SIZE : ((uintptr) 0)));
+	thread->group->userBreak = s;
 	Mutex_release(&(thread->group->breakLock));
-	uintptr sl = s + (uintptr) 0x00100000;
+	uintptr sl = s + (uintptr) 0x00100000;// TODO URGENT Guard the stack from heap growth; TODO Is that guarding necessary?
 	s += ((uintptr) 0x00200000);// TODO How much space should be given to the stack?
 	if (s < (uintptr) 0x00200000) {// TODO Ensure that there is at least one available page in the stack
 		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);

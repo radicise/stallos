@@ -184,6 +184,14 @@ const char* strct(const char** c) {// Does not check for string size overflow
 extern const char* strconcat(const char*, ...);
 struct VGATerminal mainTerm;
 Mutex kmsg;
+void kMsg_lock(void) {
+	Mutex_acquire(&kmsg);
+	return;
+}
+void kMsg_unlock(void) {
+	Mutex_release(&kmsg);
+	return;
+}
 int kernelMsg(const char* msg) {
 	unsigned int len = strlen(msg);
 	Mutex_acquire(&kmsg);
@@ -594,3 +602,4 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	irupt_80h_sequenceEntry();// TODO Use a generic non-allocated stack area for system call handling and add a guard page for the limit of the other stacks
 	return;
 }
+#include "kernel/std.h"

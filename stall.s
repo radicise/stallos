@@ -192,13 +192,15 @@ _seac:
     inpc:
     .byte 0
     .set iinter, inpc - _start
-    .set isec, (iinter / 0x10) + 0x07c0
+    .set isecnd, iinter / 0x10
+    .set isec, isecnd + 0x07c0
     .set iadd, iinter % 0x10
     prompt:
     .ascii ":# "
     .set plen, (.-prompt)
     .set pinter, prompt - _start
-    .set psec, (pinter / 0x10) + 0x07c0
+    .set psecnd, pinter / 0x10
+    .set psec, psecnd + 0x07c0
     .set padd, pinter % 0x10
     shesh:
     movw $psec,%ax
@@ -213,8 +215,10 @@ _seac:
     movw $0x01,%cx
     xorb %al,%al
     xorw %di,%di
-    .set shell_seg, (shell_offset / 16) + 0x7c0
-    .set commstart_seg, (shell_offset / 16) + 0x7c0 + staltstd_RESrmstroff
+    .set shell_segnd, shell_offset / 16
+    .set shell_seg, shell_segnd + 0x7c0
+    .set commstart_segnd, shell_offset / 16
+    .set commstart_seg, commstart_segnd + 0x7c0 + staltstd_RESrmstroff
     movw $commstart_seg,%si
     steel:
     movw $0x03,%dx

@@ -287,7 +287,7 @@ void initSegmentation(void) {
 	for (int i = 0; i < 256; i++) {// TODO URGENT Move the IRQ stack area
 		TG_setDesc(11 * 8, 0, IDT + i);
 		Seg_enable(IDT + i);
-	}// TODO URGENT add guard-pages to both stack areas
+	}// TODO URGENT add guard-pages to all kernel stack areas
 	TG_setDesc(7 * 8, 3, IDT + 0x80);
 	Seg_enable(IDT + 0x80);
 	TG_setDesc(9 * 8, 0, IDT + 0x70);

@@ -245,6 +245,14 @@ void ATA_closeFinal(int kfd) {// TODO Change, possibly
 	}
 	return;
 }
+int ATA_dup(int kfd) {// TODO Figure out how to implement and implement
+	errno = ENOSYS;
+	return (-1);
+}
+int ATA_dup2(int kfd, int reqfd) {// TODO Figure out how to implement and implement
+	errno = ENOSYS;
+	return (-1);
+}
 void initATA(void) {
 	ATA_0.bus = 0x01f0;
 	ATA_1.bus = 0x0170;
@@ -295,5 +303,7 @@ void initATA(void) {
 	FileDriver_ATA.fdatasync = ATA_fdatasync;
 	FileDriver_ATA.close = ATA_close;
 	FileDriver_ATA.closeFinal = ATA_closeFinal;
+	FileDriver_ATA.dup = ATA_dup;
+	FileDriver_ATA.dup2 = ATA_dup2;
 }
 #endif

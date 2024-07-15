@@ -47,7 +47,7 @@ const char* callname[] = {"NOCALL" /* 0 */,// TODO Make sure that `setup' disapp
 #else
 const char* callname[] = {"restart_syscall" /* 0 */,
 #endif
-	"exit",
+	"_exit",
 	"fork",
 	"read",
 	"write",
@@ -726,6 +726,16 @@ void testing_mount_tsfs(void) {
  * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t' (and `udev_old_t' under certain conditions of Linux version and Linux 'BITS_PER_LONG')
  *
  */
+void _exit(int code) {// TODO Actually implement
+	kMsg_lock();
+	kernelMsg("Thread ");
+	kernelMsgULong_hex(tid);
+	kernelMsg(" terminated with exit status ");
+	kernelMsgULong_hex((unsigned long) code);
+	kernelMsg(" & 0xff\n");
+	kMsg_unlock();
+	while (1) {}
+}
 ssize_t write(int fd, const void* buf, size_t count) {
 	if (fd < 0) {
 		errno = EBADF;
@@ -883,7 +893,9 @@ uintptr brk(uintptr rb) {
 		}
 	}
 	Mutex_release(&(usermem->lock));
+	PerThreadgroup_context->userBreak = rb;
 	Mutex_release(&(PerThreadgroup_context->breakLock));
+	return rb;
 }
 int close(int fd) {
 	// TODO Implement
@@ -965,11 +977,11 @@ void* mmap(void* addr, size_t len, int p, int flg, int fd, off_t off) {
 #if __TESTING__ == 1
 #define TESTCALL_NUMBER 1025
 unsigned long testcall(unsigned long val) {
-	Mutex_acquire(&kmsg);
+	kMsg_lock();
 	kernelMsg("Memory usage: ");
 	printMemUsage();
 	kernelMsg("\n");
-	Mutex_release(&kmsg);
+	kMsg_unlock();
 	return 0;
 }
 #endif
@@ -1016,6 +1028,9 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 	kernelMsg(")");
 #endif
 	switch (nr) {
+		case (1):
+			_exit(arg1);
+			bugCheckNum(0x0011 | FAILMASK_SYSCALLS);
 		case (3):
 			{
 				void* mem1 = getUserMem(arg2, (size_t) arg3, 0, 1);
