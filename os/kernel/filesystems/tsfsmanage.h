@@ -37,11 +37,14 @@ adds count new data blocks to the end of a file structure, returns zero on succe
 int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
     // u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
     // sn->blocks += count;
-    u32 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, 0).disk_loc : 0;
-    // sn->blocks += count;
+    TSFSDataHeader dh = {0};
     block_seek(fs, sn->data_loc, BSEEK_SET);
-    write_structnode(fs, sn);
+    read_dataheader(fs, &dh);
+    u32 prev = tsfs_traverse_blkno(fs, sn, dh.blocks-1, 0).disk_loc;
+    // sn->blocks += count;
+    // write_structnode(fs, sn);
     u32 fblock = allocate_blocks(fs, 1, count);
+    dmanip_null(fs, fblock, (u32)count);
     block_seek(fs, fblock, BSEEK_SET);
     // u64 bsize = (u64)(fs->rootblock->block_size);
     TSFSDataBlock hdb = {.blocks_to_terminus=255, .storage_flags=TSFS_SF_HEAD_BLOCK};

@@ -530,6 +530,7 @@ void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
 void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
 void __DBG_print_data(TSFSDataBlock*, long, const char*, const char*);
 void __DBG_here(long, const char*, const char*);
+#define _DBG_print_root(rb) __DBG_print_root(rb, __LINE__, __FILE__, __func__)
 #define _DBG_print_block(sb) __DBG_print_block(sb, __LINE__, __FILE__, __func__)
 #define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
 #define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)

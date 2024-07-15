@@ -329,6 +329,7 @@ extern int tsfs_free_data(FileSystem*, _kernel_u32);
 int delete_test(struct FileDriver* fdrive, int fd, char f) {
     regen_mock(fd);
     FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    _DBG_print_root(s->rootblock);
     int dfd = open("bigdata.txt", O_RDONLY);
     if (dfd == -1) {
         goto rel;
@@ -342,11 +343,16 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     tsfs_mk_file(s, &topdir, "test");
     TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
     for (int i = 0; i < 1; i ++) {
-        data_write(s, fil, 1024*i, bigdata, 512);
+        data_write(s, fil, 1024*i, bigdata, 1024);
     }
     _kernel_u32 p = fil->data_loc;
     tsfs_unload(s, fil);
     tsfs_free_data(s, p);
+    _DBG_print_root(s->rootblock);
+    block_seek(s, 0, BSEEK_SET);
+    TSFSRootBlock rbt = {0};
+    read_rootblock(s, &rbt);
+    _DBG_print_root(&rbt);
     rel:
     releaseFS(s);
     return 0;

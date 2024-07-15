@@ -28,6 +28,7 @@ size_t data_write(FSP, SNP, u64, const void*, size_t);
 size_t data_read(FSP, SNP, u64, void*, size_t);
 u32 tsfs_resolve_path(FSP, const char*);
 size_t tsfs_strlen(const char*);
+int append_datablocks(FileSystem* fs, SN* sn, u16 count);
 #undef FSP
 #undef DBP
 #undef SNP

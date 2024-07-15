@@ -1,5 +1,9 @@
 #!/bin/sh
+export GCCPATH=$(which "gcc-13")
+if [ $? != 0 ]
+then
 export GCCPATH=$(which "gcc")
+fi
 # eval "$GCCPATH" -D TARGET=x86_64 -D TARGETNUM=2 -D __TESTING__=0 -O0 -std=c99 -pedantic -Wno-builtin-declaration-mismatch -nostdlib -c os/kernel/filesystems/tsfs.c -o bin/tsfs.out
 if [ ${1:-0} = 0 ]
 then

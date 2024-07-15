@@ -20,7 +20,7 @@ struct PosDat {
     u32   poff; // how far the start of the data of the block is into the entity
 };
 
-TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockno) {
+TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockno, char create) {
     printf("blkno: %u\n", blockno);
     // _DBG_print_node(sn);
     TSFSDataBlock databloc = {0};
@@ -29,8 +29,14 @@ TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockn
     read_dataheader(fs, &dh);
     // _DBG_print_head(&dh);
     if (dh.blocks <= blockno) {
-        _DBG_here();
-        return databloc;
+        if (create == 0) {
+            _DBG_here();
+            return databloc;
+        } else {
+            u16 cnt = (u16)(blockno - dh.blocks + 1);
+            int r = append_datablocks(fs, sn, cnt);
+            printf("APPENDING %zu BLOCKS, RESULT: %d\n", cnt, r);
+        }
     }
     block_seek(fs, dh.head, BSEEK_SET);
     // loc_seek(fs, sn->data_loc);
@@ -62,13 +68,15 @@ TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockn
 
 // traverses the data blocks until it reaches the specified data position, then returns the location on disk
 // if OOB, the TSFSDataBlock will have storage_flags set to zero
+// if [create] is set, the traversal will create new data blocks as needed until the specified position is reached
+//  these data blocks will be zero initialized
 // when this function returns, the current position on disk will be the start of the data block
-struct PosDat tsfs_traverse(FileSystem* fs, TSFSStructNode* sn, u64 position) {
+struct PosDat tsfs_traverse(FileSystem* fs, TSFSStructNode* sn, u64 position, char create) {
     struct PosDat pd;
     u32 dblockdlen = BLOCK_SIZE - TSFSDATABLOCK_DSIZE;
     u32 blockno = (u32)(position / (u64)dblockdlen);
     pd.poff = ((u32)blockno) * dblockdlen;
-    pd.bloc = tsfs_traverse_blkno(fs, sn, blockno);
+    pd.bloc = tsfs_traverse_blkno(fs, sn, blockno, create);
     return pd;
 }
 
@@ -125,6 +133,10 @@ size_t tsfs_strlen(const char* s) {
 #define TSFS_ANSI_GRN "\x1b[38;2;0;200;0m"
 #define TSFS_ANSI_YEL "\x1b[38;2;200;175;0m"
 
+void __DBG_print_root(TSFSRootBlock* rb, long l, const char* f, const char* fid) {
+    printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
+    printf("ROOT BLOCK {\nBVN: %hu,\nP_SIZE: %lu,\nCREAT_T: 0x%llx,\nVER: %s,\nTOP: 0x%lx,\nUL: 0x%lx,\nUR: 0x%lx,\nUHL: 0x%lx,\nUHR: 0x%lx,\nCHK: 0x%llx\n}%s\n", rb->breakver, rb->partition_size, rb->creation_time, rb->version, rb->top_dir, rb->usedleft, rb->usedright, rb->usedhalfleft, rb->usedhalfright, rb->checksum, TSFS_ANSI_NUN);
+}
 void __DBG_print_block(TSFSStructBlock* sb, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
     printf("STRUCT BLOCK {\nDISK_LOC: 0x%x,\nDISK_REF: 0x%x,\nENTRYCOUNT: %u,\nFLAGS: %u,\nMAGIC_NO: %lu\n}%s\n", sb->disk_loc, sb->disk_ref, sb->entrycount, sb->flags, sb->magicno, TSFS_ANSI_NUN);

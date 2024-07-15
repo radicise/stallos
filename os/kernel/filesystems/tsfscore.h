@@ -1,6 +1,7 @@
 #ifndef __TSFSCORE_H__
 #define __TSFSCORE_H__ 1
 #include "./fsdefs.h"
+int tsfs_root_corruption_check(TSFSRootBlock*, u32*);
 // extern int printf(const char*, ...);
 // #include "./tsfsmanage.h"
 // #include <string.h>
@@ -118,14 +119,14 @@ available for external use
 ON ERROR:
 returns a filesystem object with a null rootblock or a rootblock with zero breakver
 */
-FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t size) {
+FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t gsize) {
     kernelWarnMsg("WARNING: itable reorganization not implemented yet");
     FSRet rv = {.err=EINVAL};
-    if (size % BLOCK_SIZE != 0) {
+    if (gsize % BLOCK_SIZE != 0) {
         kernelWarnMsg("INVALID PARTITION SIZE");
         return rv;
     }
-    size /= BLOCK_SIZE;
+    u32 size = (u32)(gsize / BLOCK_SIZE);
     if (size > TSFS_MAX_PSIZE) {
         kernelWarnMsg("ERROR: INVALID PARTITION SIZE");
         return rv;
@@ -143,16 +144,20 @@ FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t size) {
         kernelWarnMsg("VERSION INCOMPAT");
         goto err;
     }
-    u64 comphash = hash_rootblock(rblock);
-    if (comphash != rblock->checksum) {
-        printf("EH: %llx\nAH: %llx\n", comphash, rblock->checksum);
+    if (tsfs_root_corruption_check(rblock, &size)) {
         kernelWarnMsg("DATA CORRUPT");
         goto err;
     }
-    if (rblock->partition_size != size) {
-        kernelWarnMsg("PARTITION SIZE MISMATCH");
-        goto err;
-    }
+    // u64 comphash = hash_rootblock(rblock);
+    // if (comphash != rblock->checksum) {
+    //     printf("EH: %llx\nAH: %llx\n", comphash, rblock->checksum);
+    //     kernelWarnMsg("DATA CORRUPT");
+    //     goto err;
+    // }
+    // if (rblock->partition_size != size) {
+    //     kernelWarnMsg("PARTITION SIZE MISMATCH");
+    //     goto err;
+    // }
     goto ok;
     err:
     releaseFS(fs);
@@ -399,7 +404,7 @@ typedef struct DynBitField {
     char*  field;
 } DynBField;
 
-static DynBField* mk_bfield() {
+static DynBField* mk_bfield(void) {
     DynBField* ptr = allocate(sizeof(DynBField));
     ptr->size = 0;
     ptr->cap = 4;
@@ -594,7 +599,7 @@ void getcreat_databloc(FileSystem* fs, u32 loc, u32 pos, TSFSDataBlock* db, int*
 
 size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* data, size_t size) {
     size_t osize = size;
-    struct PosDat data_loc = tsfs_traverse(fs, sn, position);
+    struct PosDat data_loc = tsfs_traverse(fs, sn, position, 1);
     if (data_loc.bloc.storage_flags == 0) {
         return 0;
     }
@@ -607,6 +612,7 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
     u64 sinc = 0;
     int binc = 0;
     if (left >= size) {
+        printf("DW>=\n");
         write_buf(fs, data, size);
         block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
         size_t ns = size + realoffset;
@@ -615,6 +621,7 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
         sinc += size;
         size = 0;
     } else {
+        printf("DW<\n");
         write_buf(fs, data, left);
         block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
         data_loc.bloc.data_length = fsize;
@@ -624,11 +631,15 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
         cpos += left;
     }
     if (size > 0) {
+        printf("NCOMPLETE\nCSIZE: %zu\n", size);
         TSFSDataBlock db = {0};
         // loc_seek(fs, data_loc.bloc.next_block);
         // read_datablock(fs, &db);
+        block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
+        read_datablock(fs, &db);
         while (1) {
             if (fsize > size) {
+                printf("FS>S\n");
                 break;
             }
             getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
@@ -641,7 +652,10 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
             size -= fsize;
         }
         if (size > 0) {
+            printf("BEFORE: %d\n", binc);
             getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
+            printf("AFTER: %d\n", binc);
+            _DBG_print_data(&db);
             seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
             sinc += fsize - db.data_length;
             db.data_length = size > db.data_length ? size : db.data_length;
@@ -663,7 +677,7 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
 // TODO: make work with more than one data block
 size_t data_read(FileSystem* fs, TSFSStructNode* sn, u64 position, void* data, size_t size) {
     size_t osize = size;
-    struct PosDat data_loc = tsfs_traverse(fs, sn, position);
+    struct PosDat data_loc = tsfs_traverse(fs, sn, position, 0);
     if (data_loc.bloc.storage_flags == 0) {
         return 0;
     }
@@ -710,6 +724,49 @@ size_t data_read(FileSystem* fs, TSFSStructNode* sn, u64 position, void* data, s
         }
     }
     return osize - size;
+}
+
+/*
+tests a [TSFSRootBlock] for corrupted / invalid / malicious data
+[psize_actual] is a pointer to the known partition size, if available
+ if unavailable, [psize_actual] should be set to zero
+returns `1` if corruption was detected
+*/
+int tsfs_root_corruption_check(TSFSRootBlock* rb, u32* psize_actual) {
+    int corrupt = 0;
+    if (psize_actual != 0) { // if psize_actual was provided
+        if (rb->partition_size != *psize_actual) { // root does not match size known to be true
+            corrupt = 1;
+            kernelWarnMsg("partition size mismatch");
+        }
+    }
+    u64 chek = hash_rootblock(rb);
+    if (chek != rb->checksum) { // mismatched hashes
+        corrupt = 1;
+        kernelWarnMsg("checksum mismatch");
+    }
+    u32 maxb = rb->partition_size;
+    if (rb->usedright >= maxb) { // invalid usedright
+        corrupt = 1;
+        kernelWarnMsg("invalid usedright");
+    }
+    if (rb->usedleft < TSFS_CORE_LPROTECT) { // usedleft is below minimum
+        corrupt = 1;
+        kernelWarnMsg("usedleft below minimum");
+    }
+    if (rb->usedleft >= rb->usedright) { // used left crossed used right
+        corrupt = 1;
+        kernelWarnMsg("usedleft crossed usedright");
+    }
+    if (rb->usedhalfleft >= rb->usedhalfright || rb->usedhalfleft <= rb->usedleft) { // invalid usedhalfleft
+        corrupt = 1;
+        kernelWarnMsg("invalid usedhalfleft");
+    }
+    if (rb->usedhalfright >= rb->usedright) { // invalid usedhalfright
+        corrupt = 1;
+        kernelWarnMsg("invalid usedhalfright");
+    }
+    return corrupt;
 }
 
 #endif

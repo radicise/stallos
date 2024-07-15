@@ -46,6 +46,8 @@ typedef struct {
     void* data;
 } CLIData;
 
+char* HELPTXT = "exit\ngoto {path}\nmake [d|f] {name}\nlist\nhelp\n";
+
 CLIData clihelper(void) {
     CLIData ret = {0};
     while (1) {
@@ -55,7 +57,7 @@ CLIData clihelper(void) {
         if (ptr == NULL) { // check that readline went ok
             return ret;
         }
-        printf("%s\n", ptr);
+        // printf("%s\n", ptr);
         int r = -1;
         // string is "exit"
         if (stringcmp(ptr, "exit")) { // 0
@@ -81,16 +83,16 @@ CLIData clihelper(void) {
         } else if (startswith(ptr, "make ")) { // 2 & 3
             printf("MAKE\n");
             size_t plen = stringlen("make ");
-            printf("PLEN: %zu\n", plen);
+            // printf("PLEN: %zu\n", plen);
             size_t flen = stringlen(ptr);
-            printf("FLEN: %zu\n", flen);
+            // printf("FLEN: %zu\n", flen);
             if (flen-2 <= plen) {
                 r = -2;
                 goto end;
             }
             char* typ = ptr + plen;
             char* dst = typ + 2;
-            printf("TYP: %s\nDST: %s\n", typ, dst);
+            // printf("TYP: %s\nDST: %s\n", typ, dst);
             int t = 0;
             if (startswith(typ, "d ")) { // directory
                 printf("directory\n");
@@ -110,10 +112,13 @@ CLIData clihelper(void) {
                 return ret;
             }
             strcopy(dst, ret.data);
-            printf("RB: %s\n", ret.data);
+            // printf("RB: %s\n", ret.data);
         // string is "list"
         } else if (stringcmp(ptr, "list")) { // 4
             r = 4;
+        // string is "help"
+        } else if (stringcmp(ptr, "help")) { // none
+            r = -4;
         }
         end:
         free(ptr);
@@ -124,6 +129,8 @@ CLIData clihelper(void) {
                 printf("incomplete command\n");
             } else if (r == -3) {
                 printf("invalid command args\n");
+            } else if (r == -4) {
+                printf("%s", HELPTXT);
             } else {
                 printf("bad error code: %d\n", r);
             }

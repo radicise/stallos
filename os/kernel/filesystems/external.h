@@ -72,6 +72,7 @@ extern TSFSDataHeader* tsfs_load_head(FileSystem*, _kernel_u32);
 
 // macro'd funcs
 extern void _magic_smoke(unsigned long, long, const char*, const char*);
+extern void __DBG_print_root(TSFSRootBlock*, long, const char*, const char*);
 extern void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
 extern void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
 extern void __DBG_print_head(TSFSDataHeader*, long, const char*, const char*);
@@ -80,6 +81,7 @@ extern void __DBG_print_cename(char const*, long, const char*, const char*);
 extern void __DBG_print_child(TSFSSBChildEntry*, long, const char*, const char*);
 extern void __DBG_here(long, const char*, const char*);
 #define magic_smoke(code) _magic_smoke(code, __LINE__, __FILE__, __func__)
+#define _DBG_print_root(rb) __DBG_print_root(rb, __LINE__, __FILE__, __func__)
 #define _DBG_print_block(sn) __DBG_print_block(sn, __LINE__, __FILE__, __func__)
 #define _DBG_print_node(sn) __DBG_print_node(sn, __LINE__, __FILE__, __func__)
 #define _DBG_print_cename(name) __DBG_print_cename(name, __LINE__, __FILE__, __func__)

@@ -1,8 +1,12 @@
 CCPRGM ?= ./cc.sh
-ASPRGM ?= i686-linux-gnu-as
-LDPRGM ?= i686-linux-gnu-ld
-STRIPPRGM ?= i686-linux-gnu-strip
-OBJCOPYPRGM ?= i686-linux-gnu-objcopy
+ASPRGM ?= i686-elf-as
+LDPRGM ?= i686-elf-ld
+STRIPPRGM ?= i686-elf-strip
+OBJCOPYPRGM ?= i686-elf-objcopy
+# ASPRGM ?= i686-linux-gnu-as
+# LDPRGM ?= i686-linux-gnu-ld
+# STRIPPRGM ?= i686-linux-gnu-strip
+# OBJCOPYPRGM ?= i686-linux-gnu-objcopy
 
 TARGETNUM ?= 1
 export TARGETNUM
