@@ -121,7 +121,7 @@ returns a filesystem object with a null rootblock or a rootblock with zero break
 */
 FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t gsize) {
     kernelWarnMsg("WARNING: itable reorganization not implemented yet");
-    FSRet rv = {.err=EINVAL};
+    FSRet rv = {.err=EINVAL, .retptr=0, .retval=0};
     if (gsize % BLOCK_SIZE != 0) {
         kernelWarnMsg("INVALID PARTITION SIZE");
         return rv;
@@ -163,8 +163,13 @@ FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t gsize) {
     releaseFS(fs);
     return rv;
     ok:
+    kernelWarnMsg("FS LOADED OK");
     rv.err = 0;
     rv.retptr = fs;
+    kernelMsgULong_hex((unsigned long)rv.retptr);
+    kernelMsg("\n");
+    kernelMsgULong_hex((unsigned long)rv.err);
+    kernelMsg("\n");
     return rv;
 }
 

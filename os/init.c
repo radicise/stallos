@@ -89,12 +89,12 @@ void _start() {
 	}
 	while (1) {}
 	void* bm = brk(NULL);
-	printULong_hex(bm);
+	printULong_hex((unsigned long)bm);
 	print("\n");
 	// while (1) {}
 	while (1) {
 		print("0x");
-		printULong_hex(bm = brk((void*) (((char*) bm) + 4096 * 4)));
+		printULong_hex((unsigned long)(bm = brk((void*) (((char*) bm) + 4096 * 4))));
 		print("\n");
 		printLong(*(((char*) bm) - 1));
 		print("\n");

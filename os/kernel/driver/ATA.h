@@ -277,19 +277,19 @@ void initATA(void) {
 	ATA_BlockFile.writeMax = 256;
 	ATA_0m_file.reliance = &ATA_BlockFile;
 	ATA_0m_file.pos = 0;
-	ATA_0m_file.amnt = 1024;// TODO Change
+	ATA_0m_file.amnt = 32768;// TODO Change
 	ATA_0m_file.obj = &ATA_0m;
 	ATA_0s_file.reliance = &ATA_BlockFile;
 	ATA_0s_file.pos = 0;
-	ATA_0s_file.amnt = 1024;// TODO Change
+	ATA_0s_file.amnt = 32768;// TODO Change
 	ATA_0s_file.obj = &ATA_0s;
 	ATA_1m_file.reliance = &ATA_BlockFile;
 	ATA_1m_file.pos = 0;
-	ATA_1m_file.amnt = 1024;// TODO Change
+	ATA_1m_file.amnt = 32768;// TODO Change
 	ATA_1m_file.obj = &ATA_1m;
 	ATA_1s_file.reliance = &ATA_BlockFile;
 	ATA_1s_file.pos = 0;
-	ATA_1s_file.amnt = 1024;// TODO Change
+	ATA_1s_file.amnt = 32768;// TODO Change
 	ATA_1s_file.obj = &ATA_1s;
 	Mutex_initUnlocked(&(ATA_0m_file.lock));
 	Mutex_initUnlocked(&(ATA_0s_file.lock));
