@@ -17,8 +17,9 @@ typedef struct {
 // };
 
 FSRet tsfs_fsinit(struct FileDriver* fdr, int kfd, loff_t size) {
-    FSRet r = loadFS(fdr, kfd, size);
-    return r;
+    return loadFS(fdr, kfd, size);
+    // FSRet r = loadFS(fdr, kfd, size);
+    // return r;
 }
 void tsfs_fsclose(void* fso) {
     FileSystem* fs = (FileSystem*)fso;

@@ -8,9 +8,9 @@ then
     set -e
     if [ $? = 1 ]
     then
-	    i686-elf-gcc -D TARGET=x86_32 -D TARGETNUM=1 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=i386 -mabi=sysv "$@"
-    else
 	    i686-linux-gnu-gcc -D TARGET=x86_32 -D TARGETNUM=1 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=i386 -mabi=sysv "$@"
+    else
+	    i686-elf-gcc -D TARGET=x86_32 -D TARGETNUM=1 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -fpcc-struct-return -nostartfiles -nostdlib -nodefaultlibs -static -c -march=i386 -mabi=sysv "$@"
     fi
 elif [ ${TARGETNUM} = 2 ]
 then

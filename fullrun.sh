@@ -3,7 +3,7 @@
 # this file ensures cross platform support of the Makefile
 
 set +e
-x86_64-linux-gnu-gcc > "/dev/null" 2>&1
+which x86_64-linux-gnu-gcc > "/dev/null" 2>&1
 set -e
 if [ $? = 1 ]
 then

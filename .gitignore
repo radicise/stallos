@@ -19,4 +19,5 @@ local
 fstestinggcc
 *.gch
 *.out
+*.dbg
 /bin
