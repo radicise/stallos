@@ -128,11 +128,6 @@ size_t tsfs_strlen(const char* s) {
     return o;
 }
 
-#define TSFS_ANSI_NUN "\x1b[0m"
-#define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
-#define TSFS_ANSI_GRN "\x1b[38;2;0;200;0m"
-#define TSFS_ANSI_YEL "\x1b[38;2;200;175;0m"
-
 void __DBG_print_root(TSFSRootBlock* rb, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
     printf("ROOT BLOCK {\nBVN: %hu,\nP_SIZE: %lu,\nCREAT_T: 0x%llx,\nVER: %s,\nTOP: 0x%lx,\nUL: 0x%lx,\nUR: 0x%lx,\nUHL: 0x%lx,\nUHR: 0x%lx,\nCHK: 0x%llx\n}%s\n", rb->breakver, rb->partition_size, rb->creation_time, rb->version, rb->top_dir, rb->usedleft, rb->usedright, rb->usedhalfleft, rb->usedhalfright, rb->checksum, TSFS_ANSI_NUN);
@@ -151,7 +146,7 @@ void __DBG_print_head(TSFSDataHeader* dh, long l, const char* f, const char* fid
 }
 void __DBG_print_data(TSFSDataBlock* db, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("DATA BLOCK {\nDISK_LOC: 0x%x,REF_C: %hu,\nTERM_BLKS: %u,\nNEXT: %x,\nPREV: %x,\nLENGTH: %hu,\nFLAGS: %x\n}%s\n", db->disk_loc, db->rc, db->blocks_to_terminus, db->next_block, db->prev_block, db->data_length, db->storage_flags, TSFS_ANSI_NUN);
+    printf("DATA BLOCK {\nDISK_LOC: 0x%x,\nTERM_BLKS: %u,\nNEXT: %x,\nPREV: %x,\nLENGTH: %hu,\nFLAGS: %x\n}%s\n", db->disk_loc, db->blocks_to_terminus, db->next_block, db->prev_block, db->data_length, db->storage_flags, TSFS_ANSI_NUN);
 }
 void __DBG_print_cename(char const* name, long l, const char* f, const char* fid) {
     if (l) {

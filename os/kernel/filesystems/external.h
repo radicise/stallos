@@ -13,16 +13,23 @@ typedef struct FSReturn FSRet;
 // int printf(const char*__restrict s, ...) {}
 // #endif
 
+extern char SEEK_TRACING;
 extern void awrite_buf(void*, const void*, _kernel_size_t);
 extern int bufcmp(void const*, void const*, int);
 extern int tsfs_cmp_name(void const*, void const*);
 extern int tsfs_cmp_cename(void const*, void const*);
 extern int tsfs_cmp_ce(TSFSSBChildEntry*, TSFSSBChildEntry*);
 extern _kernel_u64 tsfs_tell(FileSystem*);
-extern int longseek(FileSystem*, _kernel_loff_t, int);
-extern int seek(FileSystem*, _kernel_off_t, int);
+extern int _real_longseek(FileSystem*, _kernel_loff_t, int, long, const char*, const char*);
+extern int _real_seek(FileSystem*, _kernel_off_t, int, long, const char*, const char*);
+extern int _real_block_seek(FileSystem*, _kernel_s32, char, long, const char*, const char*);
+#define seek(fs, offset, whence) _real_seek(fs, offset, whence, __LINE__, __func__, __FILE__)
+#define longseek(fs, offset, whence) _real_longseek(fs, offset, whence, __LINE__, __func__, __FILE__)
+#define block_seek(fs, offset, abs) _real_block_seek(fs, offset, abs, __LINE__, __func__, __FILE__)
+// extern int longseek(FileSystem*, _kernel_loff_t, int);
+// extern int seek(FileSystem*, _kernel_off_t, int);
+// extern int block_seek(FileSystem*, _kernel_s32, char);
 extern _kernel_u32 tsfs_loc_to_block(_kernel_u64);
-extern int block_seek(FileSystem*, _kernel_s32, char);
 extern int loc_seek(FileSystem*, _kernel_u64);
 extern void read_childentry(FileSystem*, TSFSSBChildEntry*);
 extern void write_childentry(FileSystem*, TSFSSBChildEntry*);

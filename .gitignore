@@ -20,4 +20,5 @@ fstestinggcc
 *.gch
 *.out
 *.dbg
+.DS_Store
 /bin

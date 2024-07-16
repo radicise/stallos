@@ -16,6 +16,12 @@
 void kernelWarnMsg(const char* msg) {
     puts(msg);
 }
+void kernelMsg(const char* msg) {
+    puts(msg);
+}
+void kernelMsgULong_hex(unsigned long l) {
+    printf("%lu", l);
+}
 
 void bugCheckNum(long n) {
     printf("BUGCHK: %li\n", n);
@@ -342,17 +348,17 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     read_structnode(s, &topdir);
     tsfs_mk_file(s, &topdir, "test");
     TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
-    for (int i = 0; i < 1; i ++) {
+    for (int i = 0; i < 2; i ++) {
         data_write(s, fil, 1024*i, bigdata, 1024);
     }
     _kernel_u32 p = fil->data_loc;
     tsfs_unload(s, fil);
     tsfs_free_data(s, p);
-    _DBG_print_root(s->rootblock);
-    block_seek(s, 0, BSEEK_SET);
-    TSFSRootBlock rbt = {0};
-    read_rootblock(s, &rbt);
-    _DBG_print_root(&rbt);
+    // _DBG_print_root(s->rootblock);
+    // block_seek(s, 0, BSEEK_SET);
+    // TSFSRootBlock rbt = {0};
+    // read_rootblock(s, &rbt);
+    // _DBG_print_root(&rbt);
     rel:
     releaseFS(s);
     return 0;
@@ -360,6 +366,7 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
 
 int full_test(struct FileDriver* fdrive, int fd, char flags) {
     FileSystem* s = 0;
+    SEEK_TRACING = 0;
     if (flags) {
         printf("REGEN\n");
         regen_mock(fd);
@@ -415,6 +422,8 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             TSFSStructBlock* sb = tsfs_load_block(s, dir.parent_loc);
             tsfs_sbcs_foreach(s, sb, _fstest_sbcs_fe_do, 0);
             tsfs_unload(s, sb);
+        } else if (clicode == 5) {
+            SEEK_TRACING ^= 1; // toggle seek tracing
         }
     }
     dealloc:
@@ -499,6 +508,8 @@ int main(int argc, char** argv) {
             flags[0] = 7;
         } else if (stringcmp(argv[i], "delete")) {
             flags[0] = 8;
+        } else if (stringcmp(argv[i], "-sktrace")) {
+            SEEK_TRACING = 1;
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);

@@ -222,6 +222,7 @@ u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
     end:
     block_seek(fs, 0, BSEEK_SET);
     write_rootblock(fs, fs->rootblock);
+    block_seek(fs, ret, BSEEK_SET);
     return ret;
 }
 

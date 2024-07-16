@@ -59,6 +59,14 @@ void dalloc(void* p, size_t s) {
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
 #define VERNOBN 10
 
+#define TSFS_ANSI_NUN "\x1b[0m"
+#define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
+#define TSFS_ANSI_GRN "\x1b[38;2;0;200;0m"
+#define TSFS_ANSI_YEL "\x1b[38;2;200;175;0m"
+void __DBG_here(long, const char*, const char*);
+
+char SEEK_TRACING = 0;
+
 /*
 PYGENSTART
 pygen-include
@@ -430,7 +438,12 @@ u64 tsfs_tell(FileSystem* fs) {
 #include "./gensizes.h"
 
 
-int longseek(FileSystem* fs, loff_t offset, int whence) {
+// int longseek(FileSystem* fs, loff_t offset, int whence) {
+int _real_longseek(FileSystem* fs, loff_t offset, int whence, long line, const char* func, const char* file) {
+    if (SEEK_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sLONGSEEK TRACE {DIR: %d, OFF: %lli, POS: %llu}%s\n", TSFS_ANSI_GRN, whence, offset, tsfs_tell(fs), TSFS_ANSI_NUN);
+    }
     loff_t x = 0;
     // if (whence == SEEK_SET) {
     //     offset += fs->partition_start;
@@ -441,7 +454,13 @@ int longseek(FileSystem* fs, loff_t offset, int whence) {
     }
     return fs->fdrive->_llseek(fs->kfd, offset>>32, offset&0xffffffff, &x, whence);
 }
-int seek(FileSystem* fs, off_t offset, int whence) {
+#define longseek(fs, offset, whence) _real_longseek(fs, offset, whence, __LINE__, __func__, __FILE__)
+// int seek(FileSystem* fs, off_t offset, int whence) {
+int _real_seek(FileSystem* fs, off_t offset, int whence, long line, const char* func, const char* file) {
+    if (SEEK_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sSEEK TRACE {DIR: %d, OFF: %li, POS: %llu}%s\n", TSFS_ANSI_GRN, whence, offset, tsfs_tell(fs), TSFS_ANSI_NUN);
+    }
     // if (whence == SEEK_SET) {
     //     longseek(fs, 0, SEEK_SET);
     //     whence = SEEK_CUR;
@@ -454,6 +473,8 @@ int seek(FileSystem* fs, off_t offset, int whence) {
     return fs->fdrive->lseek(fs->kfd, offset, whence);
 }
 
+#define seek(fs, offset, whence) _real_seek(fs, offset, whence, __LINE__, __func__, __FILE__)
+
 u32 tsfs_loc_to_block(u64 loc) {
     return (u32)(loc/BLOCK_SIZE);
 }
@@ -463,7 +484,12 @@ like seek, but goes in increments of the block size
 if abs is zero, offset is absolute, otherwise relative
 negative absolute seeking is invalid
 */
-int block_seek(FileSystem* fs, s32 offset, char abs) {
+// int block_seek(FileSystem* fs, s32 offset, char abs) {
+int _real_block_seek(FileSystem* fs, s32 offset, char abs, long line, const char* func, const char* file) {
+    if (SEEK_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sBSEEK TRACE {TYP: %u, TO: %li, POS: %lu}%s\n", TSFS_ANSI_GRN, abs, offset, tsfs_loc_to_block(tsfs_tell(fs)), TSFS_ANSI_NUN);
+    }
     if (abs) {
         return fs->fdrive->lseek(fs->kfd, (off_t)(((s32)BLOCK_SIZE) * offset), SEEK_CUR);
     }
@@ -474,6 +500,7 @@ int block_seek(FileSystem* fs, s32 offset, char abs) {
     loff_t x = 0;
     return fs->fdrive->_llseek(fs->kfd, ac>>32, ac&0xffffffff, &x, SEEK_SET);
 }
+#define block_seek(fs, offset, abs) _real_block_seek(fs, offset, abs, __LINE__, __func__, __FILE__)
 
 // #define loc_seek(fs, loc) block_seek(fs, (s32)((loc>>7)*fs->rootblock->block_size + (loc&7f)*128));
 

@@ -119,6 +119,8 @@ CLIData clihelper(void) {
         // string is "help"
         } else if (stringcmp(ptr, "help")) { // none
             r = -4;
+        } else if (stringcmp(ptr, "sktrace")) { // 5
+            r = 5;
         }
         end:
         free(ptr);

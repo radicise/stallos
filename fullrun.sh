@@ -3,9 +3,9 @@
 # this file ensures cross platform support of the Makefile
 
 set +e
-which x86_64-linux-gnu-gcc > "/dev/null" 2>&1
+which i686-elf-gcc > "/dev/null" 2>&1
 set -e
-if [ $? = 1 ]
+if [ $? = 0 ]
 then
 export ASPRGM=i686-elf-as
 export LDPRGM=i686-elf-ld
