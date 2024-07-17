@@ -1,2 +1,1 @@
-imply s32 bugCheck();
 #import "sys32/kern32.dhulb"

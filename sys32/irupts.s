@@ -11,7 +11,7 @@ incb %al
 jmp irupt_discall__loop1
 irupt_hang:
 .globl irupt_hang
-cli
+cli# TODO Is this necessary?
 irupt_hang__loop1:
 jmp irupt_hang__loop1
 bugCheck:

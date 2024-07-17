@@ -220,7 +220,7 @@ int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 int runELF(const void* elf, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
 	thread->group->mem = MemSpace_create();
 	uintptr s = 0;
-	int i = loadELF((const Elf32_Ehdr*) elf, &s, thread->group->mem);
+	int i = loadELF((const Elf32_Ehdr*) elf, &s, thread->group->mem);// TODO URGENT Handling of `argv', `argc', and maybe also `envp'
 	if (i != 0) {
 		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
@@ -242,7 +242,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 #endif
 #if TARGETNUM == 1
 	// x86_32
-	s = ((uintptr) s) - (((uintptr) s) % 4);
+	s = ((uintptr) s) - (((uintptr) s) % 16);
 	if (mapPage((uintptr) 0, (void*) (0 - RELOC), 0, 0, thread->group->mem)) {
 		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);

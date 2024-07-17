@@ -24,7 +24,6 @@ extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
 extern void irupt_yield(void);
-extern void irupt_fail(void);
 extern void irupt_noprocess(void);
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
 #define LINUX_COMPAT_VERSION 0x20603904
@@ -38,12 +37,15 @@ extern void irupt_noprocess(void);
 unsigned long long PIT0Ticks = 0;
 extern void int_enable(void);
 extern void int_disable(void);
-extern void bugCheck(void);
+extern void halt_and_catch_fire(void);
 extern void bugCheckNum(unsigned long);
+void bugCheck(void) {
+	bugCheckNum(0xabadfa17UL);
+	return;
+}
 extern void yield_iruptCall(void);
 extern u32 getEFL(void);
 void bugMsg(uintptr* trace) {
-	int_disable();
 	// while (1) {}// NRW
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
@@ -75,10 +77,10 @@ void bugMsg(uintptr* trace) {
 	int j = 11;
 	while (1) {
 		uintptr addr = trace[j];
-		if (addr == ((uintptr) 0xffffffff)) {
+		if (addr == 0) {
 			return;
 		}
-		if (j == 0) {
+		if (!j) {
 			(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - RELOC))) = 0x472e;
 			(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - RELOC))) = 0x472e;
 			(*((volatile unsigned short*) (0xb8144 + (0xa0 * 11) - RELOC))) = 0x472e;
@@ -138,8 +140,7 @@ void bugCheckNum_u32(u32 num, uintptr* addr) {
 		}
 		num >>= 4;
 	}
-	while (1) {
-	}
+	halt_and_catch_fire();
 	return;
 }
 void bugCheckNumWrapped(unsigned long num, uintptr* addr) {// Fatal kernel errors
@@ -181,7 +182,6 @@ const char* strct(const char** c) {// Does not check for string size overflow
 	(*m) = 0x00;
 	return s;
 }
-extern const char* strconcat(const char*, ...);
 struct VGATerminal mainTerm;
 Mutex kmsg;
 void kMsg_lock(void) {

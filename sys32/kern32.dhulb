@@ -1,3 +1,4 @@
+imply s32 bugCheck();
 /%. = 0xdc00
 %/
 /&_start:
@@ -5,7 +6,6 @@
 &/
 imply s32 runSystem();
 imply s32 executeSystem();
-imply s32 show();
 int entry() {
 	/*
 	:entry_aaa;
@@ -25,12 +25,6 @@ int entry() {
 		goto entry_loop2;
 	}
 	goto entry_loop1;
-}
-/&show:
-&/
-int shw() {
-	0x0707 as u16 -> (0xb8000 as *u16);
-	return 0;
 }
 #import "elfExec.dhulb"
 imply s32 setup();
@@ -61,3 +55,31 @@ int runSys() {
 	(i + 0x30) as u8 -> (0xb8000 as *u8);
 	return i;
 }
+/&setup:
+.globl setup
+pushl %ebp
+movl %esp,%ebp# TODO Are there allowed to be non-aligned stack frames?
+andl $0xfffffff0,%esp
+call setup_w
+movl %ebp,%esp
+popl %ebp
+ret
+executeSystem:
+.globl executeSystem
+pushl %ebp
+movl %esp,%ebp# TODO Are there allowed to be non-aligned stack frames?
+andl $0xfffffff0,%esp
+call executeSystem_w
+movl %ebp,%esp
+popl %ebp
+ret
+findSeg:
+.globl findSeg
+pushl %ebp
+movl %esp,%ebp# TODO Are there allowed to be non-aligned stack frames
+andl $0xfffffff0,%esp
+call findSeg_w
+movl %ebp,%esp
+popl %ebp
+ret
+&/

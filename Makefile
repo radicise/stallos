@@ -50,7 +50,7 @@ build/kernelbase-ul.elf : os/system.c os/kernel/*.h os/kernel/machine/${TARGETMA
 	${CCPRGM} -D __STALLOS__=1 -o build/kernelbase-ul.elf os/system.c
 
 build/loader.bin : build/loader.o build/sysc.elf build/irupts.o
-	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc
+	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/loader.elf build/loader.o build/sysc.elf build/irupts.o -lgcc # TODO Ensure that there are no relocations done
 	cp build/loader.elf build/loader-copy.elf
 	${STRIPPRGM} build/loader-copy.elf	
 	${OBJCOPYPRGM} --dump-section .text=build/loader.bin build/loader.elf /dev/null
@@ -69,7 +69,7 @@ build/loader-comp.s : sys32.dhulb sys32/kern32.dhulb sys32/elfExec.dhulb
 	dhulbc 32 -tNGTw < build/kern32-comp.dhulb > build/loader-comp.s
 
 build/stall.elf : build/stall.o
-	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/stall.elf build/stall.o -lgcc
+	${LDPRGM} ${LDFLAGS} -Ttext=0x0 -o build/stall.elf build/stall.o # TODO Ensure that there are no relocations
 
 build/stall.o : build/stall-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/stall.o build/stall-comp.s

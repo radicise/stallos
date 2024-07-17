@@ -699,12 +699,13 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 
 #define FAILMASK_MOUNTINGTSFS 0x00ff0000
 extern struct FSInterface FS_TSFS;
+extern struct FSReturn tsfs_fsinit(struct FileDriver*, int, loff_t);
 void testing_mount_tsfs(void) {
 	struct FileDriver* drvr = resolveFileDriver(2);
 	if (drvr == NULL) {
 		bugCheckNum(0x1111);
 	}
-	struct FSReturn fsr = FS_TSFS.FSInit(drvr, 2, 4 * 1024 * 1024);
+	struct FSReturn fsr = tsfs_fsinit(drvr, 2, 4 * 1024 * 1024);
 	if (fsr.err != 0) {
 		kernelMsg("Filesystem initialisation failed with err=");
 		kernelMsgULong_hex(fsr.err);

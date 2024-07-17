@@ -22,7 +22,7 @@ l	0x0518	Physical address of beginning of main console # TODO implement
 LGDTd32	0x07fa	LGDT descriptor data
 GDT	0x0800	Start of GDT
 LIDTd32	0x000073fa	LIDT descriptor data
-STAKTOP	0x0007f7f4	(Appriximate) top-of-stack (value of %esp when the stack is empty) of the interrupt-handling stack
+STAKTOP	0x0007f7f0	%esp pointing address for IRQ &c. handlers when idle
 l	0x0007f7f8	Address of farRunELF within segment of GDT index 0x0008
 l	0x0007f7fc	Value 0x00000008
 IDT	0x0007f800	IDT, 2048 bytes
@@ -43,6 +43,7 @@ TSS		0x00000d80	TSS for the currently-executing userspace program
 TSS		0x00000e00	TSS for exception 14
 
 # Linear addresses of certain memory structures during the execution of the main kernel
+# TODO Implement
 Address(es)		Description
 0xb0000000-0xb0000fff	Guard page to prevent stack overflow
 0xb0001000-0xbffff000	Stack
