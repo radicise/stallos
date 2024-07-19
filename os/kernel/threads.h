@@ -59,4 +59,7 @@ void Scheduler_yield(void) {// To only be called from interrupts, when IRQ are d
 	Threads_nextThread();
 	return;
 }
+void Scheduler_update(void) {
+	return;
+}
 #endif

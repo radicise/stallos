@@ -166,11 +166,7 @@ movw 4(%esp),%dx
 movl 12(%esp),%ecx
 pushl %edi
 movl 12(%esp),%edi
-pushw %es
-movw %ds,%ax
-movw %ax,%es
 rep insl
-popw %es
 popl %edi
 ret
 bus_inBlock_u16:
@@ -179,11 +175,7 @@ movw 4(%esp),%dx
 movl 12(%esp),%ecx
 pushl %edi
 movl 12(%esp),%edi
-pushw %es
-movw %ds,%ax
-movw %ax,%es
 rep insw
-popw %es
 popl %edi
 ret
 bus_inBlock_u8:
@@ -192,11 +184,7 @@ movw 4(%esp),%dx
 movl 12(%esp),%ecx
 pushl %edi
 movl 12(%esp),%edi
-pushw %es
-movw %ds,%ax
-movw %ax,%es
 rep insb
-popw %es
 popl %edi
 ret
 mem_barrier:

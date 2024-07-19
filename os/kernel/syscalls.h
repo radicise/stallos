@@ -697,14 +697,9 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 
 
 
-#define FAILMASK_MOUNTINGTSFS 0x00ff0000
 extern struct FSInterface FS_TSFS;
 extern struct FSReturn tsfs_fsinit(struct FileDriver*, int, loff_t);
-void testing_mount_tsfs(void) {
-	struct FileDriver* drvr = resolveFileDriver(2);
-	if (drvr == NULL) {
-		bugCheckNum(0x1111);
-	}
+void testing_mount_tsfs_2(struct FileDriver* drvr) {
 	struct FSReturn fsr = tsfs_fsinit(drvr, 2, 4 * 1024 * 1024);
 	if (fsr.err != 0) {
 		kernelMsg("Filesystem initialisation failed with err=");
@@ -715,7 +710,17 @@ void testing_mount_tsfs(void) {
 	kernelMsg("Filesystem initialisation succeeded\n");
 	// add to filedriver mapping
 	return;
-}// NRW
+}
+void testing_mount_tsfs(void) {
+	struct FileDriver* drvr = resolveFileDriver(2);
+	if (drvr == NULL) {
+		bugCheckNum(0x1111);
+	}
+	testing_mount_tsfs_2(drvr);
+	return;
+}
+// NRW
+
 
 
 
@@ -897,6 +902,10 @@ uintptr brk(uintptr rb) {
 	PerThreadgroup_context->userBreak = rb;
 	Mutex_release(&(PerThreadgroup_context->breakLock));
 	return rb;
+}
+int sched_yield(void) {// Introduced in Linux 1.3.55
+	yield();
+	return 0;
 }
 int close(int fd) {
 	// TODO Implement
@@ -1123,6 +1132,11 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 				}
 				retVal = (unsigned long) res;
 			}
+			break;
+#endif
+#if LINUX_COMPAT_VERSION >= 0x10305500
+		case (158):
+			retVal = sched_yield();
 			break;
 #endif
 #if LINUX_COMPAT_VERSION >= 0x20303900

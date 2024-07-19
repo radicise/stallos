@@ -62,19 +62,14 @@ iret
 jmp irupt_noprocess
 writeLongLinear:# void writeLongLinear(u32 addr, unsigned long dat)
 .globl writeLongLinear
-movw $0x10,%ax
-movw %ax,%es# TODO Does %es need to be saved?
-movl 4(%esp),%eax
-movl 8(%esp),%ecx
-movl %ecx,%es:(%eax)
+movl 4(%esp),%ecx
+movl 8(%esp),%eax
+movl %eax,-RELOC(%ecx)
 ret
 readLongLinear:# unsigned long readLongLinear(u32 addr)
 .globl readLongLinear
-movw $0x10,%ax
-movw %ax,%es# TODO Does %es need to be saved?
 movl 4(%esp),%eax
-movl %es:(%eax),%ecx
-movl %ecx,%eax
+movl -RELOC(%eax),%eax
 ret
 int_enable:# TODO How much waiting needs to be done?
 .globl int_enable

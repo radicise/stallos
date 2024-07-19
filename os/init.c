@@ -79,6 +79,7 @@ void print(const char* d) {
 	return;
 }
 void _start() {
+	/*
 	_exit(0xdeadc0de);
 	int i = 0;
 	while (i < 200) {
@@ -101,6 +102,7 @@ void _start() {
 		print("\n");
 	}
 	// TNN();
+	*/
 	/*
 	while (1) {
 		time(NULL);
