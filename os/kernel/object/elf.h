@@ -43,18 +43,18 @@ typedef struct {
 	u8 e_ident_13;
 	u8 e_ident_14;
 	u8 e_ident_15;
-	Elf32_Half e_type;
+	Elf32_Half e_type;/* offset=0x10 */
 	Elf32_Half e_machine;
 	Elf32_Word e_version;
 	Elf32_Addr e_entry;
 	Elf32_Off e_phoff;
-	Elf32_Off e_shoff;
+	Elf32_Off e_shoff;/* offset = 0x20 */
 	Elf32_Word e_flags;
 	Elf32_Half e_ehsize;
 	Elf32_Half e_phentsize;
 	Elf32_Half e_phnum;
 	Elf32_Half e_shentsize;
-	Elf32_Half e_shnum;
+	Elf32_Half e_shnum;/* offset = 0x30 */
 	Elf32_Half e_shstrndx;
 } Elf32_Ehdr;
 typedef struct {
@@ -62,7 +62,7 @@ typedef struct {
 	Elf32_Off p_offset;
 	Elf32_Addr p_vaddr;
 	Elf32_Addr p_paddr;
-	Elf32_Word p_filesz;
+	Elf32_Word p_filesz;/* offset = 0x10 */
 	Elf32_Word p_memsz;
 	Elf32_Word p_flags;
 	Elf32_Word p_align;
@@ -75,7 +75,11 @@ int ELF_fillUser(uintptr dest, uintptr count, int userReadable, int userWritable
 	MemSpace_mkUserFill(0x00, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
-int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
+int loadSeg(const Elf32_Phdr* seg, size_t len, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
+	uintptr lim = (((const char*) seg) - ((const char*) fileBase)) + 0x20;
+	if (len < lim) {
+		return 33;// Unexpected end of ELF file before end of program header table
+	}
 	Elf32_Word t = seg->p_type;
 	if ((t == 0) | (t == 4) | (t == 6)) {
 		return 0;
@@ -112,13 +116,24 @@ int loadSeg(const Elf32_Phdr* seg, const void* fileBase, uintptr* stack, struct 
 	if (s > (*stack)) {
 		(*stack) = s;
 	}
-	ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
+	if (!(seg->p_memsz)) {
+		return 0;
+	}
+	if (seg->p_filesz) {
+		if (len < ((seg->p_offset) + (seg->p_filesz))) {
+			return 34;// Unexpected end of ELF file before end of segment file image
+		}
+		ELF_cpyUser((uintptr) (seg->p_vaddr), ((const char*) fileBase) + (seg->p_offset), seg->p_filesz, (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
+	}
 	if ((seg->p_memsz) > (seg->p_filesz)) {
 		ELF_fillUser((uintptr) ((seg->p_vaddr) + (seg->p_filesz)), (seg->p_memsz) - (seg->p_filesz), (seg->p_flags & 0x04) ? 1 : 0, (seg->p_flags & 0x02) ? 1 : 0, mem);
 	}
 	return 0;
 }
-int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
+int loadELF(const Elf32_Ehdr* prgm, size_t len, uintptr* s, struct MemSpace* mem) {
+	if (len < 0x34) {
+		return 30;// Unexpected end of ELF file before end of ELF header
+	}
 	if (prgm->e_ident != 0x7F) {
 		return 1;/* Invalid magic */
 	}
@@ -178,15 +193,11 @@ int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 		return 15;/* Unrecognised processor-specific ELF file type */
 		/* TODO Check for these in the appropriate ABI &c. standards */
 	}
-	if (t >= 0xfe00) {
-		return 27;/* Unrecognised operating system-specific ELF file type */
-		/* TODO Check for the meanings of these in Linux */
-	}
 	if (t != 2) {
 		return 16;/* Unrecognised ELF file type */
 	}
 	t = prgm->e_machine;
-	if (t != 0) {
+	if (t != 0) {// Is it correct to allow any program with `e_machine' set to the value of `EM_NONE' to be loaded and executed? What would be the exact meaning of that setting, in the context of an executable ELF?
 #ifndef TARGETNUM
 #error "'TARGETNUM' is not set"
 #endif
@@ -195,21 +206,29 @@ int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 		if (t != 3) {// TODO How should an `e_type' value of 6 be handled?
 			return 17;/* Unrecognised or unsupported architecture */
 		}
+/*
 #elif TARGETNUM == 4
-		// arm
+		// arm; this architecture is not defined in the System V ABI Edition 4.1 "draft copy" of 1997-Mar-18
 		if (t != 40) {
-			return 17;/* Unrecognised or unsupported architecture */
+			return 17;
 		}
+*/
 #else
 #error "Target is not supported"
 #endif
+	}
+	if (!(prgm->e_phoff)) {
+		return 31;// ELF executable file contains no program header table
+	}
+	if (!(prgm->e_phnum)) {
+		return 32;// Program header table has no entries
 	}
 	const Elf32_Phdr* seg = (const Elf32_Phdr*) (((const char*) prgm) + (prgm->e_phoff));
 	Elf32_Half ps = prgm->e_phentsize;
 	Elf32_Half pnum = prgm->e_phnum;
 	int res = 0;
 	while (pnum--) {
-		res = loadSeg(seg, prgm, s, mem);
+		res = loadSeg(seg, len, prgm, s, mem);
 		if (res != 0) {
 			return res;
 		}
@@ -217,10 +236,10 @@ int loadELF(const Elf32_Ehdr* prgm, uintptr* s, struct MemSpace* mem) {
 	}
 	return 0;
 }
-int runELF(const void* elf, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
+int runELF(const void* elf, size_t len, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
 	thread->group->mem = MemSpace_create();
 	uintptr s = 0;
-	int i = loadELF((const Elf32_Ehdr*) elf, &s, thread->group->mem);
+	int i = loadELF((const Elf32_Ehdr*) elf, len, &s, thread->group->mem);// TODO URGENT Handling of `argv', `argc', and maybe also `envp'
 	if (i != 0) {
 		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);
@@ -242,7 +261,7 @@ int runELF(const void* elf, struct Thread* thread) {// The object at `thread' sh
 #endif
 #if TARGETNUM == 1
 	// x86_32
-	s = ((uintptr) s) - (((uintptr) s) % 4);
+	s = ((uintptr) s) - (((uintptr) s) % 16);
 	if (mapPage((uintptr) 0, (void*) (0 - RELOC), 0, 0, thread->group->mem)) {
 		MemSpace_forEach(freeUserPage, NULL, thread->group->mem);
 		MemSpace_destroy(thread->group->mem);

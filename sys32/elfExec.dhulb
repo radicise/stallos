@@ -1,5 +1,3 @@
-imply s32 sanc();
-imply u32 removeSeg(u32);
 imply u32 findSeg();
 #define RELOC 262144
 typealias Elf32_Addr u32;
@@ -342,7 +340,7 @@ int runELF(addr elf, addr memArea, *Thread_state state) {
 	s = s + 0x00200000 - memArea;
 	s = s - (s % 4);
 	/*i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, s);*/
-	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, 0x7ffff4 - $$RELOC$$);
+	i = execELF(memArea, (elf as *Elf32_Ehdr).e_entry@, state, 0x7ffff0 - $$RELOC$$);
 	if (i != 0) {
 		return i;
 	}

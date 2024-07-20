@@ -20,7 +20,7 @@ void set_irupt(void* base, unsigned int index, void(*func)(void), unsigned char 
 }
 #define SEGBMP 0x07f0
 #define SEGLEN 64
-int setup() {/* setup() IS NOT ABLE TO ISSUE ANY ERRORS */
+int setup_w(void) {/* setup() IS NOT ABLE TO ISSUE ANY ERRORS */
 	for (int i = 0; i < SEGLEN; i++) {
 		((unsigned char*) SEGBMP)[i / CHAR_BIT] &= (((unsigned char) 0xfe) << (i % CHAR_BIT));
 	}
@@ -55,7 +55,7 @@ struct Thread_state {
 };
 extern int runELF(void*, void*, struct Thread_state*);
 extern void Thread_run(struct Thread_state*);
-int executeSystem() {
+int executeSystem_w(void) {
 	/*
 	*((char*) 0xb8000) = *((char*) 0x00010000);
 	while (1) {
@@ -72,7 +72,7 @@ int executeSystem() {
 	return 0;
 }
 #define GDTD 0x7fa
-unsigned long findSeg(void) {// Changes LGDT descriptor data, finds the offset for the next segment pair; returns the value 0 if there are no available segment pairs
+unsigned long findSeg_w(void) {// Changes LGDT descriptor data, finds the offset for the next segment pair; returns the value 0 if there are no available segment pairs
 	unsigned long i = 0;
 	unsigned char t = 0x01;
 	unsigned char* pos = (unsigned char*) SEGBMP;
@@ -99,6 +99,7 @@ unsigned long findSeg(void) {// Changes LGDT descriptor data, finds the offset f
 		pos += 1;
 	}
 }
+/*
 unsigned long removeSeg(unsigned long seg) {//Changes the LGDT descriptor data; this does not invalidate the GDT entry; 0: Success; 1: Failure
 	seg += 8;
 	if ((seg + 16) == ((*((volatile unsigned short*) GDTD)) + 9)) {
@@ -109,3 +110,4 @@ unsigned long removeSeg(unsigned long seg) {//Changes the LGDT descriptor data; 
 	seg %= CHAR_BIT;
 	((unsigned char*) SEGBMP)[p] ^= (((unsigned char) 0x01) << seg);
 }
+*/

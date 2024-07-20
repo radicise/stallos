@@ -8,7 +8,7 @@ struct Thread_state {
 };
 void Threadstate_fill(uintptr stack, uintptr entry, struct MemSpace* mem, struct Thread_state* state) {
 	TSSmk(13 * 8, (6 * 8) + 0x0003, (5 * 8) + 0x0003, entry, stack, 0, ((uintptr) (mem->dir)) + RELOC, 128, &(state->tss));
-	TSSmk(13 * 8, 4 * 8, 3 * 8, (uintptr) irupt_80h, 0x007ffff4 - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, &(state->ktss));
+	TSSmk(13 * 8, 4 * 8, 3 * 8, (uintptr) irupt_80h, 0x007ffff0 - RELOC, 0, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, &(state->ktss));
 	state->kernelExecution = 0;
 	return;
 }
