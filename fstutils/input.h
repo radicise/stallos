@@ -119,8 +119,43 @@ CLIData clihelper(void) {
         // string is "help"
         } else if (stringcmp(ptr, "help")) { // none
             r = -4;
+        // string is "sktrace"
         } else if (stringcmp(ptr, "sktrace")) { // 5
             r = 5;
+        // string is "audit {name}"
+        } else if (startswith(ptr, "audit ")) { // 6
+            r = 6;
+            size_t plen = stringlen("audit ");
+            size_t flen = stringlen(ptr);
+            if (flen <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* dst = ptr + plen;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
+        // string is "auditb {name}"
+        } else if (startswith(ptr, "auditb ")) { // 7
+            r = 7;
+            size_t plen = stringlen("auditb ");
+            size_t flen = stringlen(ptr);
+            if (flen <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* dst = ptr + plen;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
         }
         end:
         free(ptr);

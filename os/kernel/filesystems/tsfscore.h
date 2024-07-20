@@ -492,7 +492,7 @@ static void bfield_setsize(DynBField* ptr, u32 nc) {
         deallocate(ptr->field, ptr->cap);
     }
     ptr->cap = nc;
-    ptr->size = 0;
+    ptr->size = nc*8;
     ptr->field = nb;
 }
 
@@ -505,18 +505,29 @@ static inline char get_bfield_block(DynBField* bf, u32 block) {
 static inline void set_bfield_block(DynBField* bf, u32 block, char val) {
     u32 quo = block / 8;
     char rem = (char)(block % 8);
+    // if (quo >= bf->size) {
+    //     bf->size ++;
+    // }
     bfield_setbit(bf, quo, rem, val);
 }
 
 static void bitfield_print(FileSystem* fs, DynBField* ptr) {
     u32 startb = fs->rootblock->usedright+1;
     u32 w = 8;
-    u32 h = ptr->size / w + ((ptr->size%w)>0?1:0);
+    u32 h = ptr->size / w;
     printf("PRINTING\n");
     printf("%u, %u\n", w, h);
     for (u32 i = 0; i < h; i ++) {
         for (u32 j = 0; j < w; j ++) {
             u32 blk = (i*w+j);
+            printf("%lu:%u ", startb+blk, get_bfield_block(ptr, blk));
+        }
+        printf("\n");
+    }
+    if ((ptr->size % w) > 0) {
+        u32 siz = ptr->size;
+        for (u32 i = 0; i < siz%w; i ++) {
+            u32 blk = siz - i - 1;
             printf("%lu:%u ", startb+blk, get_bfield_block(ptr, blk));
         }
         printf("\n");
@@ -548,19 +559,21 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
         u32 bfsize = (used)/8;
         printf("USED: %u\nBFSIZE: %u\n", used, bfsize);
         bfield_setsize(bf, bfsize + ((used%8>0)?1:0));
+        printf("BSACK: %lu\n", bf->cap);
     }
-    set_bfield_block(bf, oblk, 1);
+    set_bfield_block(bf, oblk-ur, 1);
     int rcode = 0;
     u32 removed = 1;
     TSFSDataBlock crdb;
     if (dhtest.checksum == comphash) {
         block_seek(fs, dhtest.head, BSEEK_SET);
+        set_bfield_block(bf, dhtest.head-ur, 1);
     } else {
         block_seek(fs, block_no, BSEEK_SET);
     }
     read_datablock(fs, &crdb);
     while (crdb.next_block) {
-        set_bfield_block(bf, crdb.next_block, 1);
+        set_bfield_block(bf, crdb.next_block-ur, 1);
         block_seek(fs, crdb.next_block, BSEEK_SET);
         read_datablock(fs, &crdb);
     }
@@ -622,9 +635,10 @@ size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* 
         write_buf(fs, data, size);
         block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
         size_t ns = size + realoffset;
-        data_loc.bloc.data_length = ns > data_loc.bloc.data_length ? ns : data_loc.bloc.data_length;
+        u16 dl = data_loc.bloc.data_length;
+        sinc += (ns >= dl) ? (ns - dl) : 0;
+        data_loc.bloc.data_length = ns > dl ? ns : dl;
         write_datablock(fs, &data_loc.bloc);
-        sinc += size;
         size = 0;
     } else {
         printf("DW<\n");

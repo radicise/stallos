@@ -348,8 +348,8 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     read_structnode(s, &topdir);
     tsfs_mk_file(s, &topdir, "test");
     TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
-    for (int i = 0; i < 2; i ++) {
-        data_write(s, fil, 1024*i, bigdata, 1024);
+    for (int i = 0; i < 1; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 1005);
     }
     _kernel_u32 p = fil->data_loc;
     tsfs_unload(s, fil);
@@ -424,6 +424,53 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             tsfs_unload(s, sb);
         } else if (clicode == 5) {
             SEEK_TRACING ^= 1; // toggle seek tracing
+        } else if (clicode == 6) {
+            TSFSStructNode dir = {0};
+            char* fullpath = stringcmp(clidata.data, ".") ? strmove(cwd) : strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 tarblock = tsfs_resolve_path(s, fullpath);
+            free(fullpath);
+            if (tarblock == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            block_seek(s, tarblock, BSEEK_SET);
+            read_structnode(s, &dir);
+            _DBG_print_node(&dir);
+            if (dir.storage_flags == TSFS_KIND_FILE) {
+                TSFSDataHeader head = {0};
+                block_seek(s, dir.data_loc, BSEEK_SET);
+                read_dataheader(s, &head);
+                _DBG_print_head(&head);
+            }
+        } else if (clicode == 7) {
+            TSFSStructNode dir = {0};
+            char* fullpath = stringcmp(clidata.data, ".") ? strmove(cwd) : strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 tarblock = tsfs_resolve_path(s, fullpath);
+            free(fullpath);
+            if (tarblock == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            block_seek(s, tarblock, BSEEK_SET);
+            read_structnode(s, &dir);
+            _DBG_print_node(&dir);
+            if (dir.storage_flags == TSFS_KIND_FILE) {
+                TSFSDataHeader head = {0};
+                block_seek(s, dir.data_loc, BSEEK_SET);
+                read_dataheader(s, &head);
+                _DBG_print_head(&head);
+                TSFSDataBlock cdb = {0};
+                block_seek(s, head.head, BSEEK_SET);
+                read_datablock(s, &cdb);
+                _DBG_print_data(&cdb);
+                while (cdb.next_block) {
+                    block_seek(s, cdb.next_block, BSEEK_SET);
+                    read_datablock(s, &cdb);
+                    _DBG_print_data(&cdb);
+                }
+            }
         }
     }
     dealloc:

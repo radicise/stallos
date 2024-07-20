@@ -26,6 +26,16 @@ char* strmove(const char* str) {
     return dst;
 }
 
+char* strjoin(const char* s1, const char* s2) {
+    char* dst = (char*)malloc(stringlen(s1)+stringlen(s2)+1);
+    if (dst == NULL) {
+        return NULL;
+    }
+    strcopy(s1, dst);
+    strcopy(s2, dst+stringlen(s1));
+    return dst;
+}
+
 int stringcmp(const char* s1, const char* s2) {
     int c = 0;
     char c1;
