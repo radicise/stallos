@@ -91,8 +91,11 @@ void dealloc(volatile void* obj, size_t siz) {
 	}
 }
 typedef struct {
-	unsigned long refs;
-	void (*onDeath)(void*);
+	struct PageDescData {
+		unsigned long refs;
+		void (*onDeath)(volatile void*);
+		unsigned long type;// 1: Memory allocated to the userspace process to be copied upon forks; 2: Memory to not be copied upon forks
+	} data;
 	Mutex lock;
 } PageDesc;
 void* alloc_lb(void) {// Allocated memory is guaranteed to not be at NULL and to not be at (void*) (-1) and to not be at (uintptr*) (-1); avoidance of deadlock must be sure
@@ -120,7 +123,7 @@ void dealloc_lb(volatile void* obj) {
 	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
 #if __TESTING__ == 1
 	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
-	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs) {
+	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs) {
 		bugCheckNum(0x0004 | FAILMASK_KMEMMAN);
 	}
 	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
@@ -130,7 +133,7 @@ void dealloc_lb(volatile void* obj) {
 	memAllocated_lb -= KMEM_LB_BS;
 	Mutex_release(&kmem_lb_access);
 }
-void chgPageRef(void* obj, int sub) {
+void chgPageRef(volatile void* obj, int sub) {
 	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
 #if __TESTING__ == 1
 	Mutex_acquire(&kmem_lb_access);
@@ -140,7 +143,7 @@ void chgPageRef(void* obj, int sub) {
 	Mutex_release(&kmem_lb_access);
 #endif
 	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
-	unsigned long rfs = ((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs;
+	unsigned long rfs = ((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs;
 	if (!sub) {
 		if (!rfs) {
 			bugCheckNum(0x0005 | FAILMASK_KMEMMAN);
@@ -153,14 +156,17 @@ void chgPageRef(void* obj, int sub) {
 	if (sub) {
 		rfs--;
 	}
-	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs = rfs;
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs = rfs;
 	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
 	if (!rfs) {
-		((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].onDeath(obj);
+		if (!sub) {
+			bugCheckNum(0x0008 | FAILMASK_KMEMMAN);
+		}
+		((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.onDeath(obj);
 	}
 	return;
 }
-void initPageRef(unsigned long rfs, void (*func)(void*), void* obj) {// `rfs' as passed must have a nonzero value
+void initPageRef(unsigned long rfs, void (*func)(volatile void*), void* obj, unsigned long typ) {// `rfs' as passed must have a nonzero value
 	if (!rfs) {
 		bugCheckNum(0x0006 | FAILMASK_KMEMMAN);
 	}
@@ -173,22 +179,57 @@ void initPageRef(unsigned long rfs, void (*func)(void*), void* obj) {// `rfs' as
 	Mutex_release(&kmem_lb_access);
 #endif
 	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
-	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs) {
+	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs) {
 		bugCheckNum(0x0007 | FAILMASK_KMEMMAN);
 	}
-	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].refs = rfs;
-	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].onDeath = func;
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs = rfs;
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.onDeath = func;
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.type = typ;
 	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
 	return;
 }
-void addPageRef(void* obj) {
+void initPageRefBased(unsigned long rfs, void* obj, void* based) {// `rfs' as passed must have a nonzero value
+	if (!rfs) {
+		bugCheckNum(0x0009 | FAILMASK_KMEMMAN);
+	}
+	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+	uintptr kb = (((uintptr) based) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+#if __TESTING__ == 1
+	Mutex_acquire(&kmem_lb_access);
+	if (!(((volatile char*) (volatile void*) (KMEM_LB_ADDR - RELOC))[k / CHAR_BIT] & (0x01 << (k % CHAR_BIT)))) {
+		bugCheckNum(0x000a | FAILMASK_KMEMMAN);
+	}
+	if (!(((volatile char*) (volatile void*) (KMEM_LB_ADDR - RELOC))[kb / CHAR_BIT] & (0x01 << (kb % CHAR_BIT)))) {
+		bugCheckNum(0x000b | FAILMASK_KMEMMAN);
+	}
+	Mutex_release(&kmem_lb_access);
+#endif
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	if (((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs) {
+		bugCheckNum(0x000c | FAILMASK_KMEMMAN);
+	}
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[kb].lock));
+	memcpy(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data), &(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[kb].data), sizeof(struct PageDescData));
+	((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data.refs = rfs;
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[kb].lock));
+	return;
+}
+void fetchPageData(void* obj, struct PageDescData* pddp) {
+	uintptr k = (((uintptr) obj) - KMEM_LB_DATSTART + RELOC) / KMEM_LB_BS;
+	Mutex_acquire(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	memcpy(pddp, &(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].data), sizeof(struct PageDescData));
+	Mutex_release(&(((PageDesc*) (KMEM_LB_REFS_ADDR - RELOC))[k].lock));
+	return;
+}
+void addPageRef(volatile void* obj) {
 	chgPageRef(obj, 0);
 	return;
 }
-void subPageRef(void* obj) {
+void subPageRef(volatile void* obj) {
 	chgPageRef(obj, 1);
 	return;
-}
+}// TODO Issue a bug check if a page data function is called with an inappropriate page address
 void* alloc_lb_wiped(void) {
 	void* block = alloc_lb();
 	memset(block, 0x00, KMEM_LB_BS);
@@ -227,8 +268,8 @@ void kmem_init(void) {
 		PageDesc* pdscBase = (PageDesc*) (KMEM_LB_REFS_ADDR - RELOC);
 		for (unsigned long k = 0; k < KMEM_LB_AMNTMEMSPACES; k++) {
 			PageDesc* pdsc = pdscBase + k;
-			pdsc->refs = 0;
-			pdsc->onDeath = NULL;
+			pdsc->data.refs = 0;
+			pdsc->data.onDeath = NULL;
 			Mutex_initUnlocked(&(pdsc->lock));
 		}
 	}

@@ -11,16 +11,17 @@ int thread_has_cap(int cap, pid_t tgpid) {
 }
 kuid_t fetch_ruid(void) {
 	lockThreadInfo();
-	kuid_t uid = ruid;
+	kuid_t uid = PerThread_context->ruid;
 	unlockThreadInfo();
 	return uid;
 }
 kuid_t fetch_euid(void) {
 	lockThreadInfo();
-	kuid_t uid = euid;
+	kuid_t uid = PerThread_context->euid;
 	unlockThreadInfo();
 	return uid;
 }
+// TODO `fetch_suid' and `fetch_fsuid'
 pid_t fetch_tgid(void) {
 	return tgid;
 }

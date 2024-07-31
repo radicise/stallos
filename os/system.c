@@ -23,7 +23,7 @@ extern void irupt_7dh(void);
 extern void irupt_7eh(void);
 extern void irupt_7fh(void);
 extern void irupt_80h(void);
-extern void irupt_yield(void);
+extern void irupt_kfunc(void);
 extern void irupt_noprocess(void);
 /* `RELOC' MUST be an integer multiple of both `KMEM_BS' and `KMEM_LB_BS' */
 #define LINUX_COMPAT_VERSION 0x20603904
@@ -34,6 +34,13 @@ extern void irupt_noprocess(void);
  *
  */
 #include "kernel/types.h"
+extern unsigned long kfunc(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long (*)(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long));
+size_t strlen(const char* str) {
+	const char* n = str;
+	while (*(n++)) {
+	}
+	return n - str - 1;
+}
 unsigned long long PIT0Ticks = 0;
 extern void int_enable(void);
 extern void int_disable(void);
@@ -43,10 +50,9 @@ void bugCheck(void) {
 	bugCheckNum(0xabadfa17UL);
 	return;
 }
-extern void yield_iruptCall(void);
+extern void kfunc_iruptCall(void);
 extern u32 getEFL(void);
 void bugMsg(uintptr* trace) {
-	// while (1) {}// NRW
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}
@@ -118,7 +124,7 @@ const char hex[] = {0x30,
 	0x45,
 	0x46};
 #define FAILMASK_SYSTEM 0x00010000
-long handlingIRQ = 0;// Signifies whether an IRQ may interrupt the executing code
+long handlingIRQ = 1;// Signifies whether the currently-executing code may be interrupted or execute an interrupt instruction
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Threads_nextThread' or not during kernel-space operation
 void bugCheckNum_u32(u32 num, uintptr* addr) {
 	bugMsg(addr);
@@ -146,21 +152,35 @@ void bugCheckNum_u32(u32 num, uintptr* addr) {
 void bugCheckNumWrapped(unsigned long num, uintptr* addr) {// Fatal kernel errors
 	bugCheckNum_u32(num, addr);
 }
-void yield(void) {// Not to be called when `handlingIRQ' is nonzero
-	if (handlingIRQ) {
-		bugCheckNum(0x0006 | FAILMASK_SYSTEM);
+volatile void* moveExv(volatile void* dst, volatile const void* buf, size_t count) {
+	volatile void* m = dst;
+	if (dst < buf) {
+		while (count--) {
+			*((volatile char*) dst) = *((volatile char*) buf);
+			dst = ((volatile char*) dst) + 1;
+			buf = ((volatile char*) buf) + 1;
+		}
 	}
-	yield_iruptCall();
+	else if (dst > buf) {
+		dst = ((volatile char*) dst) + count;
+		buf = ((volatile char*) buf) + count;
+		while (count--) {
+			dst = ((volatile char*) dst) - 1;
+			buf = ((volatile char*) buf) - 1;
+			*((volatile char*) dst) = *((volatile char*) buf);
+		}
+	}
+	return m;
+}
+void yield(void) {
+	if (handlingIRQ) {
+		return;
+	}
+	kfunc(1, 0, 0, 0, 0, 0, 0, 0, NULL);
 	return;
 }
 #include "kernel/util.h"
 #include "kernel/driver/VGATerminal.h"
-size_t strlen(const char* str) {
-	const char* n = str;
-	while (*(n++)) {
-	}
-	return n - str - 1;
-}
 const char* strct(const char** c) {// Does not check for string size overflow
 	int i = 0;
 	while (c[i] != NULL) {
@@ -365,6 +385,9 @@ int kernelInfoMsg(const char* msg) {
 	Mutex_release(&kmsg);
 	return w ? (-1) : 0;
 }
+void CAD(void) {
+	kernelMsg("REBOOT KEYSTROKE INVOKED\n");
+}
 extern unsigned long readLongLinear(u32);
 extern void writeLongLinear(u32, unsigned long);
 #include "kernel/driver/kbd8042.h"
@@ -382,6 +405,24 @@ extern void timeStore(time_t);// Atomic, set system time (time in seconds)
 #include "kernel/threads.h"
 #include "kernel/perThreadgroup.h"
 #include "kernel/perThread.h"
+unsigned long kfct(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long (*kfunc)(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)) {
+	unsigned long data[8];
+	data[0] = arg0;
+	data[1] = arg1;
+	data[2] = arg2;
+	data[3] = arg3;
+	data[4] = arg4;
+	data[5] = arg5;
+	data[6] = arg6;
+	data[7] = arg7;
+	moveExv(Thread_context->state.invocData.data, data, sizeof(unsigned long) * 8);
+	Thread_context->state.invocData.kfunc = kfunc;
+	kfunc_iruptCall();
+	if (kfunc == NULL) {
+		return 0;
+	}
+	return Thread_context->state.invocData.data[0];
+}
 #define SCHED_INCR_PICOS 0x2540E3C33ULL
 void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
@@ -389,18 +430,12 @@ void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 119
 		timeIncrement();
 	}
 	Scheduler_update();
-	/*
-	if (Mutex_tryAcquire(&(mainTerm.accessLock))) {
-		kernelMsgULong_hex(*((unsigned long*) (((unsigned char*) physicalZero) + 0xb24)));kernelMsg("\n");
-		Mutex_release(&(mainTerm.accessLock));
-	}
-	*/ // NRW
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
-	kbd8042_onIRQ(&kbdMain);
+	// kbd8042_onIRQ(&kbdMain);
 	return;
-}
+}// TODO Make IRQ 1 and 14 and 15 go to a generic handler that immediately returns
 void irupt_handler_72h(void) {
 	bugCheckNum(0x0072 | FAILMASK_SYSTEM);
 	return;
@@ -456,8 +491,21 @@ void irupt_handler_7eh(void) {
 void irupt_handler_7fh(void) {// IRQ 14 and IRQ 15
 	return;// ATA IRQ
 }
-void irupt_handler_yield(void) {
-	Scheduler_yield();
+void irupt_handler_kfunc(void) {
+	unsigned long data[8];
+	memcpy(data, Thread_context->state.invocData.data, sizeof(unsigned long) * 8);
+	if (Thread_context->state.invocData.kfunc == NULL) {
+		switch (data[0]) {
+			case (1):
+				Scheduler_yield();
+				break;
+			default:
+				bugCheckNum(0x0008 | FAILMASK_SYSTEM);
+		}
+	}
+	else {
+		Thread_context->state.invocData.data[0] = ((Thread_context->state.invocData.kfunc)(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]));
+	}
 	return;
 }
 void PICInit(unsigned char mOff, unsigned char sOff) {
@@ -565,35 +613,51 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	initSystemCallInterface();
 	kernelMsg("done\n");
 	// while (1) {}
-	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
-	int_enable();
-	kernelMsg("done\n");
 	// while (1) {}
 	kernelMsg("Initializing kernel thread management interface . . . ");
 	Threads_init();
 	kernelMsg("done\n");
-	kernelMsg("Starting `init'\n");
+	kernelMsg("Loading `init' . . . ");
 	// while (1) {}
 	Mutex_acquire(&Threads_threadManage);
 	struct Thread* th = alloc(sizeof(struct Thread));// Should this be declared `volatile'? It is conceivable that a thread may run on multiple CPU over time.
+	Thread_context = th;
 	PerThread_context = &(th->thread);
 	(th->group) = (PerThreadgroup_context = alloc(sizeof(struct PerThreadgroup)));
-	___nextTask___ = 1;// For consistency of the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process
+	___nextTask___ = 1;// For consistency with the Linux behaviour of the "tid" / "tgid" (pid_t) 0 not being given to any userspace process
 	Mutex_release(&Threads_threadManage);
-	currentThread = Threads_addThread(th);
+	handlingIRQ = 0;
+	currentThread = Threads_addThread(th, 1);
+	if (currentThread == ((pid_t) 0)) {
+		bugCheckNum(0x0007 | FAILMASK_SYSTEM);
+	}
 	Mutex_acquire(&Threads_threadManage);
-	tgid = currentThread;
 	Mutex_initUnlocked(&(PerThreadgroup_context->breakLock));
-	tid = tgid;
-	ruid = 0;
-	euid = 0;
-	suid = 0;
-	fsuid = 0;
+	PerThread_context->ruid = 0;
+	PerThread_context->euid = 0;
+	PerThread_context->suid = 0;
+	PerThread_context->fsuid = 0;
+	PerThread_context->cap_effective = 0xffffffffffffffffULL;
+	PerThread_context->cap_permitted = 0xffffffffffffffffULL;
+	PerThread_context->cap_inheritable = 0xffffffffffffffffULL;
+	PerThread_context->fsinfo = alloc(sizeof(struct FSInfo));
+	{
+		char* fsstr = alloc(2);
+		fsstr[0] = 0x2f;
+		fsstr[1] = 0x00;
+		PerThread_context->fsinfo->cwd = fsstr;
+		fsstr = alloc(2);
+		fsstr[0] = 0x2f;
+		fsstr[1] = 0x00;
+		PerThread_context->fsinfo->root = fsstr;
+	}
+	PerThread_context->fsinfo->umask = 0x012;// TODO URGENT Should "init" start with this umask?
+	Mutex_initUnlocked(&(PerThread_context->fsinfo->dataLock));
 	Mutex_initUnlocked(&(PerThread_context->dataLock));
 	errno = 0;
 	___nextTask___ = PID_USERSTART;// TODO Should this step be done?
 	Mutex_release(&Threads_threadManage);
-	testing_mount_tsfs();// NRW
+	// testing_mount_tsfs();// NRW
 	int errVal = runELF((const void*) (((uintptr) 0x00010000) - ((uintptr) RELOC)), 65536, th);// TODO URGENT Use actual size of file
 	if (errVal != 0) {
 		bugCheckNum(errVal | 0xe100 | FAILMASK_SYSTEM);
@@ -602,7 +666,11 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	TS_setDesc(0x0d80, 127, 0, 0, 1, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
 	setNT();
-	// while (1) {}
+	kernelMsg("done\n");
+	kernelMsg("Re-enabling IRQ, non-maskable interrupts, and software interrupts . . . ");
+	int_enable();
+	kernelMsg("done\n");
+	kernelMsg("Executing `init'\n");
 	irupt_80h_sequenceEntry();// TODO Use a generic non-allocated stack area for system call handling and add a guard page for the limit of the other stacks
 	return;
 }

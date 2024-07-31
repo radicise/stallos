@@ -80,6 +80,13 @@ void print(const char* d) {
 }
 void _start() {
 	/*
+	while (1) {
+		char b;
+		read(0, &b, 1);
+		write(1, &b, 1);
+	}
+	*/
+	/*
 	_exit(0xdeadc0de);
 	int i = 0;
 	while (i < 200) {
@@ -158,4 +165,5 @@ void _start() {
 	}
 	while (1) {
 	}
+	return;
 }

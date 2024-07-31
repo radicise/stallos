@@ -41,4 +41,17 @@ typedef _kernel_u32 _kernel_udev_new_t;
  */
 typedef volatile unsigned char _kernel_SimpleMutex;// Not reentrant, acquisition also acts as a memory fence for the thread
 typedef volatile unsigned long _kernel_AtomicULong;
+struct _kernel___old_kernel_stat {
+	unsigned short st_dev;
+	unsigned short st_ino;
+	unsigned short st_mode;
+	unsigned short st_nlink;
+	unsigned short st_uid;
+	unsigned short st_gid;
+	unsigned short st_rdev;
+	unsigned long st_size;
+	unsigned long st_atime;
+	unsigned long st_mtime;
+	unsigned long st_ctime;
+};
 #endif

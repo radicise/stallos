@@ -250,6 +250,7 @@ void initKeyboard8042(unsigned char* buf, size_t bufSize, unsigned char* bufTerm
 	}
 	return;
 }
+/*
 void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
 	Mutex_acquire(&(kbd->bufLock));
 	while (1) {
@@ -268,6 +269,7 @@ void kbd8042_oldMultithreadOnIRQ(struct Keyboard8042* kbd) {
 		(kbd->avail)++;
 	}
 }
+*/
 int kbd8042_outChar(unsigned char val, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->ctrl) {
 		val &= 0x1f;
@@ -315,7 +317,7 @@ int kbd8042_outSeq(const void* dat, size_t siz, struct Keyboard8042* kbd) {// Mu
 }
 int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->set != 2) {
-		return (-1);// TODO Implement
+		bugCheckNum(0x0103 | FAILMASK_KBD8042);
 	}
 	u8 state = kbd->state;
 	u16 code = ((u16) dat) + (((u16) state) << 8);// State when set 2: 0: N; 1: 0xe0 N; 2: 0xf0 N; 3: 0xe0 0xf0 N; 4: 0xe1 N; 5: 0xe1 0x14 N; 6: 0xe1 0xf0 N; 7: 0xe1 0xf0 0x14 N; 8: 0xe1 0xf0 0x14 0xf0 N
@@ -325,7 +327,7 @@ int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufL
 	unsigned char numL = kbd->numL;
 	unsigned char modeApp = kbd->modeApp;
 	int i = 0;
-	switch (code) {
+	switch (code) {// TODO Implement AltGr behaviour for instances of LCtrl+RAlt
 		case (0xe0):
 			kbd->state = 1;
 			break;
@@ -743,7 +745,7 @@ int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufL
 			break;
 		case (0x0171):
 			if (ctrl && kbd->alt) {
-				bugCheckNum(0xceebc0de);
+				CAD();
 			}
 			i = kbd8042_outSeq("\033[3~", 4, kbd);
 			break;
@@ -767,6 +769,7 @@ int kbd8042_process(unsigned char dat, struct Keyboard8042* kbd) {// Mutex `bufL
 	}
 	return 0;
 }
+/*
 void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have been acquired and is NOT released
 	if (kbd->ID != 0x00) {
 		bugCheckNum(0x0102 | FAILMASK_KBD8042);
@@ -795,7 +798,8 @@ void kbd8042_serviceIRQ(struct Keyboard8042* kbd) {// Mutex `bufLock' must have 
 			}
 			unsigned char res = bus_in_u8(0x0060);
 			if (kbd8042_process(res, kbd)) {
-				kbd->buf[kbd->avail = 1] = res;
+				kbd->buf[0] = res;
+				kbd->avail = 1;
 				break;
 			}
 		}
@@ -820,28 +824,36 @@ void kbd8042_onIRQ(struct Keyboard8042* kbd) {// TODO URGENT Do not need to acqu
 	Mutex_release(&(kbd->bufLock));
 	return;
 }
+*/
 ssize_t kbd8042_readGiven(void* dat, size_t count, struct Keyboard8042* kbd) {
+	if (count == 0) {
+		return count;
+	}
 	size_t oCount = count;
 	unsigned char* dats = (unsigned char*) dat;
 	Mutex_acquire(&(kbd->bufLock));
 	while (1) {
-		if (kbd->availTerm == 0) {
-			Mutex_release(&(kbd->bufLock));
-			Mutex_wait();
-			Mutex_acquire(&(kbd->bufLock));
-			continue;
+		if (kbd->availTerm) {
+			if (kbd->availTerm >= count) {
+				moveExv(dats, kbd->bufTerm, count);
+				kbd->availTerm -= count;
+				moveExv(kbd->bufTerm, kbd->bufTerm + count, kbd->availTerm);
+				Mutex_release(&(kbd->bufLock));
+				return oCount;
+			}
+			else {
+				moveExv(dats, kbd->bufTerm, kbd->availTerm);
+				count -= kbd->availTerm;
+				dats += kbd->availTerm;
+				kbd->availTerm = 0;
+			}
 		}
-		if (kbd->availTerm >= count) {
-			moveExv(dats, kbd->bufTerm, count);
-			kbd->availTerm -= count;
-			moveExv(kbd->bufTerm, kbd->bufTerm + count, kbd->availTerm);
-			Mutex_release(&(kbd->bufLock));
-			return oCount;
+		while (!(bus_in_u8(0x64) & 0x01)) {
+			yield();
 		}
-		moveExv(dats, kbd->bufTerm, kbd->availTerm);
-		count -= kbd->availTerm;
-		dats += kbd->availTerm;
-		kbd->availTerm = 0;
+		if (kbd8042_process(bus_in_u8(0x60), kbd)) {// TODO Write the terminal input directly to the target buffer
+			bugCheckNum(0x0104 | FAILMASK_KBD8042);
+		}
 	}
 }
 ssize_t kbd8042_read(int kfd, void* dat, size_t len) {

@@ -6,20 +6,22 @@
 #include "../../perThreadgroup.h"
 #include "../../obj/Map.h"
 #include "segments.h"
-struct Map* ___taskMap___;// Do NOT access directly except for within the prescribed interaction functions; pid_t -> struct Thread*
+struct Map* ___taskMap___;// Do NOT access directly except for within the prescribed interaction functions; pid_t -> struct Thread*; the `struct Thread' aggregates associated with the values mapped to by the mapping can be deallocated with dealloc(value, sizeof(struct Thread))
 int ___amntTasks___;// Do NOT access directly except for within the prescribed interaction functions
 pid_t ___nextTask___;// Do NOT access directly except for within the prescribed interaction functions
-volatile pid_t pid_max = 32768;// Acquire Threads_threadManage while accessing
+volatile pid_t pid_max = 32768;// TODO URGENT Make an interface to allow for reading and writing of this value
 #define PID_USERSTART 300
 void Threads_init(void) {
-	Mutex_initUnlocked(&Threads_threadManage);
+	Mutex_initUnlocked(&Threads_threadManage);// TODO URGENT REMOVE Threads_threadManage
 	___amntTasks___ = 0;
 	___taskMap___ = Map_create();
 	___nextTask___ = 0;
 	return;
 }
-pid_t Threads_addThread(struct Thread* thread) {// `thread' and `thread->group' must have been allocated with `alloc' with arguments of `sizeof(struct Thread)' and `sizeof(struct PerThreadgroup)', respectively; memory management of these objects is relinquished by the caller
-	Mutex_acquire(&Threads_threadManage);
+pid_t Threads_insertThread(struct Thread* thread, int newThreadgroup) {// `thread' and `thread->group' must have been allocated with `alloc' with arguments of `sizeof(struct Thread)' and `sizeof(struct PerThreadgroup)', respectively; the references of these objects and the memory management of these objects are relinquished by the caller in the case of non-failure; this function may be called ONLY when `handlingIRQ' is nonzero; this function sets the value of the `tid' member of `thread->thread' and, if and only if `newThreadgroup' is nonzero, the `tgid' member of `*(thread->group)'; `(pid_t) 0' is returned if and only if no pid could be allocated
+	if (!(Mutex_tryAcquire(&Threads_threadManage))) {
+		bugCheckNum(0x0006 | FAILMASK_THREADS);
+	}
 	pid_t n = ___nextTask___;
 	while (1) {
 		uintptr a = Map_fetch((uintptr) n, ___taskMap___);
@@ -31,16 +33,27 @@ pid_t Threads_addThread(struct Thread* thread) {// `thread' and `thread->group' 
 			n = (pid_t) PID_USERSTART;// PID_USERSTART is used and kept at 300 for consistency with Linux behaviours
 		}
 		if (n == ___nextTask___) {
-			bugCheckNum(0x0001 | FAILMASK_THREADS);// No "tid" / "tgid" could be allocated
+			Mutex_release(&Threads_threadManage);
+			return (pid_t) 0;// TODO URGENT Correctly implement behaviour for allocating tgid and tid when any threads with tid == tgid have ended
 		}
 	}
 	___nextTask___ = ((n + ((pid_t) 1)) == pid_max) ? ((pid_t) PID_USERSTART) : (n + ((pid_t) 1));
+	thread->thread.tid = n;
+	if (newThreadgroup) {
+		thread->group->tgid = n;
+	}
 	if (Map_add((uintptr) n, (uintptr) thread, ___taskMap___)) {
-		bugCheck();
+		bugCheckNum(0x0008 | FAILMASK_THREADS);
 	}
 	___amntTasks___++;
 	Mutex_release(&Threads_threadManage);
 	return n;
+}
+unsigned long Threads_addThread_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {// This function can ONLY be called when `handlingIRQ' is nonzero
+	return (unsigned long) Threads_insertThread((struct Thread*) ((uintptr) arg0), (int) arg1);
+}
+pid_t Threads_addThread(struct Thread* thread, int newGroup) {
+	return (pid_t) (kfunc((unsigned long) ((uintptr) thread), (unsigned long) newGroup, 0, 0, 0, 0, 0, 0, Threads_addThread_kfunc));
 }
 int Threads_findNext(uintptr suspect, uintptr u) {
 	struct Map_pair* pair = (struct Map_pair*) suspect;
@@ -54,13 +67,13 @@ int Threads_findNext(uintptr suspect, uintptr u) {
 }
 #include "../../perThreadgroup.h"
 #include "../../perThread.h"
-struct PerThreadgroup* volatile PerThreadgroup_context;
-struct PerThread* volatile PerThread_context;
 void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS CLEARED
 	if (!handlingIRQ) {
 		bugCheckNum(0x0005 | FAILMASK_THREADS);
 	}
-	Mutex_acquire(&Threads_threadManage);// TODO URGENT Prevent dealocking due to the scheduler trying to switch tasks while a thread is being added from happening
+	if (!(Mutex_tryAcquire(&Threads_threadManage))) {
+		bugCheckNum(0x0007 | FAILMASK_THREADS);
+	}
 	uintptr st = Map_fetch((uintptr) currentThread, ___taskMap___);
 	if (st == ((uintptr) (-1))) {
 		bugCheckNum(0x0002 | FAILMASK_THREADS);// The current thread seemingly does not exist
@@ -85,19 +98,14 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 		Mutex_release(&Threads_threadManage);
 		return;
 	}
-	currentThread = (pid_t) uu[0];
-	moveExv(&(((struct Thread*) st)->state.ktss), ((TSS*) (((volatile char*) physicalZero) + 0xb00)), sizeof(TSS));
-	moveExv(&(((struct Thread*) st)->state.tss), ((TSS*) (((volatile char*) physicalZero) + 0xb00)) + 5, sizeof(TSS));
-	((struct Thread*) st)->state.kernelExecution = (TS_isBusy(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7)) ? 1 : 0;
+	flushThreadState(&(((struct Thread*) st)->state));
 	uintptr thn = Map_fetch(uu[0], ___taskMap___);
 	if (thn == ((uintptr) (-1))) {
 		bugCheckNum(0x0003 | FAILMASK_THREADS);// The planned thread seemingly does not exist
 	}
 	struct Thread* thns = (struct Thread*) thn;
-	PerThreadgroup_context = thns->group;
-	PerThread_context = &(thns->thread);
 	struct Thread_state* sttr = &(thns->state);
-	moveExv(((TSS*) (((volatile char*) physicalZero) + 0xb00)), &(sttr->ktss), sizeof(TSS));
+	moveExv((TSS*) (((volatile char*) physicalZero) + 0xb00), &(sttr->ktss), sizeof(TSS));
 	moveExv(((TSS*) (((volatile char*) physicalZero) + 0xb00)) + 5, &(sttr->tss), sizeof(TSS));
 	TS_setDesc(0x0b00, 127, 0, 0, sttr->kernelExecution ? 1 : 0, ((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7);
@@ -111,7 +119,26 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	Mutex_release(&Threads_threadManage);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
+	currentThread = (pid_t) uu[0];
+	PerThreadgroup_context = thns->group;
+	PerThread_context = &(thns->thread);
+	Thread_context = thns;
 	mem_barrier();
 	return;
+}
+pid_t Threads_executionFork(struct Thread* newThread) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
+	flushThreadState(&(newThread->state));
+	pid_t n = Threads_insertThread(newThread, 1);
+	if (n == ((pid_t) 0)) {
+		return (pid_t) (-1);
+	}
+	newThread->state.invocData.data[0] = 0;
+	return n;// TODO URGENT Make the new kernel thread immediately return to the user and have its own stack and make each kernel thread have its stack in part of an organised stack space and ensure that locks are correct upon returning of the new kernel thread to user space
+}
+unsigned long Threads_forkExec_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {
+	return (unsigned long) (Threads_executionFork((struct Thread*) ((uintptr) arg0)));
+}
+pid_t Threads_forkExec(struct Thread* newThread) {// `newThread' and `newThread->group' must have been allocated with `alloc' with arguments of `sizeof(struct Thread)' and `sizeof(struct PerThreadgroup)', respectively; the references `newThread' and `newThread->group', as well as memory management of each of these references, are relinquished
+	return (pid_t) (kfunc((unsigned long) ((uintptr) newThread), 0, 0, 0, 0, 0, 0, 0, Threads_forkExec_kfunc));
 }
 #endif
