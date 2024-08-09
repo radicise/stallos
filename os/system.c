@@ -570,7 +570,7 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	Mutex_initUnlocked(&kmsg);
 	/* End-of-style */
 	kernelMsg("Stallos v0.0.2.1-dev\n");
-	kernelMsg("Redefining Intel 8259 Programmable Interrupt Controller IRQ mappings . . . ");
+	kernelMsg("Redefining Intel 8259A Programmable Interrupt Controller IRQ mappings . . . ");
 	PICInit(0x70, 0x78);
 	kernelMsg("done\n");
 	kernelMsg("Setting interrupt handlers . . . ");
