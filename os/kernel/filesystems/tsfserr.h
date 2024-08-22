@@ -22,15 +22,16 @@ int PUTS(const char* c) {while (*c){putchar((int)*c);c++;}return 0;}
 #define FEFULL  0x4
 #define FEBIG   0x8
 #define FESMALL 0x10
-// // coolaid
-// #define FEDRIVE 0xc001a1d0
-#define FEDRIVE 0x800
 #define FEINVL  0x20
 #define FEARG   0x40
 #define FETEST  0x80
 #define FEIMPL  0x100
 #define FEDATA  0x200
 #define FEOP    0x400
+// // coolaid
+// #define FEDRIVE 0xc001a1d0
+#define FEDRIVE 0x800
+#define FELOCK  0x1000
 int magic_check(unsigned long code, long err) {
     // long x = code ^ err;
     // return ((code ^ x) == err);
@@ -45,6 +46,9 @@ void _magic_smoke(unsigned long ecode, long line, const char* fin, const char* f
     }
     if (magic_check(ecode, FEWAND)) {
         PUTS("MAGIC");
+    }
+    if (magic_check(ecode, FELOCK)) {
+        PUTS("MUTEXLOCK");
     }
     if (magic_check(ecode, FEDRIVE)) {
         PUTS("DRIVE");

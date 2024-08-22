@@ -125,4 +125,13 @@ u8 read_u8(FileSystem* fs) {
 void read_buf(FileSystem* fs, void* buf, size_t size) {
     if ((fs->fdrive->read)(fs->kfd,buf,size)) fs->err = 1;
 }
+
+void write_buf_stable(FileSystem* fs, const void* buf, size_t size) {
+    write_buf(fs, buf, size);
+    seek(fs, -1 * ((off_t)size), SEEK_CUR);
+}
+void read_buf_stable(FileSystem* fs, void* buf, size_t size) {
+    read_buf(fs, buf, size);
+    seek(fs, -1 * ((off_t)size), SEEK_CUR);
+}
 #endif

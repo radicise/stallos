@@ -117,7 +117,7 @@ u64 tsfs_sbcs_foreach(FileSystem* fs, TSFSStructBlock* sb, int(_do)(FileSystem*,
                 return retv;
             }
             loc_seek(fs, opos);
-        } else if (_do(fs, &ce, data)) return sb->disk_loc;
+        } else if (_do(fs, &ce, data)) return ((u64)(sb->disk_loc))*1024;
     }
     return 0;
 }

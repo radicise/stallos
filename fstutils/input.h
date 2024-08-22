@@ -156,6 +156,38 @@ CLIData clihelper(void) {
                 return ret;
             }
             strcopy(dst, ret.data);
+        // string is "auditd [t|b] {name}"
+        } else if (startswith(ptr, "auditd ")) { // 8 & 9
+            size_t plen = stringlen("auditd ");
+            // printf("PLEN: %zu\n", plen);
+            size_t flen = stringlen(ptr);
+            // printf("FLEN: %zu\n", flen);
+            if (flen-2 <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* typ = ptr + plen;
+            char* dst = typ + 2;
+            // printf("TYP: %s\nDST: %s\n", typ, dst);
+            int t = 0;
+            if (startswith(typ, "t ")) { // directory
+                // printf("directory\n");
+            } else if (startswith(typ, "b ")) { // file
+                // printf("file\n");
+                t = 1;
+            } else {
+                printf("invalid: %c\n", typ[0]);
+                r = -3;
+                goto end;
+            }
+            r = t + 8;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
         }
         end:
         free(ptr);

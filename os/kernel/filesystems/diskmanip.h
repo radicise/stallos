@@ -50,10 +50,8 @@ int dmanip_fill(FileSystem* fs, u32 start, u32 count, unsigned char value) {
         ((u64*)bigbuf)[i] = v;
     }
     longseek(fs, (loff_t)(bsize * start), SEEK_SET);
-    off_t inc = (off_t)(bsize * FS_DMANIP_MAX_RAM_BLKS);
     while (count > FS_DMANIP_MAX_RAM_BLKS) {
         write_buf(fs, bigbuf, bufsize);
-        seek(fs, inc, SEEK_CUR);
         count -= FS_DMANIP_MAX_RAM_BLKS;
     }
     if (count) {
@@ -82,17 +80,17 @@ int dmanip_shift_right(FileSystem* fs, u32 start, u32 count, u32 delta) {
     size_t bufsize = (bsize * FS_DMANIP_MAX_RAM_BLKS) / 8;
     while (count > FS_DMANIP_MAX_RAM_BLKS) {
         longseek(fs, bsize * (start + count - FS_DMANIP_MAX_RAM_BLKS), SEEK_SET);
-        read_buf(fs, bigbuf, bufsize);
+        read_buf_stable(fs, bigbuf, bufsize);
         seek(fs, ((s32)delta - FS_DMANIP_MAX_RAM_BLKS) * (s32)bsize, SEEK_CUR);
-        write_buf(fs, bigbuf, bufsize);
+        write_buf_stable(fs, bigbuf, bufsize);
         count -= FS_DMANIP_MAX_RAM_BLKS;
     }
     if (count) {
         longseek(fs, bsize * start, SEEK_SET);
         u32 amt = bsize * count;
-        read_buf(fs, bigbuf, amt);
+        read_buf_stable(fs, bigbuf, amt);
         seek(fs, ((s32)delta - (s32)count) * (s32)bsize, SEEK_CUR);
-        write_buf(fs, bigbuf, amt);
+        write_buf_stable(fs, bigbuf, amt);
     }
     if (f) {
         dmanip_debuf(bsize);
@@ -114,18 +112,18 @@ int dmanip_shift_left(FileSystem* fs, u32 start, u32 count, u32 delta) {
     s32 seekoff = -(s32)(delta * bsize + bufsize);
     while (count > FS_DMANIP_MAX_RAM_BLKS) {
         longseek(fs, bsize * start, SEEK_SET);
-        read_buf(fs, bigbuf, bufsize);
+        read_buf_stable(fs, bigbuf, bufsize);
         seek(fs, seekoff, SEEK_CUR);
-        write_buf(fs, bigbuf, bufsize);
+        write_buf_stable(fs, bigbuf, bufsize);
         count -= FS_DMANIP_MAX_RAM_BLKS;
         start += FS_DMANIP_MAX_RAM_BLKS;
     }
     if (count) {
         longseek(fs, bsize * start, SEEK_SET);
         u32 amt = bsize * count;
-        read_buf(fs, bigbuf, amt);
+        read_buf_stable(fs, bigbuf, amt);
         seek(fs, -(s32)(delta * bsize + amt), SEEK_CUR);
-        write_buf(fs, bigbuf, amt);
+        write_buf_stable(fs, bigbuf, amt);
     }
     if (f) {
         dmanip_debuf(bsize);

@@ -9,6 +9,7 @@ Doing so is undefined behavior
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
+#define __FEATURE_NO_MUTEX 1
 // #define printf(...)
 extern int printf(const char*, ...);
 #include "tsfscore.h"

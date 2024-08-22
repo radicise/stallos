@@ -25,6 +25,7 @@ void kernelMsgULong_hex(unsigned long l) {
 
 void bugCheckNum(long n) {
     printf("BUGCHK: %li\n", n);
+    exit(1);
 }
 
 void* alloc(_kernel_size_t size) {
@@ -346,14 +347,18 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     block_seek(s, s->rootblock->top_dir, BSEEK_SET);
     TSFSStructNode topdir = {0};
     read_structnode(s, &topdir);
+    tsfs_mk_file(s, &topdir, "ctrl");
     tsfs_mk_file(s, &topdir, "test");
-    TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
-    for (int i = 0; i < 1; i ++) {
-        data_write(s, fil, 1024*i, bigdata, 1005);
+    _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
+    printf("FILE BLOCK NO: %lu\n", tblkno);
+    TSFSStructNode* fil = tsfs_load_node(s, tblkno);
+    for (int i = 0; i < 8; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 1024);
     }
     _kernel_u32 p = fil->data_loc;
-    tsfs_unload(s, fil);
-    tsfs_free_data(s, p);
+    // tsfs_unload(s, fil);
+    // tsfs_free_data(s, p);
+    tsfs_unlink(s, fil);
     // _DBG_print_root(s->rootblock);
     // block_seek(s, 0, BSEEK_SET);
     // TSFSRootBlock rbt = {0};
@@ -363,7 +368,7 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     releaseFS(s);
     return 0;
 }
-
+#define TSFSDBLOCKDSIZE 19
 int full_test(struct FileDriver* fdrive, int fd, char flags) {
     FileSystem* s = 0;
     SEEK_TRACING = 0;
@@ -471,6 +476,62 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                     _DBG_print_data(&cdb);
                 }
             }
+        } else if (clicode < 10) {
+            TSFSStructNode dir = {0};
+            char* name = strmove(clidata.data);
+            char* fullpath = strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 tarblock = tsfs_resolve_path(s, fullpath);
+            free(fullpath);
+            if (tarblock == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            block_seek(s, tarblock, BSEEK_SET);
+            read_structnode(s, &dir);
+            _DBG_print_node(&dir);
+            if (dir.storage_flags != TSFS_KIND_FILE) {
+                printf("BAD NODE TYPE\n");
+                continue;
+            }
+            TSFSDataHeader head = {0};
+            block_seek(s, dir.data_loc, BSEEK_SET);
+            read_dataheader(s, &head);
+            TSFSDataBlock cdb = {0};
+            block_seek(s, head.head, BSEEK_SET);
+            read_datablock(s, &cdb);
+            char* dumpdata = (char*)malloc(1006);
+            if (dumpdata == NULL) {
+                printf("MALLOC FAILED");
+                break;
+            }
+            for (int i = 0; i < head.blocks; i ++) {
+                block_seek(s, cdb.disk_loc, BSEEK_SET);
+                seek(s, TSFSDBLOCKDSIZE, SEEK_CUR);
+                read_buf(s, dumpdata, cdb.data_length);
+                dumpdata[cdb.data_length] = 0;
+                if (clicode == 8) {
+                    // text dump
+                    printf("TXT DATA @ {%lx}\n%s\nLEN: %u\n", cdb.disk_loc, dumpdata, stringlen(dumpdata));
+                } else {
+                    // binary dump
+                    printf("BIN DATA @ {%lx}\n", cdb.disk_loc);
+                    for (int j = 1; j < cdb.data_length+1; j ++) {
+                        printf("%x ", dumpdata[j-1]);
+                        if (j % 8 == 0) {
+                            printf("\n");
+                        }
+                    }
+                    if (cdb.data_length % 8) {
+                        printf("\n");
+                    }
+                }
+                if (cdb.next_block != 0) {
+                    block_seek(s, cdb.next_block, BSEEK_SET);
+                    read_datablock(s, &cdb);
+                }
+            }
+            free(dumpdata);
         }
     }
     dealloc:

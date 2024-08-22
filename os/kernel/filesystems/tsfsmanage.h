@@ -18,15 +18,15 @@ int _tsfs_make_data(FileSystem* fs, TSFSStructNode* sn) {
     // magic_smoke(FEIMPL | FEDRIVE | FEDATA | FEOP);
     u32 blkno = allocate_blocks(fs, 1, 2);
     // u64 absloc = ((u64)blkno) * ((u64)(fs->rootblock->block_size));
-    TSFSDataHeader dh = {.blocks=1,.head=blkno+1,.refcount=1,.size=0};
+    TSFSDataHeader dh = {.blocks=1,.head=blkno,.refcount=1,.size=0};
     block_seek(fs, blkno, BSEEK_SET);
-    write_dataheader(fs, &dh);
-    seek(fs, -TSFSDATAHEADER_DSIZE, SEEK_CUR);
-    block_seek(fs, 1, 1);
-    TSFSDataBlock db = {.data_length=0,.next_block=0,.prev_block=blkno,.blocks_to_terminus=0,.storage_flags=TSFS_SF_FINAL_BLOCK};
+    TSFSDataBlock db = {.data_length=0,.next_block=0,.prev_block=blkno+1,.blocks_to_terminus=0,.storage_flags=TSFS_SF_FINAL_BLOCK};
     write_datablock(fs, &db);
+    seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+    block_seek(fs, 1, 1);
+    write_dataheader(fs, &dh);
     block_seek(fs, sn->disk_loc, BSEEK_SET);
-    sn->data_loc = blkno;
+    sn->data_loc = blkno+1;
     write_structnode(fs, sn);
     return 0;
 }
@@ -167,6 +167,10 @@ int _tsfs_delce(FileSystem* fs, TSFSStructBlock* opb, u8 no) {
         block_seek(fs, opb->disk_loc, BSEEK_SET);
         write_structblock(fs, opb);
         return 1;
+    } else if (opb->disk_ref == 0) {
+        opb->entrycount = 0;
+        block_seek(fs, opb->disk_loc, BSEEK_SET);
+        write_structblock(fs, opb);
     } else {
         TSFSStructBlock* par = tsfs_load_block(fs, opb->disk_ref);
         TSFSSBChildEntry opc = {0};
@@ -192,7 +196,7 @@ int _tsfs_delce(FileSystem* fs, TSFSStructBlock* opb, u8 no) {
 WARNING: THIS FUNCTION RELEASES THE [sn] RESOURCE
 */
 int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
-    char buf[17];
+    char buf[17] = {0};
     tsfs_mk_ce_name(buf, sn->name, tsfs_strlen(sn->name)+1);
     TSFSStructNode* pn = tsfs_load_node(fs, sn->pnode);
     TSFSStructBlock* pb = tsfs_load_block(fs, pn->parent_loc);
@@ -211,7 +215,7 @@ int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
         return -1;
     }
     u64 c_loc = *((u64*)(buf+9));
-    u8 no = (u8)((c_loc - b_loc) / 14);
+    u8 no = (u8)((c_loc - b_loc) / 14)-1;
     // printf("DELNODE\n");
     // _DBG_print_node(sn);
     printf("B_LOCK = %lx\nC_LOC = %lx\nNO = %u\n", b_loc, c_loc, no);
@@ -238,7 +242,6 @@ int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
             _tsmagic_force_release(fs, dh);
             // DELETE THE DATA
             tsfs_free_data(fs, pos);
-            magic_smoke(FEOP | FEIMPL);
             goto done;
         }
         tsfs_unload(fs, dh);
@@ -287,11 +290,17 @@ int tsfs_add_sbce(FileSystem* fs, TSFSStructBlock* sb, TSFSSBChildEntry* ce) {
     if (ec < 71) { // block isn't full, just add at the end
         longseek(fs, (((u64)sb->disk_loc)*BLOCK_SIZE) + 14llu + (14llu*(u64)sb->entrycount), SEEK_SET);
         write_childentry(fs, ce);
+        // sb->entrycount ++;
+        // block_seek(fs, sb->disk_loc, BSEEK_SET);
+        // write_structblock(fs, sb);
     } else if (ec == 71) { // block needs and extended table, create it, then add the entry
         longseek(fs, (((u64)sb->disk_loc)*BLOCK_SIZE) + 14llu + (14llu*(u64)sb->entrycount), SEEK_SET);
         u32 achnk = allocate_blocks(fs, 0, 1);
         TSFSSBChildEntry nce = {.flags=TSFS_CF_EXTT,.dloc=achnk};
         write_childentry(fs, &nce);
+        // sb->entrycount ++;
+        // block_seek(fs, sb->disk_loc, BSEEK_SET);
+        // write_structblock(fs, sb);
         TSFSStructBlock nsb = {.flags=TSFS_CF_EXTT,.disk_ref=sb->disk_loc,.disk_loc=achnk,.entrycount=0};
         block_seek(fs, achnk, BSEEK_SET);
         write_structblock(fs, &nsb);

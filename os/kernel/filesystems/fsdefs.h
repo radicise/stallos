@@ -371,6 +371,17 @@ typedef struct {
     void** ptr;
 } Magic;
 
+// Mutexes for various kinds of operations
+typedef struct {
+    // WARNING: it is an error to attempt ANY kind of disk access with acquiring the drive lock
+    // NOTE: the drive lock should be released between disk operations that are independent
+    // WARNING: the operation type locks must be acquired for the ENTIRE duration of a syscall
+    Mutex* drive_lock;
+    Mutex* ddata_lock;
+    Mutex* dcent_lock;
+    Mutex* dstct_lock;
+} FSLocks;
+
 /*
 Custom File System, see the stallOS spec for more details - Tristan
 DO NOT modify any instance provided by the file system
@@ -382,6 +393,7 @@ typedef struct {
     TSFSRootBlock* rootblock;
     // table that handles the magical BS required to do reordering on-the-fly
     Magic* magic;
+    FSLocks* locks;
 } FileSystem;
 
 /*
@@ -428,14 +440,11 @@ int tsfs_cmp_ce(TSFSSBChildEntry* ce1, TSFSSBChildEntry* ce2) {
     return bufcmp(ce1->name, ce2->name, 9);
 }
 
-#include "./tsfsrw.h"
-
 u64 tsfs_tell(FileSystem* fs) {
     loff_t x = 0;
     fs->fdrive->_llseek(fs->kfd, 0, 0, &x, SEEK_CUR);
     return (u64)x;
 }
-#include "./gensizes.h"
 
 
 // int longseek(FileSystem* fs, loff_t offset, int whence) {
@@ -474,6 +483,9 @@ int _real_seek(FileSystem* fs, off_t offset, int whence, long line, const char* 
 }
 
 #define seek(fs, offset, whence) _real_seek(fs, offset, whence, __LINE__, __func__, __FILE__)
+
+#include "./tsfsrw.h"
+#include "./gensizes.h"
 
 u32 tsfs_loc_to_block(u64 loc) {
     return (u32)(loc/BLOCK_SIZE);
@@ -569,6 +581,7 @@ void __DBG_here(long, const char*, const char*);
 #include "./funcdefs.h"
 #include "./diskmanip.h"
 #include "./tsfs_magic.h"
+#include "./tsfs_locks.h"
 #include "./tsfshelpers.h"
 #include "./itable.h"
 
