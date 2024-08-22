@@ -14,9 +14,12 @@
 struct Thread {
 	struct PerThread thread;
 	struct Thread_state state;
-	struct PerThreadgroup* group;
+	struct PerThreadgroup* group;// Does not change; can be deallocated with dealloc(group, sizeof(struct PerThreadgroup))
 };
 Mutex Threads_threadManage;
+struct PerThreadgroup* volatile PerThreadgroup_context;
+struct PerThread* volatile PerThread_context;
+struct Thread* volatile Thread_context;
 #ifndef TARGETNUM
 #error "`TARGETNUM' is not set"
 #endif
@@ -41,15 +44,63 @@ void unlockFSInfo(void) {
 	Mutex_release(&(PerThread_context->fsinfo->dataLock));
 	return;
 }
+struct Thread* Threads_forkData(struct Thread* orig) {
+	Mutex_acquire(&(orig->thread.dataLock));
+	Mutex_acquire(&(orig->thread.fsinfo->dataLock));
+	struct Thread* nth = alloc(sizeof(struct Thread));
+	moveExv(nth, orig, sizeof(struct Thread));
+	struct FSInfo* nfsi = alloc(sizeof(struct FSInfo));
+	moveExv(nfsi, orig->thread.fsinfo, sizeof(struct FSInfo));
+	const char* ocwd = orig->thread.fsinfo->cwd;
+	const char* oroot = orig->thread.fsinfo->root;
+	nth->thread.fsinfo = nfsi;
+	size_t clen;
+	const char* cstr = ocwd;
+	char* nstr = alloc((clen = strlen(cstr)) + 1);
+	moveExv(nstr, cstr, clen);
+	nstr[clen] = 0x00;
+	nfsi->cwd = nstr;
+	cstr = oroot;
+	nstr = alloc((clen = strlen(cstr)) + 1);
+	moveExv(nstr, cstr, clen);
+	nstr[clen] = 0x00;
+	nfsi->root = nstr;
+	Mutex_release(&(orig->thread.fsinfo->dataLock));
+	Mutex_release(&(orig->thread.dataLock));
+	Mutex_release(&(nth->thread.fsinfo->dataLock));
+	Mutex_release(&(nth->thread.dataLock));
+	struct PerThreadgroup* ngrp = alloc(sizeof(struct PerThreadgroup));
+	Mutex_acquire(&(orig->group->breakLock));
+	memcpy(ngrp, orig->group, sizeof(struct PerThreadgroup));
+	Mutex_release(&(orig->group->breakLock));
+	Mutex_release(&(ngrp->breakLock));
+	ngrp->mem = (MemSpace_fork(ngrp->mem));
+	nth->group = ngrp;
+	return nth;
+}
+pid_t kernel_fork(void) {// When there is no "tgid"-"tid" combination available for the new thread, the operation fails, no new thread is created, and the value of `(pid_t) (-1)' is returned to the caller; when there is at least one "tgid"-"tid" combination is available for the new thread, the operation succeeds, the new thread's "tid" is returned to the calling thread, and the value of `(pid_t) 0' is returned to the new thread
+	struct Thread* nth = Threads_forkData(Thread_context);
+	pid_t result = Threads_forkExec(nth);
+	if (result == ((pid_t) (-1))) {// TODO Maybe prevent the possibility of needing to deallocate in the case of the operation failing
+		if (!(Mutex_tryAcquire(&(nth->group->breakLock)))) {
+			bugCheckNum(0x0001 | FAILMASK_PERTHREAD);
+		}
+		dealloc(nth->group, sizeof(struct PerThreadgroup));
+		if (!(Mutex_tryAcquire(&(nth->thread.dataLock)))) {
+			bugCheckNum(0x0002 | FAILMASK_PERTHREAD);
+		}
+		if (!(Mutex_tryAcquire(&(nth->thread.fsinfo->dataLock)))) {
+			bugCheckNum(0x0003 | FAILMASK_PERTHREAD);
+		}
+		dealloc((void*) (nth->thread.fsinfo->cwd), strlen(nth->thread.fsinfo->cwd) + 1);
+		dealloc((void*) (nth->thread.fsinfo->root), strlen(nth->thread.fsinfo->root) + 1);
+		dealloc(nth->thread.fsinfo, sizeof(struct FSInfo));
+		dealloc(nth, sizeof(struct Thread));
+	}
+	return result;
+}
 #define errno (PerThread_context->errno)
 #define tid (PerThread_context->tid)
-#define ruid (PerThread_context->ruid)
-#define euid (PerThread_context->euid)
-#define suid (PerThread_context->suid)
-#define fsuid (PerThread_context->fsuid)
-#define cwd (PerThread_context->fsinfo->cwd)
-#define root (PerThread_context->fsinfo->root)
-#define umask (PerThread_context->fsinfo->umask)
 #define tgid (PerThreadgroup_context->tgid)
 #define usermem (PerThreadgroup_context->mem)
 void Scheduler_yield(void) {// To only be called from interrupts, when IRQ are disabled

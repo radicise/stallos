@@ -1,5 +1,6 @@
 #ifndef __PAGING_H__
 #define __PAGING_H__ 1
+#include "kmemman.h"
 /*
  *
  * Defines:
@@ -42,6 +43,10 @@
  * void unpinPage(uintptr, struct MemSpace*);// Decrements the pinning level of a page that has a nonzero pinning level
  *
  * int chprot(uintptr vPage, int read, int write, int execute, struct MemSpace* mem);// Applies the given protection to the page specified in `vPage'; `vPage' represents a page-aligned address; Returns 0 upon success; returns (-1) upon failure due to the page not being allocated to the user; returns (-2) upon failure due to the user not having sufficient privilege to perform the specified protection change
+ *
+ * struct MemSpace* MemSpace_clone(struct MemSpace*);
+ *
+ * struct MemSpace* MemSpace_fork(struct MemSpace*);
  */
 #define FAILMASK_PAGING 0x000d0000
 #ifndef TARGETNUM
@@ -52,14 +57,15 @@
 #else
 #error "Target is not supported"
 #endif
-void freeUserPage(uintptr vAddr, void* addr, void* arb) {
+#include "memfork.h"
+void freeUserPage(uintptr vAddr, volatile void* addr, void* arb) {
 	uintptr adui = (uintptr) addr;
 	if ((adui < (KMEM_LB_DATSTART - RELOC)) || (adui >= (KMEM_LB_DATSTART + KMEM_LB_AMNT - RELOC))) {
 		return;
 	}
 	subPageRef(addr);
 }
-void userPageDealloc(void* obj) {
+void userPageDealloc(volatile void* obj) {
 	dealloc_lb(obj);
 	return;
 }
@@ -76,7 +82,7 @@ void MemSpace_mkUserData(const void* ptr, uintptr target, uintptr len, int newPa
 		}
 		else {
 			usrmem = alloc_lb_wiped();
-			initPageRef(1, userPageDealloc, usrmem);
+			initPageRef(1, userPageDealloc, usrmem, 1);
 			int r = mapPage(page, usrmem, newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
 				bugCheckNum(0x0101 | FAILMASK_PAGING);
@@ -108,7 +114,7 @@ void MemSpace_mkUserFill(char val, uintptr target, uintptr len, int newPagesUser
 		}
 		else {
 			usrmem = alloc_lb_wiped();
-			initPageRef(1, userPageDealloc, usrmem);
+			initPageRef(1, userPageDealloc, usrmem, 1);
 			int r = mapPage(page, usrmem, newPagesUserReadable, newPagesUserWritable, mem);
 			if (r) {
 				bugCheckNum(0x0102 | FAILMASK_PAGING);

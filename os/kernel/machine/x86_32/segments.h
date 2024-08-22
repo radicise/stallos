@@ -282,7 +282,7 @@ void initSegmentation(void) {
 	TSSmk(10 * 8, 4 * 8, 3 * 8, (uintptr) irupt_71h, 0x007f7f0 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 2);
 	TSSmk(11 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7dh, 0x007f7f0 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 3);
 	TSSmk(12 * 8, 4 * 8, 3 * 8, (uintptr) irupt_7fh, 0x007f7f0 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 4);
-	TSSmk(14 * 8, 4 * 8, 3 * 8, (uintptr) irupt_yield, 0x007f7f0 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 6);// TODO Is it acceptable to disable interrupts during the CPU yielding sequence?
+	TSSmk(14 * 8, 4 * 8, 3 * 8, (uintptr) irupt_kfunc, 0x007f7f0 - RELOC, 1, ((uintptr) (MemSpace_kernel->dir)) + RELOC, 128, tssp + 6);// TODO Make these routines shorter
 	SegDesc* IDT = (SegDesc*) (volatile char*) physicalZero;
 	for (int i = 0; i < 256; i++) {// TODO URGENT Move the IRQ stack area
 		TG_setDesc(11 * 8, 0, IDT + i);

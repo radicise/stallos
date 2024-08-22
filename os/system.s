@@ -163,16 +163,16 @@ movw %ax,%es
 movw %ax,%fs
 movw %ax,%gs
 ret
-irupt_yield:
-.globl irupt_yield
+irupt_kfunc:
+.globl irupt_kfunc
 movl $0x00000001,handlingIRQ
 cld
-call irupt_handler_yield
+call irupt_handler_kfunc
 movl $0x00000000,handlingIRQ
 iret
-jmp irupt_yield
-yield_iruptCall:# void yield_iruptCall(void)
-.globl yield_iruptCall
+jmp irupt_kfunc
+kfunc_iruptCall:# void kfunc_iruptCall(void)
+.globl kfunc_iruptCall
 int $0x40
 ret
 getEFL:# u32 getEFL(void)
@@ -187,3 +187,20 @@ call int_disable
 halt_and_catch_fire__loop:
 hlt
 jmp halt_and_catch_fire__loop
+kfunc:
+.globl kfunc
+pushl %ebp
+movl %esp,%ebp
+pushl 40(%ebp)
+pushl 36(%ebp)
+pushl 32(%ebp)
+pushl 28(%ebp)
+pushl 24(%ebp)
+pushl 20(%ebp)
+pushl 16(%ebp)
+pushl 12(%ebp)
+pushl 8(%ebp)
+call kfct
+movl %ebp,%esp
+popl %ebp
+ret

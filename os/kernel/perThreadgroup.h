@@ -3,8 +3,8 @@
 #include "types.h"
 #include "paging.h"
 struct PerThreadgroup {
-	pid_t tgid;
-	struct MemSpace* mem;
+	pid_t tgid;// DOES NOT CHANGE
+	struct MemSpace* mem;// DOES NOT CHANGE
 	Mutex breakLock;
 	uintptr userBreak;
 };

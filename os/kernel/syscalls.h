@@ -14,25 +14,6 @@
 #include "kmemman.h"
 #include "paging.h"
 #define FAILMASK_SYSCALLS 0x000e0000
-struct kernel_utsname_oldold {
-	char os[9];
-	char node[9];
-	char osrelease[9];
-	char machine[9];
-};
-struct kernel_utsname_old {
-	char os[65];
-	char node[65];
-	char osrelease[65];
-	char machine[65];
-};
-struct kernel_utsname {
-	char os[65];
-	char node[65];
-	char osrelease[65];
-	char machine[65];
-	char domain[65];
-};
 #if __TESTING__ == 1
 /*
  *
@@ -98,7 +79,7 @@ const char* callname[] = {"restart_syscall" /* 0 */,
 	"geteuid",
 	"getegid" /* 50 */,
 	"acct",
-	"umount2",
+	"umount2",// TODO `phys' markings
 	"lock",
 	"ioctl",
 	"fcntl",
@@ -390,7 +371,7 @@ const char* callname[] = {"restart_syscall" /* 0 */,
 	"name_to_handle_at",
 	"open_by_handle_at",
 	"clock_adjtime",
-	"syncfs" /* 344 */};
+	"syncfs" /* 344 */};//TODO Find out the history of the system call numbers of x86_32 Linux associated with the entries marked with `"NOCALL"'
 #define SYSCALL_HIGH 344
 #endif
 Mutex kfdgenLock;
@@ -453,10 +434,10 @@ int getDesc(pid_t pIdent, int fd) {
 #include "driver/VGATerminal.h"
 #include "driver/ATA.h"
 struct Map* kfdDriverMap;
-struct {
+struct FSDesc {
 	struct FSInterface* fs;
 	void* obj;
-} FSDesc;
+};
 struct Map* FSDriverMap;
 struct FileDriver* resolveFileDriver(int kfd) {
 	uintptr drvr = Map_fetch(kfd, kfdDriverMap);
@@ -696,7 +677,7 @@ void processCleanup(pid_t pIdent) {// To be run at the end of the lifetime of a 
 }
 
 
-
+/*
 extern struct FSInterface FS_TSFS;
 extern struct FSReturn tsfs_fsinit(struct FileDriver*, int, loff_t);
 void testing_mount_tsfs_2(struct FileDriver* drvr) {
@@ -719,6 +700,7 @@ void testing_mount_tsfs(void) {
 	testing_mount_tsfs_2(drvr);
 	return;
 }
+*/
 // NRW
 
 
@@ -732,7 +714,7 @@ void testing_mount_tsfs(void) {
  * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t' (and `udev_old_t' under certain conditions of Linux version and Linux 'BITS_PER_LONG')
  *
  */
-void _exit(int code) {// TODO Actually implement
+void exit(int code) {// TODO Actually implement
 	kMsg_lock();
 	kernelMsg("Thread ");
 	kernelMsgULong_hex(tid);
@@ -893,7 +875,7 @@ uintptr brk(uintptr rb) {
 	nla += PAGE_SIZE;
 	for (uintptr pmem = ola + PAGE_SIZE; pmem != nla; pmem += PAGE_SIZE) {
 		void* pmp = alloc_lb_wiped();
-		initPageRef(1, userPageDealloc, pmp);
+		initPageRef(1, userPageDealloc, pmp, 1);
 		if (mapPage(pmem, pmp, 1, 1, usermem)) {// TODO Set heap execution, reading, and writing permissions appropriately
 			bugCheckNum(0x0010 | FAILMASK_SYSCALLS);
 		}
@@ -906,6 +888,9 @@ uintptr brk(uintptr rb) {
 int sched_yield(void) {// Introduced in Linux 1.3.55
 	yield();
 	return 0;
+}
+pid_t fork(void) {
+	
 }
 int close(int fd) {
 	// TODO Implement
@@ -1011,7 +996,6 @@ unsigned long testcall(unsigned long val) {
 unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7, unsigned long nr) {// "nr" values are as they are for x86_32 Linux system call numbers; other calls have "nr" values allocated for them as needed
 	errno = 0;
 	Mutex_acquire(&(PerThread_context->dataLock));
-	// kernelMsg("en\n");// NRW
 	unsigned long retVal = 0;
 #if __TESTING__ == 1
 	if (nr > SYSCALL_HIGH) {
@@ -1039,7 +1023,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 #endif
 	switch (nr) {
 		case (1):
-			_exit(arg1);
+			exit(arg1);
 			bugCheckNum(0x0011 | FAILMASK_SYSCALLS);
 		case (3):
 			{
@@ -1170,7 +1154,6 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 	kernelMsgULong_hex(errno);
 	kernelMsg("\n");
 #endif
-	// kernelMsg("ex\n");// NRW
 	Mutex_release(&(PerThread_context->dataLock));// THIS ADDITIONALLY SERVES AS A MEMORY BARRIER
 	return retVal;
 }// TODO Allow returning of values wider than the `long' type

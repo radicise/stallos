@@ -11,10 +11,6 @@ const uintptr amntMem = 64 * 1024 * 1024;// The value of `amntMem' must be an in
 #error "Incompatible large-block memory allocation block size"
 #endif
 #include "../../types.h"
-#ifdef NAMESPACE_PG
-#error "ERROR: NAMESPACE COLLISION"
-#endif
-#define NAMESPACE_PG 1
 extern void CR3Load(unsigned long);
 extern void WPPGSetup(void);
 extern void TLBReload(void);
@@ -61,12 +57,11 @@ void PGDUnset(volatile PGDEnt* valptr, PGDEnt cond) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
-/*
-unsigned long PGDRead(volatile PGDEnt* valptr) {
+unsigned long PGDReadPins(volatile PGDEnt* valptr) {
 	PGDEnt p = (PGDEnt) AtomicULong_get((AtomicULong*) valptr);
 	return (((u32) p) >> 9) & ((u32) 0x00000007);
 }
-void PGDWrite(volatile PGDEnt* valptr, unsigned long datt) {
+void PGDWritePins(volatile PGDEnt* valptr, unsigned long datt) {
 	if (((u32) datt) & ~((u32) 0x00000007)) {
 		bugCheckNum(0x0001 | FAILMASK_PAGING);
 	}
@@ -75,9 +70,8 @@ void PGDWrite(volatile PGDEnt* valptr, unsigned long datt) {
 	AtomicULong_set((AtomicULong*) valptr, (unsigned long) p);
 	return;
 }
-*/
-void PGDSetAddr(volatile PGDEnt* valptr, uintptr ptr) {
-	u32 b = (u32) ((ptr) + ((uintptr) RELOC));
+void PGDSetAddr(volatile PGDEnt* valptr, volatile void* ptr) {
+	u32 b = (u32) (((uintptr) ptr) + ((uintptr) RELOC));
 	if (b & 0x00000fff) {
 		bugCheckNum(0x0002 | FAILMASK_PAGING);
 	}
@@ -107,12 +101,12 @@ void initEntry(volatile PGDEnt* ent, int userWritable, int privileged, volatile 
 	if (userWritable) {
 		PGDSet(ent, PG_RW);
 	}
-	PGDSetAddr(ent, (uintptr) addr);
+	PGDSetAddr(ent, addr);
 	PGDSet(ent, PG_P);
 	return;
 }
 struct MemSpace {
-	volatile PGDEnt* dir;
+	PGDEnt* dir;
 	Mutex lock;
 	uintptr offset;
 };
@@ -163,7 +157,7 @@ void MemSpace_destroy(struct MemSpace* ms) {
 	dealloc(ms, sizeof(struct MemSpace));
 	return;
 }
-void MemSpace_forEach(void (*operation)(uintptr, void*, void*), void* obj, struct MemSpace* mem) {
+void MemSpace_forEach(void (*operation)(uintptr, volatile void*, void*), void* obj, struct MemSpace* mem) {
 	Mutex_acquire(&(mem->lock));
 	volatile PGDEnt* dir = (mem->dir);
 	for (int i = 0; i < 1024; i++) {
@@ -171,7 +165,7 @@ void MemSpace_forEach(void (*operation)(uintptr, void*, void*), void* obj, struc
 			volatile PGDEnt* tbl = PGDGetAddr(dir + i);
 			for (int j = 0; j < 1024; j++) {
 				if (PGDTest(tbl + j, PG_P)) {
-					void* addr = PGDGetAddr(tbl + j);
+					volatile void* addr = PGDGetAddr(tbl + j);
 					operation(((((uintptr) i) << 22) | (((uintptr) j) << 12)) - ((uintptr) (mem->offset)), addr, obj);
 				}
 			}
@@ -367,5 +361,40 @@ void initPaging(void) {
 int chprot(uintptr vPage, int read, int write, int execute, struct MemSpace* ms) {
 	bugCheckNum(0x000a | FAILMASK_PAGING);// TODO URGENT Implement
 }
-#undef NAMESPACE_PG
+#include "../../memfork.h"
+struct MemSpace* MemSpace_based(struct MemSpace* mem, int memfork) {
+	Mutex_acquire(&(mem->lock));
+	const PGDEnt* dir = (mem->dir);
+	PGDEnt* ndir = alloc_lb();
+	memcpy(ndir, dir, 4096);
+	for (int i = 0; i < 1024; i++) {
+		if (PGDTest(ndir + i, PG_P)) {
+			const PGDEnt* tbl = PGDGetAddr(ndir + i);
+			PGDEnt* ntbl = alloc_lb();
+			memcpy(ntbl, tbl, 4096);
+			if (memfork) {
+				for (int j = 0; j < 1024; j++) {
+					if (PGDTest(ntbl + j, PG_P)) {
+						PGDSetAddr(ntbl + j, fork_user_page(PGDGetAddr(ntbl + j)));
+						PGDWritePins(ntbl + j, 0);
+					}
+				}
+			}
+			PGDSetAddr(ndir + i, ntbl);
+		}
+	}
+	struct MemSpace* nms = alloc(sizeof(struct MemSpace));
+	memcpy(nms, mem, sizeof(struct MemSpace));
+	nms->dir = ndir;
+	Mutex_release(&(mem->lock));
+	Mutex_release(&(nms->lock));
+	return nms;
+}
+struct MemSpace* MemSpace_clone(struct MemSpace* mem) {
+	return MemSpace_based(mem, 0);
+}
+struct MemSpace* MemSpace_fork(struct MemSpace* mem) {
+	return MemSpace_based(mem, 1);
+}
+// TODO Remove volatility where not needed
 #endif

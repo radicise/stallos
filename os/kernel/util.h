@@ -129,26 +129,6 @@ void AtomicLongF_init(AtomicLongF* alf, long val) {// Performs a memory barrier 
 	Mutex_initUnlocked(&(alf->lock));
 	return;
 }
-volatile void* moveExv(volatile void* dst, volatile const void* buf, size_t count) {
-	volatile void* m = dst;
-	if (dst < buf) {
-		while (count--) {
-			*((volatile char*) dst) = *((volatile char*) buf);
-			dst = ((volatile char*) dst) + 1;
-			buf = ((volatile char*) buf) + 1;
-		}
-	}
-	else if (dst > buf) {
-		dst = ((volatile char*) dst) + count;
-		buf = ((volatile char*) buf) + count;
-		while (count--) {
-			dst = ((volatile char*) dst) - 1;
-			buf = ((volatile char*) buf) - 1;
-			*((volatile char*) dst) = *((volatile char*) buf);
-		}
-	}
-	return m;
-}
 void* move(void* dst, const void* buf, size_t count) {
 	return (void*) moveExv(dst, buf, count);
 }
