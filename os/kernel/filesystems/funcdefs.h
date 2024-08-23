@@ -33,6 +33,10 @@ u32 aquire_itable_slot(FileSystem*, u32);
 int release_itable_slot(FileSystem*, u32);
 int update_itable_entry(FileSystem*, u32, u32);
 u32 resolve_itable_entry(FileSystem*, u32);
+char test_dataheader(FSP, u32);
+char test_datablock(FSP, u32);
+char test_structnode(FSP, u32);
+char test_structblock(FSP, u32);
 #undef FSP
 #undef DBP
 #undef SNP

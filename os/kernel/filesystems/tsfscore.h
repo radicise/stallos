@@ -539,16 +539,6 @@ static void bitfield_print(FileSystem* fs, DynBField* ptr) {
 
 static inline u32 minu32(u32 n1, u32 n2) {return n1 ? n1 < n2 : n2;}
 
-static char test_dataheader(FileSystem* fs, u32 block_no) {
-    block_seek(fs, block_no, BSEEK_SET);
-    TSFSDataHeader dh = {0};
-    read_dataheader(fs, &dh);
-    if (dh.checksum == hash_dataheader(&dh)) {
-        return 1;
-    }
-    return 0;
-}
-
 /*
 frees all data blocks starting from the given dataheader or datablock
 !!WARNING!!

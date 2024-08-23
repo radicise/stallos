@@ -1,6 +1,42 @@
 #ifndef __TSFS_HELPERS_H__
 #define __TSFS_HELPERS_H__ 1
 #include "./fsdefs.h"
+char test_dataheader(FileSystem* fs, u32 block_no) {
+    block_seek(fs, block_no, BSEEK_SET);
+    TSFSDataHeader obj = {0};
+    read_dataheader(fs, &obj);
+    if (obj.checksum == hash_dataheader(&obj)) {
+        return 1;
+    }
+    return 0;
+}
+char test_datablock(FileSystem* fs, u32 block_no) {
+    block_seek(fs, block_no, BSEEK_SET);
+    TSFSDataBlock obj = {0};
+    read_datablock(fs, &obj);
+    if (obj.checksum == hash_datablock(&obj)) {
+        return 1;
+    }
+    return 0;
+}
+char test_structnode(FileSystem* fs, u32 block_no) {
+    block_seek(fs, block_no, BSEEK_SET);
+    TSFSStructNode obj = {0};
+    read_structnode(fs, &obj);
+    if (obj.checksum == hash_structnode(&obj)) {
+        return 1;
+    }
+    return 0;
+}
+char test_structblock(FileSystem* fs, u32 block_no) {
+    block_seek(fs, block_no, BSEEK_SET);
+    TSFSStructBlock obj = {0};
+    read_structblock(fs, &obj);
+    if (obj.checksum == hash_structblock(&obj)) {
+        return 1;
+    }
+    return 0;
+}
 // void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
 // void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
 // void __DBG_print_cename(char const*, long, const char*, const char*);

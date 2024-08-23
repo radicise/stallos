@@ -551,6 +551,25 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             unsigned long ikey = parse_ulonghex(ikeytxt);
             free(ikeytxt);
             printf("IKEY: %lx\nIKEYRES: %lx\n", ikey, resolve_itable_entry(s, ikey));
+        } else if (clicode == 11) {
+            DMAN_TRACING ^= 1; // toggle disk manip tracing
+        } else if (clicode == 12) {
+            char* path = strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 blockno = tsfs_resolve_path(s, path);
+            free(path);
+            if (blockno == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            TSFSStructNode* dnode = tsfs_load_node(s, blockno);
+            if (dnode->storage_flags == TSFS_KIND_FILE) {
+                tsfs_unlink(s, dnode);
+            } else {
+                if (tsfs_rmdir(s, dnode)) {
+                    tsfs_unload(s, dnode);
+                };
+            }
         }
     }
     dealloc:

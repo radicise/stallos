@@ -168,7 +168,7 @@ int _tsfs_delce(FileSystem* fs, TSFSStructBlock* opb, u8 no) {
         block_seek(fs, opb->disk_loc, BSEEK_SET);
         write_structblock(fs, opb);
         return 1;
-    } else if (opb->disk_ref == 0) {
+    } else if (opb->flags == TSFS_CF_DIRE) {
         opb->entrycount = 0;
         block_seek(fs, opb->disk_loc, BSEEK_SET);
         write_structblock(fs, opb);
@@ -244,14 +244,17 @@ int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
             // DELETE THE DATA
             tsfs_free_data(fs, pos);
             goto done;
+        } else {
+            tsfs_unload(fs, dh);
         }
-        tsfs_unload(fs, dh);
         goto done;
     } else {
         goto err;
     }
     done:
+    printf("DELNODE\n");
     _tsfs_delnode(fs, sn);
+    printf("FULL DONE\n");
     return 0;
     err:
     return -1;
