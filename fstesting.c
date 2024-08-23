@@ -13,6 +13,10 @@
 #include "os/kernel/filesystems/external.h"
 #include "./fstutils/input.h"
 
+// #define MDISK_SIZE 21
+#define MDISK_SIZE 1024*1024*4
+// #define MDISK_SIZE 4096
+
 void kernelWarnMsg(const char* msg) {
     puts(msg);
 }
@@ -38,7 +42,15 @@ void dealloc(void* ptr, _kernel_size_t size) {
 FILE* fp;
 char* bigdata[1024];
 
+_kernel_off_t fdrive_tell(int _) {
+    return ftell(fp);
+}
 _kernel_ssize_t fdrive_write(int _, const void* data, _kernel_size_t len) {
+    if (fdrive_tell(0) + len > MDISK_SIZE) {
+        printf("BOUNDRY EXCEEDED\n");
+        exit(2);
+        return 0;
+    }
     if (len % 16 == 0) {
         return fwrite(data, 16, len / 16, fp);
     } else if (len % 8 == 0) {
@@ -60,9 +72,6 @@ _kernel_off_t fdrive_lseek(int _, _kernel_off_t offset, int whence) {
     fseek(fp, offset, whence);
     return ftell(fp);
 }
-_kernel_off_t fdrive_tell(int _) {
-    return ftell(fp);
-}
 int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff_t* posptr, int whence) {
     fseek(fp, (((long)offhi) << 32) | (long)(offlo), whence);
     (*posptr) = ftell(fp);
@@ -71,10 +80,6 @@ int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff
 
 #undef fsflush
 #define fsflush(fs) fflush(fp)
-
-// #define MDISK_SIZE 21
-#define MDISK_SIZE 1024*1024*4
-// #define MDISK_SIZE 4096
 
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
     if (ce->flags != TSFS_CF_EXTT) {
@@ -347,15 +352,23 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     block_seek(s, s->rootblock->top_dir, BSEEK_SET);
     TSFSStructNode topdir = {0};
     read_structnode(s, &topdir);
-    tsfs_mk_file(s, &topdir, "ctrl");
     tsfs_mk_file(s, &topdir, "test");
+    tsfs_mk_file(s, &topdir, "ctrl");
     _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
     printf("FILE BLOCK NO: %lu\n", tblkno);
     TSFSStructNode* fil = tsfs_load_node(s, tblkno);
+    _DBG_print_node(fil);
     for (int i = 0; i < 8; i ++) {
         data_write(s, fil, 1024*i, bigdata, 1024);
     }
-    _kernel_u32 p = fil->data_loc;
+    _kernel_u32 p = resolve_itable_entry(s, fil->ikey);
+    printf("DLOC: %lx\n", p);
+    block_seek(s, p, BSEEK_SET);
+    TSFSDataHeader dh = {0};
+    read_dataheader(s, &dh);
+    _DBG_print_head(&dh);
+    // tsfs_unload(s, fil);
+    // goto rel;
     // tsfs_unload(s, fil);
     // tsfs_free_data(s, p);
     tsfs_unlink(s, fil);
@@ -444,7 +457,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             _DBG_print_node(&dir);
             if (dir.storage_flags == TSFS_KIND_FILE) {
                 TSFSDataHeader head = {0};
-                block_seek(s, dir.data_loc, BSEEK_SET);
+                block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
                 read_dataheader(s, &head);
                 _DBG_print_head(&head);
             }
@@ -463,7 +476,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             _DBG_print_node(&dir);
             if (dir.storage_flags == TSFS_KIND_FILE) {
                 TSFSDataHeader head = {0};
-                block_seek(s, dir.data_loc, BSEEK_SET);
+                block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
                 read_dataheader(s, &head);
                 _DBG_print_head(&head);
                 TSFSDataBlock cdb = {0};
@@ -495,7 +508,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                 continue;
             }
             TSFSDataHeader head = {0};
-            block_seek(s, dir.data_loc, BSEEK_SET);
+            block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
             read_dataheader(s, &head);
             TSFSDataBlock cdb = {0};
             block_seek(s, head.head, BSEEK_SET);
@@ -532,6 +545,12 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                 }
             }
             free(dumpdata);
+        } else if (clicode == 10) {
+            char* ikeytxt = strmove(clidata.data);
+            free(clidata.data);
+            unsigned long ikey = parse_ulonghex(ikeytxt);
+            free(ikeytxt);
+            printf("IKEY: %lx\nIKEYRES: %lx\n", ikey, resolve_itable_entry(s, ikey));
         }
     }
     dealloc:

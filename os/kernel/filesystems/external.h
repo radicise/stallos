@@ -57,12 +57,24 @@ extern int tsfs_rmdir(FileSystem*, TSFSStructNode*);
 extern int tsfs_mk_dir(FileSystem*, TSFSStructNode*, char const*, TSFSStructBlock*);
 extern int tsfs_mk_file(FileSystem*, TSFSStructNode*, const char*);
 extern _kernel_u32 tsfs_resolve_path(FileSystem*, const char*);
-extern int dmanip_fill(FileSystem*, _kernel_u32, _kernel_u32, unsigned char);
-extern int dmanip_null(FileSystem*, _kernel_u32, _kernel_u32);
-extern int dmanip_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
-extern int dmanip_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
-extern int dmanip_null_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
-extern int dmanip_null_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
+// extern int dmanip_fill(FileSystem*, _kernel_u32, _kernel_u32, unsigned char);
+// extern int dmanip_null(FileSystem*, _kernel_u32, _kernel_u32);
+// extern int dmanip_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
+// extern int dmanip_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
+// extern int dmanip_null_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
+// extern int dmanip_null_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32);
+int _dmanip_fill(FileSystem*, _kernel_u32, _kernel_u32, unsigned char, unsigned long, const char*, const char*);
+int _dmanip_null(FileSystem*, _kernel_u32, _kernel_u32, unsigned long, const char*, const char*);
+int _dmanip_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32, unsigned long, const char*, const char*);
+int _dmanip_null_shift_right(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32, unsigned long, const char*, const char*);
+int _dmanip_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32, unsigned long, const char*, const char*);
+int _dmanip_null_shift_left(FileSystem*, _kernel_u32, _kernel_u32, _kernel_u32, unsigned long, const char*, const char*);
+#define dmanip_fill(fs, start, count, value) _dmanip_fill(fs, start, count, value, __LINE__, __FILE__, __func__)
+#define dmanip_null(fs, start, count) _dmanip_null(fs, start, count, __LINE__, __FILE__, __func__)
+#define dmanip_shift_right(fs, start, count, delta) _dmanip_shift_right(fs, start, count, delta, __LINE__, __FILE__, __func__)
+#define dmanip_shift_left(fs, start, count, delta) _dmanip_shift_left(fs, start, count, delta, __LINE__, __FILE__, __func__)
+#define dmanip_null_shift_right(fs, start, count, delta) _dmanip_null_shift_right(fs, start, count, delta, __LINE__, __FILE__, __func__)
+#define dmanip_null_shift_left(fs, start, count, delta) _dmanip_null_shift_left(fs, start, count, delta, __LINE__, __FILE__, __func__)
 extern _kernel_u64 tsfs_sbcs_foreach(FileSystem*, TSFSStructBlock*, int(*)(FileSystem*, TSFSSBChildEntry*, void*), void*);
 extern TSFSStructBlock* _tsmagic_block(FileSystem*);
 extern TSFSStructNode* _tsmagic_node(FileSystem*);
@@ -78,6 +90,9 @@ extern TSFSStructBlock* tsfs_load_block(FileSystem*, _kernel_u32);
 extern TSFSStructNode* tsfs_load_node(FileSystem*, _kernel_u32);
 extern TSFSDataBlock* tsfs_load_data(FileSystem*, _kernel_u32);
 extern TSFSDataHeader* tsfs_load_head(FileSystem*, _kernel_u32);
+extern _kernel_u32 resolve_itable_entry(FileSystem*, _kernel_u32);
+extern _kernel_u32 aquire_itable_slot(FileSystem*, _kernel_u32);
+extern int release_itable_slot(FileSystem*, _kernel_u32);
 
 // macro'd funcs
 extern void _magic_smoke(unsigned long, long, const char*, const char*);

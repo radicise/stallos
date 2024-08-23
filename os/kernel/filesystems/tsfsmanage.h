@@ -12,13 +12,13 @@ writes a valid dataheader to disk for the given structnode
 fails if the structnode already has data
 */
 int _tsfs_make_data(FileSystem* fs, TSFSStructNode* sn) {
-    if (sn->data_loc != 0) {
+    if (sn->ikey != 0) {
         return -1;
     }
     // magic_smoke(FEIMPL | FEDRIVE | FEDATA | FEOP);
     u32 blkno = allocate_blocks(fs, 1, 2);
     // u64 absloc = ((u64)blkno) * ((u64)(fs->rootblock->block_size));
-    TSFSDataHeader dh = {.blocks=1,.head=blkno,.refcount=1,.size=0};
+    TSFSDataHeader dh = {.blocks=1,.head=blkno,.refcount=1,.size=0,.ikey=aquire_itable_slot(fs, blkno+1)};
     block_seek(fs, blkno, BSEEK_SET);
     TSFSDataBlock db = {.data_length=0,.next_block=0,.prev_block=blkno+1,.blocks_to_terminus=0,.storage_flags=TSFS_SF_FINAL_BLOCK};
     write_datablock(fs, &db);
@@ -26,7 +26,7 @@ int _tsfs_make_data(FileSystem* fs, TSFSStructNode* sn) {
     block_seek(fs, 1, 1);
     write_dataheader(fs, &dh);
     block_seek(fs, sn->disk_loc, BSEEK_SET);
-    sn->data_loc = blkno+1;
+    sn->ikey = dh.ikey;
     write_structnode(fs, sn);
     return 0;
 }
@@ -38,7 +38,7 @@ int append_datablocks(FileSystem* fs, TSFSStructNode* sn, u16 count) {
     // u64 prev = sn->data_loc ? tsfs_traverse_blkno(fs, sn, sn->blocks).disk_loc : 0;
     // sn->blocks += count;
     TSFSDataHeader dh = {0};
-    block_seek(fs, sn->data_loc, BSEEK_SET);
+    block_seek(fs, resolve_itable_entry(fs, sn->ikey), BSEEK_SET);
     read_dataheader(fs, &dh);
     u32 prev = tsfs_traverse_blkno(fs, sn, dh.blocks-1, 0).disk_loc;
     // sn->blocks += count;
@@ -157,11 +157,12 @@ int _tsfs_delce(FileSystem* fs, TSFSStructBlock* opb, u8 no) {
         write_buf(fs, b, 14);
         if (no < opb->entrycount) {
             unsigned char buffer[1024] = {0};
-            size_t amt = (size_t)(opb->entrycount - no);
+            size_t amt = (size_t)(opb->entrycount - no)*14;
             // seek(fs, ((off_t)no)*16+16, SEEK_CUR);
             read_buf(fs, buffer, amt);
             seek(fs, -((off_t)amt)-14, SEEK_CUR);
             write_buf(fs, buffer, amt);
+            write_buf(fs, b, 14);
         }
         _DBG_print_block(opb);
         block_seek(fs, opb->disk_loc, BSEEK_SET);
@@ -222,7 +223,6 @@ int _tsfs_delnode(FileSystem* fs, TSFSStructNode* sn) {
     TSFSStructBlock* opb = tsfs_load_block(fs, b_loc/BLOCK_SIZE);
     if (_tsfs_delce(fs, opb, no)) {tsfs_unload(fs, opb);}
     sn->pnode = 0;
-    release_itable_slot(fs, sn->inum);
     tsfs_free_structure(fs, sn->disk_loc);
     _tsmagic_force_release(fs, sn);
     return 0;
@@ -233,12 +233,13 @@ deletes a "name" from the file system, the object MUST be a hard link
 */
 int tsfs_unlink(FileSystem* fs, TSFSStructNode* sn) {
     if (sn->storage_flags&TSFS_KIND_FILE) {
-        TSFSDataHeader* dh = tsfs_load_head(fs, sn->data_loc);
+        TSFSDataHeader* dh = tsfs_load_head(fs, resolve_itable_entry(fs, sn->ikey));
         dh->refcount --;
         block_seek(fs, dh->disk_loc, BSEEK_SET);
         write_dataheader(fs, dh);
         if (dh->refcount == 0) {
             u32 pos = dh->disk_loc;
+            release_itable_slot(fs, dh->ikey);
             _tsmagic_force_release(fs, dh);
             // DELETE THE DATA
             tsfs_free_data(fs, pos);
@@ -352,7 +353,7 @@ int tsfs_mk_dir(FileSystem* fs, TSFSStructNode* parent, char const* name, TSFSSt
     }
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 2);
-    TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+1,.pnode=parent->disk_loc,.inum=aquire_itable_slot(fs, ac1+1)};
+    TSFSStructNode sn = {.storage_flags=TSFS_KIND_DIR,.parent_loc=ac1,.disk_loc=ac1+1,.pnode=parent->disk_loc,.ikey=0};
     awrite_buf(sn.name, name, tsfs_strlen(name));
     nsb->flags = TSFS_CF_DIRE;
     nsb->disk_ref = sn.disk_loc;
@@ -376,7 +377,7 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
     }
     // addr of first allocated block
     u32 ac1 = allocate_blocks(fs, 0, 1);
-    TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.data_loc=0,.inum=aquire_itable_slot(fs, ac1)};
+    TSFSStructNode sn = {.storage_flags=TSFS_KIND_FILE,.disk_loc=ac1,.pnode=parent->disk_loc,.ikey=0};
     awrite_buf(sn.name, name, tsfs_strlen(name));
     block_seek(fs, ac1, BSEEK_SET);
     write_structnode(fs, &sn);

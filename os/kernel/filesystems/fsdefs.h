@@ -242,6 +242,8 @@ typedef struct {
     u32   head;
     // blocks used by data
     u32   blocks;
+    // inode number
+    u32   ikey;
     // size of data in bytes
     u64   size;
     // permissions and other metadata
@@ -324,13 +326,13 @@ typedef struct {
     u8    id;
     //
     u8    storage_flags;
-    u32   data_loc;
+    // u32   data_loc;
     // location of the child table, name is shot because the child tables used to own the nodes
     u32   parent_loc;
     // parent node
     u32   pnode;
     // inode number
-    u32   inum;
+    u32   ikey;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
     char  name[255];

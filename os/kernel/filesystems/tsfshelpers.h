@@ -24,7 +24,7 @@ TSFSDataBlock tsfs_traverse_blkno(FileSystem* fs, TSFSStructNode* sn, u32 blockn
     printf("blkno: %u\n", blockno);
     // _DBG_print_node(sn);
     TSFSDataBlock databloc = {0};
-    block_seek(fs, sn->data_loc, BSEEK_SET);
+    block_seek(fs, resolve_itable_entry(fs, sn->ikey), BSEEK_SET);
     TSFSDataHeader dh;
     read_dataheader(fs, &dh);
     // _DBG_print_head(&dh);
@@ -138,7 +138,7 @@ void __DBG_print_block(TSFSStructBlock* sb, long l, const char* f, const char* f
 }
 void __DBG_print_node(TSFSStructNode* sn, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
-    printf("STRUCT NODE {\nDISK_LOC: 0x%x,\nB_LOCK: 0x%x,\nPNODE: 0x%x,\nDATA_LOC: 0x%x,\nFLAGS: %u,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->data_loc, sn->storage_flags, sn->name, sn->magicno, TSFS_ANSI_NUN);
+    printf("STRUCT NODE {\nDISK_LOC: 0x%x,\nB_LOCK: 0x%x,\nPNODE: 0x%x,\nIKEY: 0x%x,\nFLAGS: %u,\nNAME:\n\"%s\",\nMAGIC_NO: %lu\n}%s\n", sn->disk_loc, sn->parent_loc, sn->pnode, sn->ikey, sn->storage_flags, sn->name, sn->magicno, TSFS_ANSI_NUN);
 }
 void __DBG_print_head(TSFSDataHeader* dh, long l, const char* f, const char* fid) {
     printf("%sSOURCE {%ld} of {%s} (%s)%s\n", TSFS_ANSI_YEL, l, f, fid, TSFS_ANSI_GRN);
