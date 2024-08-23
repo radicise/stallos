@@ -46,7 +46,7 @@ typedef struct {
     void* data;
 } CLIData;
 
-char* HELPTXT = "exit - quits this program\ngoto {path} - equivalent to absolute cd\nmake [d|f] {name} - creates a directory (d) or file (f) of with specified name in CWD\nlist - lists files and directories in CWD\nhelp - show this text\nsktrace - toggles seek tracing\naudit {name} - gives info on the node with specified name in CWD\nauditb {name} - lists the blocks of the node with specified name in CWD\nauditd [t|b] {name} - prints the text (t) or hex (b) of the specified file\nreskey {ikey} - resolves the given ikey\ndmtrace - toggles disk manipulation operation tracing\n";
+char* HELPTXT = "exit - quits this program\ngoto {path} - equivalent to absolute cd\nmake [d|f] {name} - creates a directory (d) or file (f) of with specified name in CWD\nlist - lists files and directories in CWD\nhelp - show this text\nsktrace - toggles seek tracing\naudit {name} - gives info on the node with specified name in CWD\nauditb {name} - lists the blocks of the node with specified name in CWD\nauditd [t|b] {name} - prints the text (t) or hex (b) of the specified file\nreskey {ikey} - resolves the given ikey\ndmtrace - toggles disk manipulation operation tracing\nrem {name} - removes the node with specified name\n";
 
 CLIData clihelper(void) {
     CLIData ret = {0};
