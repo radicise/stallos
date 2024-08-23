@@ -1,0 +1,7 @@
+For Data Delete Reloc:
+
+Create map of still-live blocks
+Go from left-to-right to search for first live block
+Go from right-to-left to search for first hole
+Move as many left-most blocks as needed to fill the hole, preserving their ordering
+Repeat until no holes remain
