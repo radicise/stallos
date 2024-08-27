@@ -578,6 +578,51 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
     return 0;
 }
 
+int truncate_test(struct FileDriver* fdrive, int fd, char flags) {
+    regen_mock(fd);
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    int dfd = open("bigdata.txt", O_RDONLY);
+    if (dfd == -1) {
+        goto rel;
+    }
+    read(dfd, bigdata, 1024);
+    close(dfd);
+    // TSFSStructBlock sb = {0};
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    TSFSStructNode topdir = {0};
+    read_structnode(s, &topdir);
+    tsfs_mk_file(s, &topdir, "test");
+    _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
+    printf("FILE BLOCK NO: %lu\n", tblkno);
+    TSFSStructNode* fil = tsfs_load_node(s, tblkno);
+    _DBG_print_node(fil);
+    for (int i = 0; i < 1; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 1024);
+    }
+    // _kernel_u32 p = resolve_itable_entry(s, fil->ikey);
+    // printf("DLOC: %lx\n", p);
+    // block_seek(s, p, BSEEK_SET);
+    // TSFSDataHeader dh = {0};
+    // read_dataheader(s, &dh);
+    // _DBG_print_head(&dh);
+    // tsfs_unload(s, fil);
+    // goto rel;
+    // tsfs_free_data(s, p);
+    // tsfs_unlink(s, fil);
+    // tsfs_truncate(s, fil, 1028);
+    tsfs_truncate(s, fil, 0);
+    tsfs_truncate(s, fil, 0);
+    tsfs_unload(s, fil);
+    // _DBG_print_root(s->rootblock);
+    // block_seek(s, 0, BSEEK_SET);
+    // TSFSRootBlock rbt = {0};
+    // read_rootblock(s, &rbt);
+    // _DBG_print_root(&rbt);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
 int harness(const char* fpath, char flag, int(*tst)(struct FileDriver*, int, char)) {
     int retc = 0;
     int fd;
@@ -656,6 +701,8 @@ int main(int argc, char** argv) {
             flags[0] = 8;
         } else if (stringcmp(argv[i], "-sktrace")) {
             SEEK_TRACING = 1;
+        } else if (stringcmp(argv[i], "truncate")) {
+            flags[0] = 9;
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);
@@ -688,6 +735,9 @@ int main(int argc, char** argv) {
             break;
         case 8:
             harness(fpath, flags[1], delete_test);
+            break;
+        case 9:
+            harness(fpath, flags[1], truncate_test);
             break;
         default:
             printf("bad args\n");

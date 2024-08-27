@@ -390,6 +390,98 @@ int tsfs_mk_file(FileSystem* fs, TSFSStructNode* parent, const char* name) {
     return 0;
 }
 
+int tsfs_truncate(FileSystem* fs, TSFSStructNode* file, u64 length) {
+    if (file->storage_flags != TSFS_KIND_FILE) {
+        return EBADF;
+    }
+    TSFSDataHeader* dh = tsfs_load_head(fs, resolve_itable_entry(fs, file->ikey));
+    if (dh->size == length) { // truncate does a no-op
+        tsfs_unload(fs, dh);
+        return 0;
+    }
+    int retval = 0;
+    TSFSDataBlock* db1 = tsfs_load_data(fs, dh->head);
+    char dhbigger = dh->size > length;
+    u64 diff = dhbigger ? dh->size - length : length - dh->size;
+    dh->size = length;
+    if (length == 0) { // needs special handling to ensure format isn't messed up
+        u32 db2l = db1->next_block;
+        db1->next_block = 0;
+        if (db2l != 0) {
+            tsfs_free_data(fs, db2l);
+        }
+        db1->data_length = 0;
+        dh->blocks = 1;
+        block_seek(fs, db1->disk_loc, BSEEK_SET);
+        write_datablock(fs, db1);
+        block_seek(fs, dh->disk_loc, BSEEK_SET);
+        write_dataheader(fs, dh);
+    } else if (dhbigger) { // truncation is making the file smaller
+        u64 sreached = 0;
+        u32 kept_blocks = 1;
+        while (sreached + db1->data_length < length) { // find the last data block that will be kept
+            kept_blocks ++;
+            sreached += db1->data_length;
+            if (db1->next_block == 0) break;
+            u32 nb = db1->next_block;
+            tsfs_unload(fs, db1);
+            tsfs_load_data(fs, nb);
+        }
+        u32 nblk = db1->next_block;
+        db1->next_block = 0;
+        if (sreached + db1->data_length > length) {
+            db1->data_length = (u16)(length - sreached);
+        }
+        seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+        write_datablock(fs, db1);
+        tsfs_unload(fs, db1);
+        dh->blocks = kept_blocks;
+        block_seek(fs, dh->disk_loc, BSEEK_SET);
+        write_dataheader(fs, dh);
+        if (nblk) {
+            tsfs_free_data(fs, nblk);
+        }
+    } else { // truncation is making the file larger
+        u64 sreached = 0;
+        while (db1->next_block) { // find the last data block
+            sreached += db1->data_length;
+            u32 nb = db1->next_block;
+            tsfs_unload(fs, db1);
+            tsfs_load_data(fs, nb);
+        }
+        sreached -= db1->data_length;
+        u16 fsize = 1024 - TSFSDATABLOCK_DSIZE;
+        sreached += fsize;
+        if (sreached > length) {
+            sreached -= fsize;
+            sreached += db1->data_length;
+            u16 nlen = length - sreached;
+            size_t siz = TSFSDATABLOCK_DSIZE + db1->data_length;
+            seek(fs, siz, SEEK_CUR);
+            size_t len = nlen-db1->data_length;
+            unsigned char zbuf[1024] = {0};
+            write_buf(fs, zbuf, len);
+            db1->data_length = nlen;
+            block_seek(fs, db1->disk_loc, BSEEK_SET);
+            write_datablock(fs, db1);
+        } else {
+            u64 needed = length - sreached;
+            u16 blocks_needed = (u16)((needed / ((u64)fsize)) + ((needed % fsize) != 0));
+            // printf("LEN: %llu\nREA: %llu\nNEE: %llu\nBNE: %u\n", length, sreached, needed, blocks_needed);
+            db1->data_length = fsize;
+            write_datablock(fs, db1);
+            append_datablocks(fs, file, blocks_needed);
+            dh->blocks += (u32)blocks_needed;
+        }
+        block_seek(fs, dh->disk_loc, BSEEK_SET);
+        write_dataheader(fs, dh);
+    }
+    end:
+    tsfs_unload(fs, db1);
+    tsfs_unload(fs, dh);
+    return retval;
+}
+
 int _tsfs_find_sbcsfe_do(FileSystem* fs, TSFSSBChildEntry* ce, void* data) {
     // _DBG_print_child(ce);
     if (tsfs_cmp_cename(ce->name, data)) {
