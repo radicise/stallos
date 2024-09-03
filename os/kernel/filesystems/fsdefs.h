@@ -47,8 +47,9 @@ void dalloc(void* p, size_t s) {
 // #define SEEK_CUR 1
 // #define SEEK_END 2
 // #endif
-// #include "./tsfsconst.h"
+#include "./tsfsconst.h"
 #include "../FileDriver.h"
+typedef _kernel_u32 fsikey_t;
 #include "../fsiface.h"
 // typedef struct FSReturn FSRet;
 #include "./tsfserr.h"
@@ -57,7 +58,7 @@ void dalloc(void* p, size_t s) {
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 10
+#define VERNOBN 11
 
 #define TSFS_ANSI_NUN "\x1b[0m"
 #define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
@@ -208,6 +209,7 @@ typedef struct {
     c - create
     m - modify
     a - access
+    u - update
     s - secs
     n - nsec
     */
@@ -217,6 +219,8 @@ typedef struct {
     s64 mn;
     s64 as;
     s64 an;
+    s64 us;
+    s64 un;
 } TIMES;
 
 typedef struct {
@@ -248,9 +252,9 @@ typedef struct {
     u64   size;
     // permissions and other metadata
     // permissions
-    u16   perms;
+    u32   perms;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
-    u64   times[6];
+    u64   times[8];
     u64   checksum;
 } TSFSDataHeader;
 
@@ -262,6 +266,8 @@ void get_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     times->mn = timelist[3];
     times->as = timelist[4];
     times->an = timelist[5];
+    times->us = timelist[6];
+    times->un = timelist[7];
 }
 void set_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     s64* timelist = (s64*)(dh->times);
@@ -271,6 +277,8 @@ void set_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     timelist[3] = times->mn;
     timelist[4] = times->as;
     timelist[5] = times->an;
+    timelist[6] = times->us;
+    timelist[7] = times->un;
 }
 
 typedef struct {
@@ -331,7 +339,7 @@ typedef struct {
     u32   parent_loc;
     // parent node
     u32   pnode;
-    // inode number
+    // inode number / permissions
     u32   ikey;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
@@ -364,6 +372,29 @@ typedef struct {
     u32   disk_ref;
     u64   checksum;
 } TSFSStructBlock;
+
+/*
+struct that gives proper access to fields shared by the TSFS block types
+*/
+typedef struct {
+    size_t magicno;
+    u32   disk_loc;
+    u16   rc;
+    u8    id;
+} TSFSObj;
+
+inline char check_obj_id(TSFSObj* obj, u8 id) {
+    return obj->id == id;
+}
+inline char check_sn_type(TSFSStructNode* sn, u8 typ) {
+    return sn->storage_flags == typ;
+}
+
+#define FS_TNOD(o) check_obj_id(o,0)
+#define FS_TBLK(o) check_obj_id(o,1)
+#define FS_TDAT(o) check_obj_id(o,2)
+#define FS_THED(o) check_obj_id(o,3)
+#define FS_SFIL(s) check_sn_type(s,TSFS_KIND_FILE)
 
 typedef struct {
     size_t csize;

@@ -40,6 +40,14 @@ char test_dataheader(FSP, u32);
 char test_datablock(FSP, u32);
 char test_structnode(FSP, u32);
 char test_structblock(FSP, u32);
+inline void update_structnode(FSP, SN*);
+inline void update_structblock(FSP, SB*);
+inline void update_datablock(FSP, DB*);
+inline void update_dataheader(FSP, DH*);
+inline void update_structnode_stable(FSP, SN*);
+inline void update_structblock_stable(FSP, SB*);
+inline void update_datablock_stable(FSP, DB*);
+inline void update_dataheader_stable(FSP, DH*);
 #undef FSP
 #undef DBP
 #undef SNP

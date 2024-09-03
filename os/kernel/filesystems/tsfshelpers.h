@@ -1,6 +1,7 @@
 #ifndef __TSFS_HELPERS_H__
 #define __TSFS_HELPERS_H__ 1
 #include "./fsdefs.h"
+#include "./perms.h"
 char test_dataheader(FileSystem* fs, u32 block_no) {
     block_seek(fs, block_no, BSEEK_SET);
     TSFSDataHeader obj = {0};
@@ -37,6 +38,52 @@ char test_structblock(FileSystem* fs, u32 block_no) {
     }
     return 0;
 }
+
+// seek to then write struct node
+inline void update_structnode(FileSystem* fs, TSFSStructNode* sn) {
+    block_seek(fs, sn->disk_loc, BSEEK_SET);
+    write_structnode(fs, sn);
+}
+// update struct node, then return to original location
+inline void update_structnode_stable(FileSystem* fs, TSFSStructNode* sn) {
+    u64 rest = tsfs_tell(fs);
+    update_structnode(fs, sn);
+    longseek(fs, rest, SEEK_SET);
+}
+// seek to then write struct block
+inline void update_structblock(FileSystem* fs, TSFSStructBlock* sb) {
+    block_seek(fs, sb->disk_loc, BSEEK_SET);
+    write_structblock(fs, sb);
+}
+// update struct block, then return to original location
+inline void update_structblock_stable(FileSystem* fs, TSFSStructBlock* sb) {
+    u64 rest = tsfs_tell(fs);
+    update_structblock(fs, sb);
+    longseek(fs, rest, SEEK_SET);
+}
+// seek to then write data block
+inline void update_datablock(FileSystem* fs, TSFSDataBlock* sb) {
+    block_seek(fs, sb->disk_loc, BSEEK_SET);
+    write_datablock(fs, sb);
+}
+// update data block, then return to original location
+inline void update_datablock_stable(FileSystem* fs, TSFSDataBlock* sb) {
+    u64 rest = tsfs_tell(fs);
+    update_datablock(fs, sb);
+    longseek(fs, rest, SEEK_SET);
+}
+// seek to then write data header
+inline void update_dataheader(FileSystem* fs, TSFSDataHeader* sb) {
+    block_seek(fs, sb->disk_loc, BSEEK_SET);
+    write_dataheader(fs, sb);
+}
+// update data header, then return to original location
+inline void update_dataheader_stable(FileSystem* fs, TSFSDataHeader* sb) {
+    u64 rest = tsfs_tell(fs);
+    update_dataheader(fs, sb);
+    longseek(fs, rest, SEEK_SET);
+}
+
 // void __DBG_print_block(TSFSStructBlock*, long, const char*, const char*);
 // void __DBG_print_node(TSFSStructNode*, long, const char*, const char*);
 // void __DBG_print_cename(char const*, long, const char*, const char*);

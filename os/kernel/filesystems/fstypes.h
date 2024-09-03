@@ -10,6 +10,8 @@ typedefs for use externally
 #include "../ktypes.h"
 #include "../FileDriver.h"
 
+typedef _kernel_u32 fsikey_t;
+
 struct FSReturn {// `errno' == 0: Success; `errno' != 0: Failure
 	void* retptr;// Pointer to object, if `errno' == 0 and return type is a pointer
 	_kernel_ssize_t retval;// Value, if `errno' == 0 and the return type is not a pointer
@@ -41,6 +43,7 @@ typedef struct {
     c - create
     m - modify
     a - access
+    u - update
     s - secs
     n - nsec
     */
@@ -50,6 +53,8 @@ typedef struct {
     _kernel_s64 mn;
     _kernel_s64 as;
     _kernel_s64 an;
+    _kernel_s64 us;
+    _kernel_s64 un;
 } TIMES;
 
 typedef struct {
@@ -62,9 +67,9 @@ typedef struct {
     _kernel_u32   blocks;
     _kernel_u32   ikey;
     _kernel_u64   size;
-    _kernel_u16   perms;
+    _kernel_u32   perms;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
-    _kernel_u64   times[6];
+    _kernel_u64   times[8];
     _kernel_u64   checksum;
 } TSFSDataHeader;
 
