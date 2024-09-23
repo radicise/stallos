@@ -58,7 +58,7 @@ typedef _kernel_u32 fsikey_t;
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 11
+#define VERNOBN 12
 
 #define TSFS_ANSI_NUN "\x1b[0m"
 #define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
@@ -253,6 +253,8 @@ typedef struct {
     // permissions and other metadata
     // permissions
     u32   perms;
+    u32   oid;
+    u32   gid;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
     u64   times[8];
     u64   checksum;
@@ -341,6 +343,8 @@ typedef struct {
     u32   pnode;
     // inode number / permissions
     u32   ikey;
+    u32   oid;
+    u32   gid;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
     char  name[255];

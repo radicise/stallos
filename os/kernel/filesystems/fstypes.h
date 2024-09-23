@@ -68,6 +68,8 @@ typedef struct {
     _kernel_u32   ikey;
     _kernel_u64   size;
     _kernel_u32   perms;
+    _kernel_u32   oid;
+    _kernel_u32   gid;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
     _kernel_u64   times[8];
     _kernel_u64   checksum;
@@ -95,6 +97,8 @@ typedef struct {
     _kernel_u32   parent_loc;
     _kernel_u32   pnode;
     _kernel_u32   ikey;
+    _kernel_u32   oid;
+    _kernel_u32   gid;
     char  name[255];
     _kernel_u64   checksum;
 } TSFSStructNode;

@@ -40,7 +40,7 @@ void dealloc(void* ptr, _kernel_size_t size) {
 }
 
 FILE* fp;
-char* bigdata[1024];
+char bigdata[1024];
 
 _kernel_off_t fdrive_tell(int _) {
     return ftell(fp);
@@ -88,11 +88,18 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
         TSFSStructNode sn = {0};
         read_structnode(s, &sn);
+        char* permtxt = strmove("rwx-rwx-rwx");
         char tc = 'i';
+        _kernel_mode_t objmod = 0;
         if (sn.storage_flags == TSFS_KIND_DIR) {
             tc = 'd';
+            objmod = sn.ikey;
         } else if (sn.storage_flags == TSFS_KIND_FILE) {
             tc = 'f';
+            TSFSDataHeader dh = {0};
+            block_seek(s, resolve_itable_entry(s, sn.ikey), BSEEK_SET);
+            read_dataheader(s, &dh);
+            objmod = dh.perms;
         } else if (sn.storage_flags == TSFS_KIND_HARD) {
             tc = 'h';
         } else if (sn.storage_flags == TSFS_KIND_LINK) {
@@ -100,7 +107,8 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         } else {
             tc = 'i';
         }
-        printf("@ %u : -%c- %s\n", ce->dloc, tc, sn.name);
+        printf("@ %u : -%c- -%s- [%d|%d] %s\n", ce->dloc, tc, permtxt, sn.oid, sn.gid, sn.name);
+        free(permtxt);
         loc_seek(s, l);
     }
     return 0;
@@ -668,6 +676,7 @@ int generic_test(char f1, char f2) {
 }
 
 int main(int argc, char** argv) {
+    printf("%zu\n", sizeof(TSFSStructNode));
     char flags[] = {0, 0};
     char* fpath = argv[1];
     for (int i = 2; i < argc; i ++) {

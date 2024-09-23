@@ -20,6 +20,7 @@ struct PerThread {// TODO Make a system for threads to change the properties of 
 	volatile u64 cap_permitted;
 	volatile u64 cap_inheritable;
 	struct FSInfo* fsinfo;// Can be deallocated with dealloc(fsinfo, sizeof(struct FSInfo))
+    volatile int __curr_userFD;
 };
 #include "threads.h"
 #endif

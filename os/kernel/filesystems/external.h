@@ -26,6 +26,8 @@ extern _kernel_u64 tsfs_tell(FileSystem*);
 extern int _real_longseek(FileSystem*, _kernel_loff_t, int, long, const char*, const char*);
 extern int _real_seek(FileSystem*, _kernel_off_t, int, long, const char*, const char*);
 extern int _real_block_seek(FileSystem*, _kernel_s32, char, long, const char*, const char*);
+extern _kernel_mode_t get_fperms(TSFSDataHeader*, _kernel_uidnatural_t);
+extern _kernel_mode_t get_dperms(TSFSStructNode*, _kernel_uidnatural_t);
 #define seek(fs, offset, whence) _real_seek(fs, offset, whence, __LINE__, __func__, __FILE__)
 #define longseek(fs, offset, whence) _real_longseek(fs, offset, whence, __LINE__, __func__, __FILE__)
 #define block_seek(fs, offset, abs) _real_block_seek(fs, offset, abs, __LINE__, __func__, __FILE__)
