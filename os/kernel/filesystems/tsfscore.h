@@ -20,7 +20,7 @@ char* strcpy(char* dst, const char* src) {
 // #include <string.h>
 // #endif
 
-#define TSFS_CORE_LPROTECT 7
+#define TSFS_CORE_LPROTECT 9
 
 u32 partition_blocks(FileSystem* fs) {
     // return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
@@ -36,6 +36,8 @@ DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
+    unsigned char buffer[6] = {0, 2, 0, 0, 0, 7};
+    printf("%lx\n", hashsized(&buffer, 6));
     s64 curr_time = (s64)(fetch_time(NULL));
     FSRet rv = {.err=EINVAL,.retptr=0};
     if (p_size % BLOCK_SIZE != 0) {
@@ -60,7 +62,7 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     strcpy(rblock->version, TSFSVERSION);
     rblock->partition_size = (u32)p_size;
     rblock->creation_time = *((u64*)(&curr_time));
-    rblock->usedleft = 7;
+    rblock->usedleft = TSFS_CORE_LPROTECT;
     // u32 tblocks = (u32)((((u64)1)<<(rblock->partition_size)) / BLOCK_SIZE);
     u32 tblocks = (u32)p_size;
     rblock->usedright = tblocks - 1;
@@ -68,13 +70,14 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     printf("CENTER: %lx\n", center);
     rblock->usedhalfleft = center;
     rblock->usedhalfright = center;
-    rblock->top_dir = 5;
+    rblock->top_dir = TSFS_CORE_LPROTECT-2;
     u64 checksum = hash_rootblock(rblock);
     rblock->checksum = checksum;
     write_rootblock(fs, rblock);
-    dmanip_null(fs, 1, 4);
-    // block_seek(fs, 1, BSEEK_SET);
-    // write_u32be(fs, center);
+    dmanip_null(fs, 1, 6);
+    dmanip_fill(fs, 6, 1, 1);
+    block_seek(fs, 1, BSEEK_SET);
+    write_u32be(fs, 5);
     TSFSStructNode snode = {
         .storage_flags = TSFS_KIND_DIR,
         .parent_loc = rblock->top_dir + 1,
@@ -91,13 +94,14 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     sblock.entrycount = 0;
     block_seek(fs, snode.parent_loc, BSEEK_SET);
     write_structblock(fs, &sblock);
-    block_seek(fs, center, BSEEK_SET);
-    write_u32be(fs, 0xff010000UL);
+    block_seek(fs, 5, BSEEK_SET);
+    write_u32be(fs, 0xff000100UL);
     write_u32be(fs, 1);
-    block_seek(fs, center+1, BSEEK_SET);
-    write_u32be(fs, 0xff010100UL);
-    write_u32be(fs, center);
-    write_u32be(fs, rblock->top_dir);
+    write_u32be(fs, 6);
+    block_seek(fs, 6, BSEEK_SET);
+    write_u32be(fs, 0xff010000UL);
+    write_u32be(fs, 5);
+    // write_u32be(fs, rblock->top_dir);
     rv.retptr = fs;
     return rv;
 }
@@ -345,6 +349,20 @@ int _tsfs_free_structure(FileSystem* fs, u32 block_no, unsigned long line, const
     TSFSStructNode* nodeptr = 0;
     block_seek(fs, (s32)ul, BSEEK_SET);
     read_structblock(fs, &sblock);
+    if (sblock.entrycount == 0xff) { // itable block
+        unsigned char data[8] = {0};
+        block_seek(fs, ul, BSEEK_SET);
+        read_buf(fs, data, 8);
+        u32 meta = areadu32be(data);
+        u32 ploc = areadu32be(data+4);
+        block_seek(fs, ploc, BSEEK_SET);
+        seek(fs, ((meta&0xff0000)?8:0) // offset by 8 bytes if the parent is an L1 table to account for metadata
+            +(4*(meta&0xff)), // go to the entry that needs to be updated
+            SEEK_CUR);
+        write_u32be(fs, block_no);
+        dmanip_null_shift_left(fs, ul, 1, ul-block_no);
+        return 0;
+    }
     // blockptr = tsfs_load_block(fs, 0);
     // printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
     // _DBG_print_block(blockptr);
@@ -970,14 +988,14 @@ int tsfs_root_corruption_check(TSFSRootBlock* rb, u32* psize_actual) {
         corrupt = 1;
         kernelWarnMsg("usedleft crossed usedright");
     }
-    if (rb->usedhalfleft >= rb->usedhalfright || rb->usedhalfleft <= rb->usedleft) { // invalid usedhalfleft
-        corrupt = 1;
-        kernelWarnMsg("invalid usedhalfleft");
-    }
-    if (rb->usedhalfright >= rb->usedright) { // invalid usedhalfright
-        corrupt = 1;
-        kernelWarnMsg("invalid usedhalfright");
-    }
+    // if (rb->usedhalfleft >= rb->usedhalfright || rb->usedhalfleft <= rb->usedleft) { // invalid usedhalfleft
+    //     corrupt = 1;
+    //     kernelWarnMsg("invalid usedhalfleft");
+    // }
+    // if (rb->usedhalfright >= rb->usedright) { // invalid usedhalfright
+    //     corrupt = 1;
+    //     kernelWarnMsg("invalid usedhalfright");
+    // }
     return corrupt;
 }
 

@@ -14,12 +14,14 @@ int _dmanip_shift_right(FileSystem*, u32, u32, u32, unsigned long, const char*, 
 int _dmanip_null_shift_right(FileSystem*, u32, u32, u32, unsigned long, const char*, const char*);
 int _dmanip_shift_left(FileSystem*, u32, u32, u32, unsigned long, const char*, const char*);
 int _dmanip_null_shift_left(FileSystem*, u32, u32, u32, unsigned long, const char*, const char*);
+int _dmanip_swap(FileSystem*, u32, u32, u32, unsigned long, const char*, const char*);
 #define dmanip_fill(fs, start, count, value) _dmanip_fill(fs, start, count, value, __LINE__, __FILE__, __func__)
 #define dmanip_null(fs, start, count) _dmanip_null(fs, start, count, __LINE__, __FILE__, __func__)
 #define dmanip_shift_right(fs, start, count, delta) _dmanip_shift_right(fs, start, count, delta, __LINE__, __FILE__, __func__)
 #define dmanip_shift_left(fs, start, count, delta) _dmanip_shift_left(fs, start, count, delta, __LINE__, __FILE__, __func__)
 #define dmanip_null_shift_right(fs, start, count, delta) _dmanip_null_shift_right(fs, start, count, delta, __LINE__, __FILE__, __func__)
 #define dmanip_null_shift_left(fs, start, count, delta) _dmanip_null_shift_left(fs, start, count, delta, __LINE__, __FILE__, __func__)
+#define dmanip_swap(fs, a, b, count) _dmanip_swap(fs, a, b, count, __LINE__, __FILE__, __func__)
 
 /*
 maximum number of blocks that may be loaded into RAM at any point by any of the functions defined here
@@ -49,6 +51,59 @@ static void dmanip_debuf(u32 bsize) {
     }
     deallocate(dman_buf, bsize * FS_DMANIP_MAX_RAM_BLKS);
     dman_buf = 0;
+}
+
+int _dmanip_swap(FileSystem* fs, u32 a, u32 b, u32 count, unsigned long line, const char* func, const char* file) {
+    if (DMAN_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sDMAN TRACE <SWAP> {A: %lu, B: %lu, COUNT: %lu}%s\n", TSFS_ANSI_GRN, a, b, count, TSFS_ANSI_NUN);
+    }
+    u32 prog = 0;
+    if (a > b) {
+        if (b + count >= a) {
+            goto overlap;
+        }
+        goto clear;
+    }
+    if (a < b) {
+        if (a + count >= b) {
+            goto overlap;
+        }
+        goto clear;
+    }
+    overlap:
+    printf("%sDMAN ERROR: overlapping swap regions%s\n", TSFS_ANSI_RED, TSFS_ANSI_NUN);
+    return -1;
+    clear:
+    b = b;
+    u32 bsize = BLOCK_SIZE;
+    u32 conc = (FS_DMANIP_MAX_RAM_BLKS == 1) ? 2 : (FS_DMANIP_MAX_RAM_BLKS/2);
+    if (FS_DMANIP_MAX_RAM_BLKS == 1) {
+        dmanip_albuf(bsize * 2);
+    } else {
+        dmanip_albuf(bsize);
+    }
+    unsigned char* buf = (unsigned char*)dman_buf;
+    while (prog < count) {
+        if (prog + conc >= count) {
+            conc = count - prog;
+        }
+        size_t concsize = (size_t)(bsize * conc);
+        longseek(fs, (loff_t)(bsize * (a+prog)), SEEK_SET);
+        read_buf(fs, buf, concsize);
+        longseek(fs, (loff_t)(bsize * (b+prog)), SEEK_SET);
+        read_buf_stable(fs, buf+concsize, concsize);
+        write_buf(fs, buf, concsize);
+        longseek(fs, (loff_t)(bsize * (a+prog)), SEEK_SET);
+        write_buf(fs, buf+concsize, concsize);
+        prog += conc;
+    }
+    if (FS_DMANIP_MAX_RAM_BLKS == 1) {
+        dmanip_debuf(bsize * 2);
+    } else {
+        dmanip_debuf(bsize);
+    }
+    return 0;
 }
 
 /*

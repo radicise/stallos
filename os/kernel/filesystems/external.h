@@ -13,6 +13,7 @@ typedef struct FSReturn FSRet;
 // int printf(const char*__restrict s, ...) {}
 // #endif
 
+extern char* _tsfs_normalize(const char*, const char*, const char*);
 extern void read_buf(FileSystem*, void*, _kernel_size_t);
 extern void write_buf(FileSystem*, const void*, _kernel_size_t);
 extern char SEEK_TRACING;

@@ -2,6 +2,51 @@
 #define __TSFS_HELPERS_H__ 1
 #include "./fsdefs.h"
 #include "./perms.h"
+
+static char locked_threadinfo = 0;
+void aquire_infolock(void) {
+    if (!locked_threadinfo) {
+        Mutex_acquire(&PerThread_context->dataLock);
+        Mutex_acquire(&PerThread_context->fsinfo->dataLock);
+        locked_threadinfo = 1;
+    }
+}
+void release_infolock(void) {
+    if (locked_threadinfo) {
+        Mutex_release(&PerThread_context->fsinfo->dataLock);
+        Mutex_release(&PerThread_context->dataLock);
+        locked_threadinfo = 0;
+    }
+}
+char* get_cwd(void) {
+    const char* volatile cwd = PerThread_context->fsinfo->cwd;
+    char* buffer = allocate(tsfs_strlen(cwd));
+    int i = 0;
+    while (cwd[i]) {
+        buffer[i] = cwd[i++];
+    }
+    buffer[i] = 0;
+    return buffer;
+}
+char* get_root(void) {
+    const char* volatile root = PerThread_context->fsinfo->root;
+    char* buffer = allocate(tsfs_strlen(root));
+    int i = 0;
+    while (root[i]) {
+        buffer[i] = root[i++];
+    }
+    buffer[i] = 0;
+    return buffer;
+}
+kuid_t get_euid(void) {
+    return PerThread_context->euid;
+}
+kuid_t get_egid(void) {
+    return 0;
+}
+u64 get_capa(void) {
+    return PerThread_context->cap_effective;
+}
 char test_dataheader(FileSystem* fs, u32 block_no) {
     block_seek(fs, block_no, BSEEK_SET);
     TSFSDataHeader obj = {0};
@@ -209,6 +254,49 @@ size_t tsfs_strlen(const char* s) {
     size_t o = 0;
     while (s[o++]);
     return o;
+}
+
+char* strjoin(const char*,const char*);
+
+/*
+prepends s1 with s2, then deallocates s1, returning the new string
+*/
+char* strprepend(char* s1, const char* s2) {
+    char* b = strjoin(s2, s1);
+    deallocate(s1, tsfs_strlen(s1));
+    return b;
+}
+/*
+joins s1 and s2, deallocates s1, and returns the new string
+*/
+char* strappend(char* s1, const char* s2) {
+    char* b = strjoin(s1, s2);
+    deallocate(s1, tsfs_strlen(s1));
+    return b;
+}
+char* strjoin(const char* s1, const char* s2) {
+    char* b = allocate(tsfs_strlen(s1) + tsfs_strlen(s2) - 1);
+    size_t i = 0;
+    size_t j = 0;
+    while (s1[i]) {b[i] = s1[i++];}
+    while (s2[j]) {b[i+j] = s2[j++];}
+    b[i+j] = 0;
+    return b;
+}
+char* strmove(const char* s) {
+    char* d = allocate(tsfs_strlen(s));
+    size_t i = 0;
+    while (s[i]) {d[i] = s[i++];}
+    d[i] = 0;
+    return d;
+}
+char* substrmove(const char* s, size_t l) {
+    char* d = allocate(l+1);
+    for (size_t i = 0; i < l; i ++) {
+        d[i] = s[i];
+    }
+    d[l] = 0;
+    return d;
 }
 
 void __DBG_print_root(TSFSRootBlock* rb, long l, const char* f, const char* fid) {

@@ -1,9 +1,12 @@
 #ifndef __TSFSSTD_H__
 #define __TSFSSTD_H__ 1
+#define __THREADS_H__ 1
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
 #include "../types.h"
+#include "../perThread.h"
+extern struct PerThread* volatile PerThread_context;
 struct FileDriver;
 extern kuid_t fetch_euid(void);
 extern int have_cap(int);

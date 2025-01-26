@@ -523,7 +523,7 @@ u32 tsfs_find(FileSystem* fs, TSFSStructNode* par, const char* name) {
 }
 
 /*
-sets [curr->disk_loc] to zero on failure
+sets [curr->disk_loc] to zero on ENOENT, one on EACCES, and two on ENOTDIR
 */
 void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, int cfs, int cfe) {
     int cfl = cfe - cfs;
@@ -542,6 +542,13 @@ void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, 
                 }
                 block_seek(fs, curr->pnode, BSEEK_SET);
                 read_structnode(fs, curr);
+                if (curr->storage_flags == TSFS_KIND_LINK) {
+                    magic_smoke(FEDRIVE | FEOP | FEIMPL);
+                    return;
+                }
+                if (!(has_dperm(curr, get_uid(), 4) || has_dperm(curr, get_gid(), 4))) {
+                    //
+                }
                 return;
             }
         }
@@ -562,7 +569,8 @@ void _tsfs_respath_step(FileSystem* fs, TSFSStructNode* curr, const char* path, 
 /*
 resolves [path] to a disk location, returns zero on failure
 accepts only absolute paths
-returns zero on failure
+returns zero on failure, and sets fs->err
+in the event that the final component does not exist, the would-be parent's disk location is returned instead, and fs->err is set as EINPROGRESS
 */
 u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
     if (path[0] != '/') {
@@ -577,7 +585,11 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
         if (path[i] == '/' || path[i] == 0) {
             // _DBG_print_node(&curr);
             _tsfs_respath_step(fs, &curr, path, cfs, i);
-            if (curr.disk_loc == 0) {
+            if (curr.disk_loc < 3) {
+                if (path[i] == 0 && curr.disk_loc == 0) {
+                    return 0;
+                }
+                fs->err = ENOENT;
                 return 0;
             }
             cfs = i + 1;
@@ -587,6 +599,184 @@ u32 tsfs_resolve_path(FileSystem* fs, const char* path) {
     }
     // _DBG_print_node(&curr);
     return curr.disk_loc;
+}
+
+static int symlink_depth = 0;
+
+typedef struct _TSFSFRP_D {
+    char* root;
+    char* cwd;
+    kuid_t uid;
+    kuid_t gid;
+    u64 capa;
+} _TSFSFRP_D;
+
+#define is_slash(p) (p[0] == 0 || (p[0] == '/' && p[1] == 0))
+
+#define _TSFS_NORM_IGNORE 0
+#define _TSFS_NORM_DISCARD 1
+#define _TSFS_NORM_APPEND 2
+
+static char _tsfs_normalize_sub1(const char* frags, size_t fragl) {
+    switch(fragl) {
+        case 0:return _TSFS_NORM_IGNORE;
+        case 1:{if(frags[0]=='.')return _TSFS_NORM_IGNORE;return _TSFS_NORM_APPEND;}
+        case 2:{if(frags[0]=='.'&&frags[1]=='.')return _TSFS_NORM_DISCARD;return _TSFS_NORM_APPEND;}
+        default:return _TSFS_NORM_APPEND;
+    }
+}
+
+char* _tsfs_normalize(const char* root, const char* cwd, const char* path) {
+    if (path[0] == 0) {
+        return strjoin(root, cwd);
+    }
+    char* cp = NULL;
+    if (path[0] != '/') {
+        cp = strmove(cwd);
+    } else {
+        cp = strmove("");
+    }
+    char* p = strjoin("/", path);
+    size_t plen = tsfs_strlen(p) - 1;
+    size_t ps, pe=plen, pl, i = plen-1;
+    char* acc = strmove("");
+    int skipover = 0;
+    while (1) {
+        if (p[i] == '/') {
+            ps = i + 1;
+            pl = pe - ps;
+            char op = _tsfs_normalize_sub1(p+ps, pl);
+            if (op == _TSFS_NORM_DISCARD) {
+                skipover ++;
+            } else if (op == _TSFS_NORM_APPEND) {
+                if (skipover) {
+                    skipover --;
+                } else {
+                    acc = strprepend(acc, substrmove(p+ps, pl));
+                    acc = strprepend(acc, "/");
+                }
+            }
+            pe = i;
+        }
+        if (i == 0) {
+            break;
+        }
+        i --;
+    }
+    size_t clen = tsfs_strlen(cp);
+    size_t cs, ce=clen, ci = clen-1;
+    while (1) {
+        if (p[ci] == '/') {
+            cs = ci + 1;
+            skipover --;
+            ce = ci;
+        }
+        if (skipover == 0 || ci == 0) {
+            break;
+        }
+        ci --;
+    }
+    char* tcp = substrmove(cp, ce);
+    deallocate(cp, tsfs_strlen(cp));
+    cp = tcp;
+    deallocate(p, tsfs_strlen(p));
+    cp = strappend(cp, acc);
+    deallocate(acc, tsfs_strlen(acc));
+    return strprepend(cp, root);
+}
+#undef _TSFS_NORM_IGNORE
+#undef _TSFS_NORM_DISCARD
+#undef _TSFS_NORM_APPEND
+
+u32 _tsfs_full_respath_ac(FileSystem* fs, _TSFSFRP_D* _data, const char* path) {
+    u32 retval = 0;
+    #define xreturn(v) do {retval=v;goto ret;} while(0)
+    #define ereturn(v) do {retval=v;symlink_depth=0;goto ret;} while(0)
+    char* root = _data->root;
+    char* cwd  = _data->cwd;
+    kuid_t uid = _data->uid;
+    kuid_t gid = _data->gid;
+    u64 capa   = _data->capa;
+    TSFSStructNode currsrch = {0};
+    { // resolve currsrch to cwd relative to root
+        char*x = "/";
+        if (!is_slash(cwd)) {
+            _TSFSFRP_D newdata = {.root=root,.cwd=x,.uid=uid,.gid=gid,.capa=capa};
+            block_seek(fs, _tsfs_full_respath_ac(fs, &newdata, cwd), BSEEK_SET);
+        } else if (!is_slash(root)) {
+            _TSFSFRP_D newdata = {.root=x,.cwd=x,.uid=uid,.gid=gid,.capa=capa};
+            block_seek(fs, _tsfs_full_respath_ac(fs, &newdata, root), BSEEK_SET);
+        } else {
+            block_seek(fs, fs->rootblock->top_dir, BSEEK_SET);
+        }
+        read_structnode(fs, &currsrch);
+    }
+    // cs is fragment start, ce is fragment end, cl is fragment length
+    size_t cs = 0, ce, cl, i = 0;
+    while (1) {
+        if (path[i] == '/' || path[i] == 0) {
+            if (i == 0) {
+                xreturn(currsrch.disk_loc);
+            }
+        }
+    }
+    #undef rreturn
+    #undef ereturn
+    ret:
+    return retval;
+}
+
+#undef is_slash
+
+u32 tsfs_full_respath(FileSystem* fs, const char* path) {
+    u32 retval = 0;
+    #define xreturn(v) do {retval=v;goto ret;} while(0)
+    #define ereturn(v) do {retval=v;symlink_depth=0;goto ret;} while(0)
+    aquire_infolock();
+    char* root = get_root();
+    char* cwd = get_cwd();
+    kuid_t uid = get_euid();
+    kuid_t gid = get_egid();
+    u64 capa = get_capa();
+    release_infolock();
+    TSFSStructNode currsrch = {0};
+    block_seek(fs, fs->rootblock->top_dir, BSEEK_SET);
+    read_structnode(fs, &currsrch);
+    size_t cs = 0, ce, cl, i = 0;
+    while (1) {
+        if (path[i] == '/' || path[i] == 0) {
+            if (i == 0) {
+                return fs->rootblock->top_dir;
+            }
+            if (path[i] == 0) {
+                return currsrch.disk_loc;
+            }
+            ce = i;
+            cl = ce-cs;
+            if (cl == 0) {
+                cs = i++;
+                continue;
+            }
+            if (currsrch.storage_flags == TSFS_KIND_LINK) {
+                //TODO: implement symlink following
+                fs->err = EOPNOTSUPP;
+                ereturn(0);
+            }
+            if (currsrch.storage_flags != TSFS_KIND_DIR) {
+                fs->err = ENOTDIR;
+                ereturn(0);
+            }
+            if (!has_adperm(&currsrch, 4, uid, gid, capa)) { // check search perms
+                fs->err = EACCES;
+                ereturn(0);
+            }
+        }
+        i ++;
+    }
+    #undef rreturn
+    #undef ereturn
+    ret:
+    return retval;
 }
 
 char tsfs_truncate_pfrag(char const* iname, char* oname) {

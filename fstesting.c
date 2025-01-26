@@ -363,14 +363,14 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     tsfs_mk_file(s, &topdir, "test");
     tsfs_mk_file(s, &topdir, "ctrl");
     _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
-    printf("FILE BLOCK NO: %lu\n", tblkno);
+    printf("FILE BLOCK NO: %u\n", tblkno);
     TSFSStructNode* fil = tsfs_load_node(s, tblkno);
     _DBG_print_node(fil);
     for (int i = 0; i < 8; i ++) {
         data_write(s, fil, 1024*i, bigdata, 1024);
     }
     _kernel_u32 p = resolve_itable_entry(s, fil->ikey);
-    printf("DLOC: %lx\n", p);
+    printf("DLOC: %x\n", p);
     block_seek(s, p, BSEEK_SET);
     TSFSDataHeader dh = {0};
     read_dataheader(s, &dh);
@@ -434,6 +434,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             char* name = strmove(clidata.data);
             free(clidata.data);
             TSFSStructNode* par = tsfs_load_node(s, tsfs_resolve_path(s, cwd));
+            _DBG_print_node(par);
             if (clicode == 2) {
                 TSFSStructBlock blk = {0};
                 tsfs_mk_dir(s, par, name, &blk);
@@ -533,10 +534,10 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                 dumpdata[cdb.data_length] = 0;
                 if (clicode == 8) {
                     // text dump
-                    printf("TXT DATA @ {%lx}\n%s\nLEN: %u\n", cdb.disk_loc, dumpdata, stringlen(dumpdata));
+                    printf("TXT DATA @ {%x}\n%s\nLEN: %zu\n", cdb.disk_loc, dumpdata, stringlen(dumpdata));
                 } else {
                     // binary dump
-                    printf("BIN DATA @ {%lx}\n", cdb.disk_loc);
+                    printf("BIN DATA @ {%x}\n", cdb.disk_loc);
                     for (int j = 1; j < cdb.data_length+1; j ++) {
                         printf("%x ", dumpdata[j-1]);
                         if (j % 8 == 0) {
@@ -558,7 +559,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             free(clidata.data);
             unsigned long ikey = parse_ulonghex(ikeytxt);
             free(ikeytxt);
-            printf("IKEY: %lx\nIKEYRES: %lx\n", ikey, resolve_itable_entry(s, ikey));
+            printf("IKEY: %lx\nIKEYRES: %x\n", ikey, resolve_itable_entry(s, ikey));
         } else if (clicode == 11) {
             DMAN_TRACING ^= 1; // toggle disk manip tracing
         } else if (clicode == 12) {
@@ -601,7 +602,7 @@ int truncate_test(struct FileDriver* fdrive, int fd, char flags) {
     read_structnode(s, &topdir);
     tsfs_mk_file(s, &topdir, "test");
     _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
-    printf("FILE BLOCK NO: %lu\n", tblkno);
+    printf("FILE BLOCK NO: %u\n", tblkno);
     TSFSStructNode* fil = tsfs_load_node(s, tblkno);
     _DBG_print_node(fil);
     for (int i = 0; i < 1; i ++) {
@@ -653,6 +654,8 @@ int harness(const char* fpath, char flag, int(*tst)(struct FileDriver*, int, cha
     return retc;
 }
 
+static char* argpass;
+
 int generic_test(char f1, char f2) {
     switch (f1) {
         case -1:
@@ -668,6 +671,14 @@ int generic_test(char f1, char f2) {
             printf("ECHO: %s\n", str);
             free(str);
             break;
+        case -3:
+            if (f2) {
+                printf("NO PATH TO NORMALIZE\n");
+                break;
+            }
+            char* n = _tsfs_normalize("", "/s1/s2", argpass);
+            printf("ROOT: %s\nCWD: %s\nPATH: %s\nNORM: %s\n", "", "/s1/s2", argpass, n);
+            free(n);
         default:
             printf("BAD FLAG\n");
             break;
@@ -712,6 +723,13 @@ int main(int argc, char** argv) {
             SEEK_TRACING = 1;
         } else if (stringcmp(argv[i], "truncate")) {
             flags[0] = 9;
+        } else if (stringcmp(argv[i], "normalize")) {
+            flags[0] = -3;
+            if (argc == i+1) {
+                flags[1] = 1;
+            } else {
+                argpass = argv[i+1];
+            }
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);

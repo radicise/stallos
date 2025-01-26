@@ -91,7 +91,7 @@ u32 _search_l2_table(FileSystem* fs, u32 dl, char flags, u32 val) {
 
 u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
     u64 opos = tsfs_tell(fs);
-    u32 r = allocate_blocks(fs, 2, 1);
+    u32 r = allocate_blocks(fs, 0, 1);
     block_seek(fs, r, BSEEK_SET);
     write_u32be(fs, 0xff010100 + (u32)pindex);
     write_u32be(fs, ploc);
@@ -102,7 +102,7 @@ u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
 
 u32 _create_l1_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
     u64 opos = tsfs_tell(fs);
-    u32 r = allocate_blocks(fs, 2, 1);
+    u32 r = allocate_blocks(fs, 0, 1);
     block_seek(fs, r, BSEEK_SET);
     write_u32be(fs, 0xff000100 + (u32)pindex);
     write_u32be(fs, ploc);
@@ -197,14 +197,16 @@ int release_itable_slot(FileSystem* fs, u32 imapkey) {
     write_u32be(fs, l1d);
     seek(fs, 8 + (4*cl1&IDATA_INDX), SEEK_CUR);
     write_u32be(fs, 0);
-    tsfs_free_centered(fs, l2p);
+    // tsfs_free_centered(fs, l2p);
+    tsfs_free_structure(fs, l2p);
     if (croot == 0 || (l1d&IDATA_ENTS)) return 0;
     block_seek(fs, 1, BSEEK_SET);
     seek(fs, 4 * croot, SEEK_CUR);
     l1p = read_u32be(fs);
     seek(fs, -4, SEEK_CUR);
     write_u32be(fs, 0);
-    tsfs_free_centered(fs, l1p);
+    // tsfs_free_centered(fs, l1p);
+    tsfs_free_structure(fs, l1p);
     return 0;
 }
 
