@@ -5,11 +5,12 @@ if [ ${TARGETNUM} = 1 ]
 then
    set +e
    i686-linux-gnu-gcc --version > "/dev/null" 2>&1
-   set -e
    if [ $? = 0 ]
    then
+            set -e
 	    i686-linux-gnu-gcc -D TARGET=x86_32 -D TARGETNUM=1 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=i386 -mabi=sysv "$@"
    else
+            set -e
 	    i686-elf-gcc -D TARGET=x86_32 -D TARGETNUM=1 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=i386 -mabi=sysv "$@"
    fi
 elif [ ${TARGETNUM} = 2 ]
