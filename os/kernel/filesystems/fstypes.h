@@ -122,12 +122,23 @@ typedef struct {
     void** ptr;
 } Magic;
 
+// Mutexes for various kinds of operations
+typedef struct {
+    // WARNING: it is an error to attempt ANY kind of disk access with acquiring the drive lock
+    // NOTE: the drive lock should be released between disk operations that are independent
+    // WARNING: the operation type locks must be acquired for the ENTIRE duration of a syscall
+    _kernel_Mutex* drive_lock; // lock on all disk operations
+    _kernel_Mutex* ddata_lock; // lock on disk operations that affect data
+    _kernel_Mutex* dstct_lock; // lock on disk operations that affect structure
+} FSLocks;
+
 typedef struct {
     struct FileDriver* fdrive;
     int kfd;
     int err;
     TSFSRootBlock* rootblock;
     Magic* magic;
+    FSLocks* locks;
 } FileSystem;
 
 typedef struct {

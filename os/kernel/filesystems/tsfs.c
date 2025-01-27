@@ -9,9 +9,15 @@ Doing so is undefined behavior
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
+#ifndef FST
+#define FST 0
+#endif
+#if FST == 1
 #define __FEATURE_NO_MUTEX 1
-// #define printf(...)
 extern int printf(const char*, ...);
+#else
+#define printf(...)
+#endif
 #include "tsfscore.h"
 #include "tsfsmanage.h"
 #include "tsfsinterface.h"

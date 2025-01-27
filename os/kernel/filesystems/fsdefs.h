@@ -413,10 +413,9 @@ typedef struct {
     // WARNING: it is an error to attempt ANY kind of disk access with acquiring the drive lock
     // NOTE: the drive lock should be released between disk operations that are independent
     // WARNING: the operation type locks must be acquired for the ENTIRE duration of a syscall
-    Mutex* drive_lock;
-    Mutex* ddata_lock;
-    Mutex* dcent_lock;
-    Mutex* dstct_lock;
+    Mutex* drive_lock; // lock on all disk operations
+    Mutex* ddata_lock; // lock on disk operations that affect data
+    Mutex* dstct_lock; // lock on disk operations that affect structure
 } FSLocks;
 
 /*

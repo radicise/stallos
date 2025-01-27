@@ -23,7 +23,8 @@ char* get_cwd(void) {
     char* buffer = allocate(tsfs_strlen(cwd));
     int i = 0;
     while (cwd[i]) {
-        buffer[i] = cwd[i++];
+        buffer[i] = cwd[i];
+        i++;
     }
     buffer[i] = 0;
     return buffer;
@@ -33,7 +34,8 @@ char* get_root(void) {
     char* buffer = allocate(tsfs_strlen(root));
     int i = 0;
     while (root[i]) {
-        buffer[i] = root[i++];
+        buffer[i] = root[i];
+        i++;
     }
     buffer[i] = 0;
     return buffer;
@@ -256,13 +258,13 @@ size_t tsfs_strlen(const char* s) {
     return o;
 }
 
-char* strjoin(const char*,const char*);
+char* tsfs_strjoin(const char*,const char*);
 
 /*
 prepends s1 with s2, then deallocates s1, returning the new string
 */
 char* strprepend(char* s1, const char* s2) {
-    char* b = strjoin(s2, s1);
+    char* b = tsfs_strjoin(s2, s1);
     deallocate(s1, tsfs_strlen(s1));
     return b;
 }
@@ -270,23 +272,23 @@ char* strprepend(char* s1, const char* s2) {
 joins s1 and s2, deallocates s1, and returns the new string
 */
 char* strappend(char* s1, const char* s2) {
-    char* b = strjoin(s1, s2);
+    char* b = tsfs_strjoin(s1, s2);
     deallocate(s1, tsfs_strlen(s1));
     return b;
 }
-char* strjoin(const char* s1, const char* s2) {
+char* tsfs_strjoin(const char* s1, const char* s2) {
     char* b = allocate(tsfs_strlen(s1) + tsfs_strlen(s2) - 1);
     size_t i = 0;
     size_t j = 0;
-    while (s1[i]) {b[i] = s1[i++];}
-    while (s2[j]) {b[i+j] = s2[j++];}
+    while (s1[i]) {b[i] = s1[i];i++;}
+    while (s2[j]) {b[i+j] = s2[j];j++;}
     b[i+j] = 0;
     return b;
 }
-char* strmove(const char* s) {
+char* tsfs_strmove(const char* s) {
     char* d = allocate(tsfs_strlen(s));
     size_t i = 0;
-    while (s[i]) {d[i] = s[i++];}
+    while (s[i]) {d[i] = s[i];i++;}
     d[i] = 0;
     return d;
 }

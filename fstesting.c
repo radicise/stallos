@@ -17,6 +17,32 @@
 #define MDISK_SIZE 1024*1024*4
 // #define MDISK_SIZE 4096
 
+void Mutex_acquire(_kernel_Mutex* mutex){}
+void Mutex_release(_kernel_Mutex* mutex){}
+
+struct FSInfo {
+	_kernel_Mutex dataLock;// Must be acquired when any of the references `cwd' and `root' are held; must be acquired when any of the following fields are being accessed
+	const char* volatile cwd;// Can be deallocated with dealloc(cwd, strlen(cwd) + 1)
+	const char* volatile root;// Can be deallocated with dealloc(root, strlen(root) + 1)
+	volatile _kernel_mode_t umask;
+};
+struct PerThread {// TODO Make a system for threads to change the properties of other threads
+	int errno;// This MUST be the first member (in order of member declaration) of `struct PerThread'; this may not be accessed in the kernel by any thread other than the one handling a system call of the thread specified by this structure
+	_kernel_pid_t tid;// Does not change
+	_kernel_Mutex dataLock;// TODO Must be acquired when any of the following fields are being accessed; this must be acquired when the reference `fsinfo' is had
+	volatile _kernel_kuid_t ruid;
+	volatile _kernel_kuid_t euid;
+	volatile _kernel_kuid_t suid;
+	volatile _kernel_kuid_t fsuid;
+	volatile _kernel_u64 cap_effective;
+	volatile _kernel_u64 cap_permitted;
+	volatile _kernel_u64 cap_inheritable;
+	struct FSInfo* fsinfo;// Can be deallocated with dealloc(fsinfo, sizeof(struct FSInfo))
+    volatile int __curr_userFD;
+};
+
+struct PerThread volatile* PerThread_context;
+
 void kernelWarnMsg(const char* msg) {
     puts(msg);
 }
@@ -632,6 +658,22 @@ int truncate_test(struct FileDriver* fdrive, int fd, char flags) {
     return 0;
 }
 
+int pathres_test(struct FileDriver* fdrive, int fd, char flags) {
+    regen_mock(fd);
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    TSFSStructNode pn;
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    read_structnode(s, &pn);
+    TSFSStructBlock nb;
+    tsfs_mk_dir(s, &pn, "test", &nb);
+    _kernel_u32 r1 = tsfs_resolve_path(s, "/test");
+    _kernel_u32 r2 = tsfs_resolve_path(s, "test");
+    printf("r1(/test)=%u\nr2(test)=%u\n", r1, r2);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
 int harness(const char* fpath, char flag, int(*tst)(struct FileDriver*, int, char)) {
     int retc = 0;
     int fd;
@@ -676,9 +718,12 @@ int generic_test(char f1, char f2) {
                 printf("NO PATH TO NORMALIZE\n");
                 break;
             }
-            char* n = _tsfs_normalize("", "/s1/s2", argpass);
-            printf("ROOT: %s\nCWD: %s\nPATH: %s\nNORM: %s\n", "", "/s1/s2", argpass, n);
+            char* _root = "/";
+            char* _cwd = "/s1/s2";
+            char* n = _tsfs_normalize(_root, _cwd, argpass);
+            printf("ROOT: %s\nCWD: %s\nPATH: %s\nNORM: %s\n", _root, _cwd, argpass, n);
             free(n);
+            break;
         default:
             printf("BAD FLAG\n");
             break;
@@ -687,7 +732,7 @@ int generic_test(char f1, char f2) {
 }
 
 int main(int argc, char** argv) {
-    printf("%zu\n", sizeof(TSFSStructNode));
+    // printf("%zu\n", sizeof(TSFSStructNode));
     char flags[] = {0, 0};
     char* fpath = argv[1];
     for (int i = 2; i < argc; i ++) {
@@ -730,6 +775,8 @@ int main(int argc, char** argv) {
             } else {
                 argpass = argv[i+1];
             }
+        } else if (stringcmp(argv[i], "pathres")) {
+            flags[0] = 10;
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);
@@ -765,6 +812,9 @@ int main(int argc, char** argv) {
             break;
         case 9:
             harness(fpath, flags[1], truncate_test);
+            break;
+        case 10:
+            harness(fpath, flags[1], pathres_test);
             break;
         default:
             printf("bad args\n");

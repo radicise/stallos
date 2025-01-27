@@ -17,10 +17,10 @@ void tslocks_make(FileSystem* fs) {
     if (locks->ddata_lock == 0) {
         magic_smoke(FEALLOC | FELOCK);
     }
-    locks->dcent_lock = (Mutex*) allocate(sizeof(Mutex));
-    if (locks->dcent_lock == 0) {
-        magic_smoke(FEALLOC | FELOCK);
-    }
+    // locks->dcent_lock = (Mutex*) allocate(sizeof(Mutex));
+    // if (locks->dcent_lock == 0) {
+    //     magic_smoke(FEALLOC | FELOCK);
+    // }
     locks->dstct_lock = (Mutex*) allocate(sizeof(Mutex));
     if (locks->dstct_lock == 0) {
         magic_smoke(FEALLOC | FELOCK);
@@ -36,7 +36,7 @@ void tslocks_release(FileSystem* fs) {
     FSLocks* locks = fs->locks;
     deallocate(locks->drive_lock, sizeof(Mutex));
     deallocate(locks->ddata_lock, sizeof(Mutex));
-    deallocate(locks->dcent_lock, sizeof(Mutex));
+    // deallocate(locks->dcent_lock, sizeof(Mutex));
     deallocate(locks->dstct_lock, sizeof(Mutex));
     deallocate(fs->locks, sizeof(FSLocks));
 }

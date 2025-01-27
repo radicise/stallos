@@ -19,7 +19,7 @@ then
     exit 1
 fi
 
-echo $TAR
+# echo $TAR
 
 if [ $TAR = 3 ]
 then

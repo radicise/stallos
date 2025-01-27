@@ -626,20 +626,34 @@ static char _tsfs_normalize_sub1(const char* frags, size_t fragl) {
     }
 }
 
+static char* tsfs_simple_pathjoin(const char* pf1, const char* pf2) {
+    size_t l1 = tsfs_strlen(pf1)-1, l2 = tsfs_strlen(pf2)-1;
+    // printf("pf1: %s\npf2: %s\nl1: %zu\nl2: %zu\n", pf1, pf2, l1, l2);
+    size_t i = 0;
+    if (pf1[l1-1] == '/') {
+        // printf("pf1 ends slash\n");
+        while (pf2[i] == '/') {
+            i ++;
+            if (i >= l2) break;
+        }
+    }
+    return tsfs_strjoin(pf1, pf2+i);
+}
+
 char* _tsfs_normalize(const char* root, const char* cwd, const char* path) {
     if (path[0] == 0) {
-        return strjoin(root, cwd);
+        return tsfs_simple_pathjoin(root, cwd);
     }
     char* cp = NULL;
     if (path[0] != '/') {
-        cp = strmove(cwd);
+        cp = tsfs_strmove(cwd);
     } else {
-        cp = strmove("");
+        cp = tsfs_strmove("");
     }
-    char* p = strjoin("/", path);
+    char* p = tsfs_strjoin("/", path);
     size_t plen = tsfs_strlen(p) - 1;
     size_t ps, pe=plen, pl, i = plen-1;
-    char* acc = strmove("");
+    char* acc = tsfs_strmove("");
     int skipover = 0;
     while (1) {
         if (p[i] == '/') {
@@ -663,11 +677,14 @@ char* _tsfs_normalize(const char* root, const char* cwd, const char* path) {
         }
         i --;
     }
+    if (path[tsfs_strlen(path)-2] == '/') {
+        acc = strappend(acc, "/");
+    }
+    // printf("skipover: %d\n", skipover);
     size_t clen = tsfs_strlen(cp);
-    size_t cs, ce=clen, ci = clen-1;
+    size_t ce=clen, ci = clen-1;
     while (1) {
-        if (p[ci] == '/') {
-            cs = ci + 1;
+        if (cp[ci] == '/') {
             skipover --;
             ce = ci;
         }
@@ -677,16 +694,42 @@ char* _tsfs_normalize(const char* root, const char* cwd, const char* path) {
         ci --;
     }
     char* tcp = substrmove(cp, ce);
+    // printf("skipover: %d\nci: %zu\nce: %zu\ntcp: %s\nacc: %s\n", skipover, ci, ce, tcp, acc);
     deallocate(cp, tsfs_strlen(cp));
     cp = tcp;
     deallocate(p, tsfs_strlen(p));
     cp = strappend(cp, acc);
     deallocate(acc, tsfs_strlen(acc));
-    return strprepend(cp, root);
+    char* rp = tsfs_simple_pathjoin(root, cp);
+    deallocate(cp, tsfs_strlen(cp));
+    return rp;
 }
 #undef _TSFS_NORM_IGNORE
 #undef _TSFS_NORM_DISCARD
 #undef _TSFS_NORM_APPEND
+
+u32 _tsfs_full_respath_act(FileSystem* fs, _TSFSFRP_D* _data, const char* path) {
+    u32 retval = 0;
+    #define xreturn(v) do {retval=v;goto ret;} while(0)
+    #define ereturn(v, e) do {fs->err=e;retval=v;symlink_depth=0;goto ret;} while(0)
+    char* root = _data->root;
+    char* cwd  = _data->cwd;
+    kuid_t uid = _data->uid;
+    kuid_t gid = _data->gid;
+    u64   capa = _data->capa;
+    char* normpath = _tsfs_normalize(root, cwd, path);
+    TSFSStructNode currsrch = {0};
+    block_seek(fs, fs->rootblock->top_dir, BSEEK_SET);
+    read_structnode(fs, &currsrch);
+    size_t cs = 0, ce, cl, i = 0;
+    while (1) {
+        if (path[i] == '/' || path[i] == 0) {}
+    }
+    #undef rreturn
+    #undef ereturn
+    ret:
+    return retval;
+}
 
 u32 _tsfs_full_respath_ac(FileSystem* fs, _TSFSFRP_D* _data, const char* path) {
     u32 retval = 0;

@@ -48,11 +48,11 @@ int get_dperm(TSFSStructNode* sn, int perm_flag, int value) {
     u32 f = (u32)perm_flag;
     return (p & f) != 0;
 }
-inline _internal_perm_t get_fperms(TSFSDataHeader* dh, kuid_t id) {
+_internal_perm_t get_fperms(TSFSDataHeader* dh, kuid_t id) {
     char which = (id == dh->oid || id == 0) ? 0 : ((id == dh->gid) ? 1 : 2);
     return (dh->perms & ((which == 0) ? S_IRWXU : ((which == 1) ? S_IRWXG : S_IRWXO))) >> ((which == 0) ? 8 : ((which == 1) ? 4 : 0));
 }
-inline _internal_perm_t get_dperms(TSFSStructNode* sn, kuid_t id) {
+_internal_perm_t get_dperms(TSFSStructNode* sn, kuid_t id) {
     char which = (id == sn->oid || id == 0) ? 0 : ((id == sn->gid) ? 1 : 2);
     return (sn->ikey & ((which == 0) ? S_IRWXU : ((which == 1) ? S_IRWXG : S_IRWXO))) >> ((which == 0) ? 8 : ((which == 1) ? 4 : 0));
 }
@@ -73,6 +73,7 @@ int has_adperm(TSFSStructNode* sn, int perm, kuid_t uid, kuid_t gid, u64 cap) {
         }
         return 1;
     }
+    return 0;
 }
 int has_fperm(TSFSDataHeader* dh, kuid_t id, int perm) {
     return (get_fperms(dh, id) & perm) != 0;
