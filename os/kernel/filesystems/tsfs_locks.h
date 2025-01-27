@@ -28,7 +28,7 @@ void tslocks_make(FileSystem* fs) {
     #ifndef __FEATURE_NO_MUTEX
     Mutex_initUnlocked(locks->drive_lock);
     Mutex_initUnlocked(locks->ddata_lock);
-    Mutex_initUnlocked(locks->dcent_lock);
+    // Mutex_initUnlocked(locks->dcent_lock);
     Mutex_initUnlocked(locks->dstct_lock);
     #endif
 }

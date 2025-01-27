@@ -723,7 +723,9 @@ u32 _tsfs_full_respath_act(FileSystem* fs, _TSFSFRP_D* _data, const char* path) 
     read_structnode(fs, &currsrch);
     size_t cs = 0, ce, cl, i = 0;
     while (1) {
-        if (path[i] == '/' || path[i] == 0) {}
+        if (path[i] == '/' || path[i] == 0) {
+            //
+        }
     }
     #undef rreturn
     #undef ereturn
