@@ -54,7 +54,7 @@ void kernelMsgULong_hex(unsigned long l) {
 }
 
 void bugCheckNum(long n) {
-    printf("BUGCHK: %li\n", n);
+    printf("BUGCHK: 0x%lx\n", n);
     exit(1);
 }
 

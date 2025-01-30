@@ -712,24 +712,53 @@ u32 _tsfs_full_respath_act(FileSystem* fs, _TSFSFRP_D* _data, const char* path) 
     u32 retval = 0;
     #define xreturn(v) do {retval=v;goto ret;} while(0)
     #define ereturn(v, e) do {fs->err=e;retval=v;symlink_depth=0;goto ret;} while(0)
+    // unpack data fields
     char* root = _data->root;
     char* cwd  = _data->cwd;
     kuid_t uid = _data->uid;
     kuid_t gid = _data->gid;
     u64   capa = _data->capa;
+    // get normalized path
     char* normpath = _tsfs_normalize(root, cwd, path);
-    TSFSStructNode currsrch = {0};
+    TSFSStructNode currsrch = {0}; // the directory that is the current step on the path, initialized to topdir
     block_seek(fs, fs->rootblock->top_dir, BSEEK_SET);
     read_structnode(fs, &currsrch);
-    size_t cs = 0, ce, cl, i = 0;
+    size_t cs = 1, ce, cl, i = 1; // starts at one because the first char of normalized path is always '/'
     while (1) {
         if (path[i] == '/' || path[i] == 0) {
-            //
+            ce = i;
+            cl = ce - cs;
+            if (cl == 0) {goto fproc;} // nothing to do here
+            if (!tsfs_substrcmp(normpath+cs, "..", cl)) { // checks if fragment is either "." or ".."
+                // fatal error, this part of path res has no mechanism to handle "." or ".." while
+                // conforming to proper semantics
+                kernelWarnMsg("BUG IN FS INTERNAL PATH NORMALIZATION");
+                kernelWarnMsg(root);
+                kernelWarnMsg(cwd);
+                kernelWarnMsg(path);
+                kernelWarnMsg(normpath);
+                bugCheckNum(0x02 | FAILMASK_TSFS);
+            }
+            fproc:
+            if (path[i] == 0) {
+                xreturn(currsrch.disk_loc);
+            } else if (cl == 0) {
+                kernelWarnMsg("BUG IN FS INTERNAL PATH NORMALIZATION");
+                kernelWarnMsg(root);
+                kernelWarnMsg(cwd);
+                kernelWarnMsg(path);
+                kernelWarnMsg(normpath);
+                if (_FS_WARN_LOUD == 1) {
+                    bugCheckNum(0x01 | FAILMASK_TSFS);
+                }
+            }
         }
+        i ++;
     }
-    #undef rreturn
+    #undef xreturn
     #undef ereturn
     ret:
+    deallocate(normpath, tsfs_strlen(normpath));
     return retval;
 }
 
@@ -765,7 +794,7 @@ u32 _tsfs_full_respath_ac(FileSystem* fs, _TSFSFRP_D* _data, const char* path) {
             }
         }
     }
-    #undef rreturn
+    #undef xreturn
     #undef ereturn
     ret:
     return retval;
@@ -818,7 +847,7 @@ u32 tsfs_full_respath(FileSystem* fs, const char* path) {
         }
         i ++;
     }
-    #undef rreturn
+    #undef xreturn
     #undef ereturn
     ret:
     return retval;

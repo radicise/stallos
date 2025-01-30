@@ -258,6 +258,23 @@ size_t tsfs_strlen(const char* s) {
     return o;
 }
 
+/*
+performs string compare on s1 and s2, comparing at most maxlen bytes
+*/
+char tsfs_substrcmp(const char* s1, const char* s2, size_t maxlen) {
+    size_t i = 0;
+    while (i < maxlen) {
+        if (s1[i] != s2[i]) {
+            return 1;
+        }
+        if (s1[i] == 0) { // already established by previous if that bytes are equal, so only need to check one of them for being zero
+            return 0;
+        }
+        i ++;
+    }
+    return 0;
+}
+
 char* tsfs_strjoin(const char*,const char*);
 
 /*

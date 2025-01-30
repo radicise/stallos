@@ -1,6 +1,12 @@
 #ifndef __TSFSCORE_H__
 #define __TSFSCORE_H__ 1
+#include "./errdata.h"
+#if _EDATA_START != 7
+#error "improperly updated magic number"
+#endif
+#undef _EDATA_START
 #include "./fsdefs.h"
+#define TSFS_CORE_LPROTECT (9+TSFS_EDATA_SIZE)
 char BLOC_TRACING = 0;
 int tsfs_root_corruption_check(TSFSRootBlock*, u32*);
 // extern int printf(const char*, ...);
@@ -19,8 +25,6 @@ char* strcpy(char* dst, const char* src) {
 // #else
 // #include <string.h>
 // #endif
-
-#define TSFS_CORE_LPROTECT 9
 
 u32 partition_blocks(FileSystem* fs) {
     // return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
