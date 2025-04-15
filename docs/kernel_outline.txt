@@ -1,0 +1,44 @@
+Global:
+	Threadgroup Context (perThreadgroup.h) (declared in threads.h)
+	Per-thread Context (perThread.h) (declared in threads.h)
+	Thread Context (threads.h) (declared in threads.h)
+	Kernel Memory Mapping (machine/[machine]/paging.h) (declared in machine/[machine]/paging.h)
+
+Threadgroup Context (struct PerThreadgroup, perThreadgroup.h):
+	Threadgroup ID (pid_t)
+	Memory Mapping ptr (struct MemSpace*)
+	Lock for memory break changing (Mutex)
+	Break address (uintptr)
+
+Memory Mapping (struct MemSpace, machine/[machine]/paging.h): Keeps track of userspace vaddr-page to kernel vaddr-page mappings, rwx-permissions of each page, and page pinnings
+
+Per-thread Context (struct PerThread, perThread.h):
+	errno for the thread (int)
+	Thread ID (pid_t)
+	Lock for accessing the following fields and the holding of the filesystem information pointer (Mutex)
+	ruid (kuid_t)
+	euid (kuid_t)
+	suid (kuid_t)
+	fsuid (kuid_t)
+	Effective capability bitmask (u64)
+	Permitted capability bitmask (u64)
+	Inheritable capability bitmask (u64)
+	Filesystem Information ptr (struct FSInfo*)
+
+Filesystem Information (struct FSInfo, perThread.h):
+	Lock for accessing the following fields and holding the cwd and root string pointers (Mutex)
+	Cwd string ptr (char*)
+	Root string ptr (char*)
+	Umask (mode_t)
+
+Thread Context (struct Thread, threads.h):
+	Per-thread Context (struct PerThread)
+	Thread State (struct Thread_state)
+	Threadgroup Context (struct PerThreadgroup)
+
+Thread State (struct Thread_state, machine/[machine]/Threadstate.h): Holds all non-memory aspects of a thread's userspace and kernel execution while another thread is running
+
+
+
+
+

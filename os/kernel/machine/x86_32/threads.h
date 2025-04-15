@@ -126,19 +126,32 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	mem_barrier();
 	return;
 }
-pid_t Threads_executionFork(struct Thread* newThread) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
+pid_t Threads_executionFork(struct Thread* newThread, void* stack) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE; the argument `stack' is the first byte not in the stack if 'MACHINE_KSTACK_GROWSDOWN' is nonzero and otherwise is the first byte in the stack
 	flushThreadState(&(newThread->state));
+	prepare_fork_child(&(newThread->state), stack);
 	pid_t n = Threads_insertThread(newThread, 1);
 	if (n == ((pid_t) 0)) {
 		return (pid_t) (-1);
 	}
 	newThread->state.invocData.data[0] = 0;
-	return n;// TODO URGENT Make the new kernel thread immediately return to the user and have its own stack and make each kernel thread have its stack in part of an organised stack space and ensure that locks are correct upon returning of the new kernel thread to user space
+	return n;// TODO URGENT Ensure that locks are correct upon returning of the new kernel thread to user space
 }
-unsigned long Threads_forkExec_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {
-	return (unsigned long) (Threads_executionFork((struct Thread*) ((uintptr) arg0)));
+unsigned long Threads_forkExec_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
+	return (unsigned long) (Threads_executionFork((struct Thread*) ((uintptr) arg0), (void*) ((uintptr) arg1)));
 }
-pid_t Threads_forkExec(struct Thread* newThread) {// `newThread' and `newThread->group' must have been allocated with `alloc' with arguments of `sizeof(struct Thread)' and `sizeof(struct PerThreadgroup)', respectively; the references `newThread' and `newThread->group', as well as memory management of each of these references, are relinquished
-	return (pid_t) (kfunc((unsigned long) ((uintptr) newThread), 0, 0, 0, 0, 0, 0, 0, Threads_forkExec_kfunc));
+pid_t Threads_forkExec(struct Thread* newThread, void* stack) {// `newThread' and `newThread->group' must have been allocated with `alloc' with arguments of `sizeof(struct Thread)' and `sizeof(struct PerThreadgroup)', respectively; the references `newThread' and `newThread->group', as well as memory management of each of these references, are relinquished
+	return (pid_t) (kfunc((unsigned long) ((uintptr) newThread), (unsigned long) ((uintptr) stack), 0, 0, 0, 0, 0, 0, Threads_forkExec_kfunc));
+}
+void Threads_threadstateDump(struct Thread_state* dump) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
+	flushThreadState(dump);
+	return;
+}
+unsigned long Threads_dumpThreadstate_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
+	Threads_threadstateDump((struct Thread_state*) ((uintptr) arg0));
+	return 0;
+}
+void Threads_dumpThreadState(struct Thread_state* dump) {
+	kfunc((unsigned long) ((uintptr) dump), 0, 0, 0, 0, 0, 0, 0, Threads_dumpThreadstate_kfunc);
+	return;
 }
 #endif

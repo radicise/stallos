@@ -17,6 +17,9 @@
  * PAGEOF(x)
  * // The type of the value of `PAGEOF(x)' is `uintptr'
  *
+ * MACHINE_SUPPORT_WRONLYMEM
+ * // 1 if the machine supports pages that are user-writable but not user-readable, 0 otherwise
+ *
  * struct MemSpace
  * // struct MemSpace has an operations lock `lock' of type `Mutex' that is utilised appropriately
  *

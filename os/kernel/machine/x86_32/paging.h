@@ -3,6 +3,7 @@
 #define PAGE_SIZE 4096
 #define PAGE_LOMASK ((uintptr) 0x00000fff)
 #define PAGEOF(x) ((uintptr) ((((uintptr) (x)) / PAGE_SIZE) * PAGE_SIZE))
+#define MACHINE_SUPPORT_WRONLYMEM 0
 const uintptr amntMem = 64 * 1024 * 1024;// The value of `amntMem' must be an integer multiple of the value of `PAGE_SIZE'
 #define USERMEMHIGH (((uintptr) 0) - ((uintptr) 1))
 // TODO URGENT Ensure that `uintptr' wrap-around works as expected

@@ -890,7 +890,12 @@ int sched_yield(void) {// Introduced in Linux 1.3.55
 	return 0;
 }
 pid_t fork(void) {
-	
+	pid_t res = kernel_fork((void*) (((char*) alloc_lb()) + KMEM_LB_BS));
+	if (res == ((pid_t) (-1))) {
+		errno = EAGAIN;
+		return ((pid_t) (-1));
+	}
+	return res;
 }
 int close(int fd) {
 	// TODO Implement
@@ -1025,6 +1030,9 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 		case (1):
 			exit(arg1);
 			bugCheckNum(0x0011 | FAILMASK_SYSCALLS);
+		case (2):
+			retVal = (unsigned long) (fork());
+			break;
 		case (3):
 			{
 				void* mem1 = getUserMem(arg2, (size_t) arg3, 0, 1);

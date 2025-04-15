@@ -75,7 +75,7 @@ int ELF_fillUser(uintptr dest, uintptr count, int userReadable, int userWritable
 	MemSpace_mkUserFill(0x00, dest, count, userReadable, userWritable, mem);// TODO How should overlapping segments that should all be loaded be handled?
 	return 0;
 }
-int loadSeg(const Elf32_Phdr* seg, size_t len, const void* fileBase, uintptr* stack, struct MemSpace* mem) {
+int loadSeg(const Elf32_Phdr* seg, size_t len, const void* fileBase, uintptr* stack, struct MemSpace* mem) {// TODO URGENT Validate MACHINE_SUPPORT_WRONLYMEM
 	uintptr lim = (((const char*) seg) - ((const char*) fileBase)) + 0x20;
 	if (len < lim) {
 		return 33;// Unexpected end of ELF file before end of program header table

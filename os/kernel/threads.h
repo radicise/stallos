@@ -78,9 +78,9 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	nth->group = ngrp;
 	return nth;
 }
-pid_t kernel_fork(void) {// When there is no "tgid"-"tid" combination available for the new thread, the operation fails, no new thread is created, and the value of `(pid_t) (-1)' is returned to the caller; when there is at least one "tgid"-"tid" combination is available for the new thread, the operation succeeds, the new thread's "tid" is returned to the calling thread, and the value of `(pid_t) 0' is returned to the new thread
+pid_t kernel_fork(void* kstack) {// When there is no "tgid"-"tid" combination available for the new thread, the operation fails, no new thread is created, and the value of `(pid_t) (-1)' is returned to the caller; when there is at least one "tgid"-"tid" combination available for the new thread, the operation succeeds, the new thread's "tid" is returned to the calling thread, and the new thread returns to its saved state as if resulting from being a successfully-created child from fork(2)
 	struct Thread* nth = Threads_forkData(Thread_context);
-	pid_t result = Threads_forkExec(nth);
+	pid_t result = Threads_forkExec(nth, kstack);
 	if (result == ((pid_t) (-1))) {// TODO Maybe prevent the possibility of needing to deallocate in the case of the operation failing
 		if (!(Mutex_tryAcquire(&(nth->group->breakLock)))) {
 			bugCheckNum(0x0001 | FAILMASK_PERTHREAD);
