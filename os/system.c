@@ -52,7 +52,7 @@ void bugCheck(void) {
 }
 extern void kfunc_iruptCall(void);
 extern u32 getEFL(void);
-void bugMsg(uintptr* trace) {
+void bugMsg(uintptr* trace, pid_t thd) {
 	for (int i = 0xb8000; i < 0xb8fa0; i += 2) {
 		(*((volatile unsigned short*) (i - RELOC))) = 0x4720;
 	}
@@ -75,11 +75,32 @@ void bugMsg(uintptr* trace) {
 	(*((volatile unsigned short*) (0xb8020 - RELOC))) = 0x474f;
 	(*((volatile unsigned short*) (0xb8022 - RELOC))) = 0x4752;
 	(*((volatile unsigned short*) (0xb80a0 - RELOC))) = 0x4754;
-	(*((volatile unsigned short*) (0xb80a2 - RELOC))) = 0x4752;
-	(*((volatile unsigned short*) (0xb80a4 - RELOC))) = 0x4741;
-	(*((volatile unsigned short*) (0xb80a6 - RELOC))) = 0x4743;
-	(*((volatile unsigned short*) (0xb80a8 - RELOC))) = 0x4745;
-	(*((volatile unsigned short*) (0xb80aa - RELOC))) = 0x473a;
+	(*((volatile unsigned short*) (0xb80a2 - RELOC))) = 0x4748;
+	(*((volatile unsigned short*) (0xb80a4 - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb80a6 - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb80a8 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb80aa - RELOC))) = 0x4744;
+	(*((volatile unsigned short*) (0xb80ac - RELOC))) = 0x473a;
+	(*((volatile unsigned short*) (0xb80ae - RELOC))) = 0x4720;
+	(*((volatile unsigned short*) (0xb80b0 - RELOC))) = 0x4730;
+	(*((volatile unsigned short*) (0xb80b2 - RELOC))) = 0x4778;
+	volatile unsigned char* place = (volatile unsigned char*) (0xb80b2 - RELOC);
+	u32 thrd = thd;
+	for (volatile unsigned char* i = place + 16; i != place; i -= 2) {
+		if ((thrd & 0x0f) < 10) {
+			*i = ((thrd & 0x0f) + 0x30);
+		}
+		else {
+			*i = ((thrd & 0x0f) + 0x37);
+		}
+		thrd >>= 4;
+	}
+	(*((volatile unsigned short*) (0xb8140 - RELOC))) = 0x4754;
+	(*((volatile unsigned short*) (0xb8142 - RELOC))) = 0x4752;
+	(*((volatile unsigned short*) (0xb8144 - RELOC))) = 0x4741;
+	(*((volatile unsigned short*) (0xb8146 - RELOC))) = 0x4743;
+	(*((volatile unsigned short*) (0xb8148 - RELOC))) = 0x4745;
+	(*((volatile unsigned short*) (0xb814a - RELOC))) = 0x473a;
 	int j = 11;
 	while (1) {
 		uintptr addr = trace[j];
@@ -87,14 +108,14 @@ void bugMsg(uintptr* trace) {
 			return;
 		}
 		if (!j) {
-			(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - RELOC))) = 0x472e;
-			(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - RELOC))) = 0x472e;
-			(*((volatile unsigned short*) (0xb8144 + (0xa0 * 11) - RELOC))) = 0x472e;
+			(*((volatile unsigned short*) (0xb81e0 + (0xa0 * 11) - RELOC))) = 0x472e;
+			(*((volatile unsigned short*) (0xb81e2 + (0xa0 * 11) - RELOC))) = 0x472e;
+			(*((volatile unsigned short*) (0xb81e4 + (0xa0 * 11) - RELOC))) = 0x472e;
 			return;
 		}
-		(*((volatile unsigned short*) (0xb8140 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4730;
-		(*((volatile unsigned short*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4778;
-		for (volatile unsigned char* i = (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb8142 + (0xa0 * 11) - (0xa0 * j) - RELOC); i -= 2) {
+		(*((volatile unsigned short*) (0xb81e0 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4730;
+		(*((volatile unsigned short*) (0xb81e2 + (0xa0 * 11) - (0xa0 * j) - RELOC))) = 0x4778;
+		for (volatile unsigned char* i = (void*) (0xb81e2 + (0xa0 * 11) - (0xa0 * j) - RELOC + (sizeof(uintptr) * 4)); i != (void*) (0xb81e2 + (0xa0 * 11) - (0xa0 * j) - RELOC); i -= 2) {
 			if ((addr & 0x0f) < 10) {
 				*i = ((addr & 0x0f) + 0x30);
 			}
@@ -127,16 +148,16 @@ const char hex[] = {0x30,
 long handlingIRQ = 1;// Signifies whether the currently-executing code may be interrupted or execute an interrupt instruction
 pid_t currentThread;// Only to be changed when it is either changed by kernel code through `Threads_nextThread' or not during kernel-space operation
 void bugCheckNum_u32(u32 num, uintptr* addr) {
-	bugMsg(addr);
-	(*((volatile unsigned char*) (0xb8b40 - RELOC))) = 0x49;
-	(*((volatile unsigned char*) (0xb8b42 - RELOC))) = 0x4e;
-	(*((volatile unsigned char*) (0xb8b44 - RELOC))) = 0x46;
-	(*((volatile unsigned char*) (0xb8b46 - RELOC))) = 0x4f;
-	(*((volatile unsigned char*) (0xb8b48 - RELOC))) = 0x3a;
-	(*((volatile unsigned char*) (0xb8b4a - RELOC))) = 0x20;
-	(*((volatile unsigned char*) (0xb8b4c - RELOC))) = 0x30;
-	(*((volatile unsigned char*) (0xb8b4e - RELOC))) = 0x78;
-	volatile unsigned char* place = (volatile unsigned char*) (0xb8b4e - RELOC);
+	bugMsg(addr, handlingIRQ ? (~currentThread) : currentThread);
+	(*((volatile unsigned char*) (0xb8be0 - RELOC))) = 0x49;
+	(*((volatile unsigned char*) (0xb8be2 - RELOC))) = 0x4e;
+	(*((volatile unsigned char*) (0xb8be4 - RELOC))) = 0x46;
+	(*((volatile unsigned char*) (0xb8be6 - RELOC))) = 0x4f;
+	(*((volatile unsigned char*) (0xb8be8 - RELOC))) = 0x3a;
+	(*((volatile unsigned char*) (0xb8bea - RELOC))) = 0x20;
+	(*((volatile unsigned char*) (0xb8bec - RELOC))) = 0x30;
+	(*((volatile unsigned char*) (0xb8bee - RELOC))) = 0x78;
+	volatile unsigned char* place = (volatile unsigned char*) (0xb8bee - RELOC);
 	for (volatile unsigned char* i = place + 16; i != place; i -= 2) {
 		if ((num & 0x0f) < 10) {
 			*i = ((num & 0x0f) + 0x30);
@@ -429,7 +450,9 @@ void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 119
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
 	}
-	Scheduler_update();
+	if ((PIT0Ticks % 3LL) == 0) {// NRW
+		Scheduler_update();
+	}
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1

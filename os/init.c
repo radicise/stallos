@@ -8,6 +8,8 @@ extern ssize_t read(int, void*, size_t);
 extern time_t time(time_t*);
 extern int stime(const time_t*);
 extern void* brk(void*);
+extern pid_t fork(void);
+extern pid_t gettid(void);
 size_t strlen(const char* s) {
 	size_t l = 0;
 	while (s[l++]) {
@@ -131,6 +133,8 @@ void _start() {
 	}
 	*/
 	time_t timeOld = time(NULL);
+	printLong(gettid());
+	write(1, ": ", 2);
 	printLong(timeOld);
 	printLine();
 	time_t timeNow;
@@ -140,8 +144,21 @@ void _start() {
 #endif
 		while ((timeNow = time(NULL)) == timeOld) {
 		}
+		printLong(gettid());
+		write(1, ": ", 2);
 		printLong(timeNow);
 		printLine();
+		if (timeNow == ((time_t) 3)) {
+			pid_t l = fork();
+			/*
+			if (l == (pid_t) 0) {
+				while (1) {
+				}
+			}
+			*/
+			printLong(l);
+			printLine();
+		}
 		timeOld = timeNow;
 	}
 	unsigned char c;

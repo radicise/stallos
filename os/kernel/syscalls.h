@@ -735,10 +735,13 @@ ssize_t write(int fd, const void* buf, size_t count) {
 		return (-1);
 	}
 	struct FileDriver* driver = resolveFileDriver(kfd);
+	//if (tid == 300) {while (1) {}}// NRW
 	if (driver == NULL) {
 		bugCheck();
 	}
+	//if (tid == 300) {bugCheckNum(0x12);}// NRW
 	errno = 0;
+	//if (tid == 300) {bugCheckNum(0x12);}// NRW
 	ssize_t res = driver->write(kfd, buf, count);
 	retDesc(kfd);
 	return res;

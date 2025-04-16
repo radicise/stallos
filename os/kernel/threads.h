@@ -67,13 +67,13 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	nfsi->root = nstr;
 	Mutex_release(&(orig->thread.fsinfo->dataLock));
 	Mutex_release(&(orig->thread.dataLock));
-	Mutex_release(&(nth->thread.fsinfo->dataLock));
-	Mutex_release(&(nth->thread.dataLock));
+	Mutex_initUnlocked(&(nth->thread.fsinfo->dataLock));
+	Mutex_initUnlocked(&(nth->thread.dataLock));
 	struct PerThreadgroup* ngrp = alloc(sizeof(struct PerThreadgroup));
 	Mutex_acquire(&(orig->group->breakLock));
 	memcpy(ngrp, orig->group, sizeof(struct PerThreadgroup));
 	Mutex_release(&(orig->group->breakLock));
-	Mutex_release(&(ngrp->breakLock));
+	Mutex_initUnlocked(&(ngrp->breakLock));
 	ngrp->mem = (MemSpace_fork(ngrp->mem));
 	nth->group = ngrp;
 	return nth;
@@ -111,6 +111,7 @@ void Scheduler_yield(void) {// To only be called from interrupts, when IRQ are d
 	return;
 }
 void Scheduler_update(void) {
+	Scheduler_yield();// TODO Make thread yielding timing better
 	return;
 }
 #endif

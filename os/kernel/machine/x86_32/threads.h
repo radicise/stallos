@@ -128,7 +128,7 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 }
 pid_t Threads_executionFork(struct Thread* newThread, void* stack) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE; the argument `stack' is the first byte not in the stack if 'MACHINE_KSTACK_GROWSDOWN' is nonzero and otherwise is the first byte in the stack
 	flushThreadState(&(newThread->state));
-	prepare_fork_child(&(newThread->state), stack);
+	prepare_fork_child(&(newThread->state), stack, newThread->group->mem);
 	pid_t n = Threads_insertThread(newThread, 1);
 	if (n == ((pid_t) 0)) {
 		return (pid_t) (-1);

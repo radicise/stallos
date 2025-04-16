@@ -20,10 +20,10 @@ then
     set -e
     if [ $? = 1 ]
     then
-	    x86_64-linux-gnu-gcc -D TARGET=x86_64 -D TARGETNUM=2 -D __TESTING__=1 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=x86-64 -mabi=sysv "$@"
+	    x86_64-linux-gnu-gcc -D TARGET=x86_64 -D TARGETNUM=2 -D __TESTING__=0 -O0 -std=c99 -pedantic -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=x86-64 -mabi=sysv "$@"
     else
         # fallback to explicit path
-        eval "$GCCPATH" -D TARGET=x86_64 -D TARGETNUM=2 -D __TESTING__=1 -O0 -std=c99 -pedantic -Wno-builtin-declaration-mismatch -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=x86-64 -mabi=sysv "$@"
+        eval "$GCCPATH" -D TARGET=x86_64 -D TARGETNUM=2 -D __TESTING__=0 -O0 -std=c99 -pedantic -Wno-builtin-declaration-mismatch -ffreestanding -nostartfiles -nostdlib -nodefaultlibs -static -c -march=x86-64 -mabi=sysv "$@"
     fi
 else
     exit 1

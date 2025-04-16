@@ -51,6 +51,16 @@ movl $45,%eax
 int $0x80
 popl %ebx
 ret
+fork:
+.globl fork
+movl $2,%eax
+int $0x80
+ret
+gettid:
+.globl gettid
+movl $224,%eax
+int $0x80
+ret
 testcall:
 .globl testcall
 pushl %ebx
