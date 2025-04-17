@@ -29,6 +29,7 @@ time_t fetch_time(void) {
 	return timeFetch();
 }
 #include "syscalls.h"
+/*
 int reserve_userFD(void) {
     int fd;
     lockThreadInfo();
@@ -39,6 +40,7 @@ int reserve_userFD(void) {
     }
     return fd;
 }
+*/
 int reserve_kfd(void) {
 	return makeKfd();
 }

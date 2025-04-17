@@ -669,7 +669,7 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	PerThread_context->cap_effective = 0xffffffffffffffffULL;
 	PerThread_context->cap_permitted = 0xffffffffffffffffULL;
 	PerThread_context->cap_inheritable = 0xffffffffffffffffULL;
-    PerThread_context->__curr_userFD = 40;
+	//PerThread_context->__curr_userFD = 40;
 	PerThread_context->fsinfo = alloc(sizeof(struct FSInfo));
 	{
 		char* fsstr = alloc(2);
