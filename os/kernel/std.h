@@ -29,6 +29,16 @@ time_t fetch_time(void) {
 	return timeFetch();
 }
 #include "syscalls.h"
+int reserve_userFD(void) {
+    int fd;
+    lockThreadInfo();
+    fd = PerThread_context->__curr_userFD ++;
+    unlockThreadInfo();
+    if (fd == 399) {
+        bugCheck();
+    }
+    return fd;
+}
 int reserve_kfd(void) {
 	return makeKfd();
 }

@@ -1,14 +1,18 @@
 #ifndef __TSFSSTD_H__
 #define __TSFSSTD_H__ 1
+#define __THREADS_H__ 1
 #ifndef TARGETNUM
 #define TARGETNUM 2
 #endif
 #include "../types.h"
+#include "../perThread.h"
+extern struct PerThread* volatile PerThread_context;
 struct FileDriver;
 extern kuid_t fetch_euid(void);
 extern int have_cap(int);
 extern void associate_kfd(int, struct FileDriver*, int, int);
 extern int reserve_kfd(void);
+extern int reserve_userFD(void);
 extern void Mutex_acquire(Mutex* mutex);
 extern void Mutex_release(Mutex* mutex);
 extern int Mutex_tryAcquire(Mutex* mutex);

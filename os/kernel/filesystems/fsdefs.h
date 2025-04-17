@@ -47,8 +47,9 @@ void dalloc(void* p, size_t s) {
 // #define SEEK_CUR 1
 // #define SEEK_END 2
 // #endif
-// #include "./tsfsconst.h"
 #include "../FileDriver.h"
+#include "./tsfsconst.h"
+typedef _kernel_u32 fsikey_t;
 #include "../fsiface.h"
 // typedef struct FSReturn FSRet;
 #include "./tsfserr.h"
@@ -57,7 +58,7 @@ void dalloc(void* p, size_t s) {
 #define VERNOHI 001
 #define VERNOLO 002
 // only one that really counts, any change between this and what is on disk will result in failure, BN stand for breaking number (version of breaking changes)
-#define VERNOBN 10
+#define VERNOBN 12
 
 #define TSFS_ANSI_NUN "\x1b[0m"
 #define TSFS_ANSI_RED "\x1b[38;2;235;0;0m"
@@ -208,6 +209,7 @@ typedef struct {
     c - create
     m - modify
     a - access
+    u - update
     s - secs
     n - nsec
     */
@@ -217,6 +219,8 @@ typedef struct {
     s64 mn;
     s64 as;
     s64 an;
+    s64 us;
+    s64 un;
 } TIMES;
 
 typedef struct {
@@ -242,13 +246,17 @@ typedef struct {
     u32   head;
     // blocks used by data
     u32   blocks;
+    // inode number
+    u32   ikey;
     // size of data in bytes
     u64   size;
     // permissions and other metadata
     // permissions
-    u16   perms;
+    u32   perms;
+    u32   oid;
+    u32   gid;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
-    u64   times[6];
+    u64   times[8];
     u64   checksum;
 } TSFSDataHeader;
 
@@ -260,6 +268,8 @@ void get_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     times->mn = timelist[3];
     times->as = timelist[4];
     times->an = timelist[5];
+    times->us = timelist[6];
+    times->un = timelist[7];
 }
 void set_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     s64* timelist = (s64*)(dh->times);
@@ -269,6 +279,8 @@ void set_dhtimes(TSFSDataHeader* dh, TIMES* times) {
     timelist[3] = times->mn;
     timelist[4] = times->as;
     timelist[5] = times->an;
+    timelist[6] = times->us;
+    timelist[7] = times->un;
 }
 
 typedef struct {
@@ -324,13 +336,15 @@ typedef struct {
     u8    id;
     //
     u8    storage_flags;
-    u32   data_loc;
+    // u32   data_loc;
     // location of the child table, name is shot because the child tables used to own the nodes
     u32   parent_loc;
     // parent node
     u32   pnode;
-    // inode number
-    u32   inum;
+    // inode number / permissions
+    u32   ikey;
+    u32   oid;
+    u32   gid;
     // u32   blocks; // number of blocks forming the data of this node
     // u64   size;
     char  name[255];
@@ -363,6 +377,29 @@ typedef struct {
     u64   checksum;
 } TSFSStructBlock;
 
+/*
+struct that gives proper access to fields shared by the TSFS block types
+*/
+typedef struct {
+    size_t magicno;
+    u32   disk_loc;
+    u16   rc;
+    u8    id;
+} TSFSObj;
+
+inline char check_obj_id(TSFSObj* obj, u8 id) {
+    return obj->id == id;
+}
+inline char check_sn_type(TSFSStructNode* sn, u8 typ) {
+    return sn->storage_flags == typ;
+}
+
+#define FS_TNOD(o) check_obj_id(o,0)
+#define FS_TBLK(o) check_obj_id(o,1)
+#define FS_TDAT(o) check_obj_id(o,2)
+#define FS_THED(o) check_obj_id(o,3)
+#define FS_SFIL(s) check_sn_type(s,TSFS_KIND_FILE)
+
 typedef struct {
     size_t csize;
     size_t cused;
@@ -370,6 +407,16 @@ typedef struct {
     size_t hmin;
     void** ptr;
 } Magic;
+
+// Mutexes for various kinds of operations
+typedef struct {
+    // WARNING: it is an error to attempt ANY kind of disk access with acquiring the drive lock
+    // NOTE: the drive lock should be released between disk operations that are independent
+    // WARNING: the operation type locks must be acquired for the ENTIRE duration of a syscall
+    Mutex* drive_lock; // lock on all disk operations
+    Mutex* ddata_lock; // lock on disk operations that affect data
+    Mutex* dstct_lock; // lock on disk operations that affect structure
+} FSLocks;
 
 /*
 Custom File System, see the stallOS spec for more details - Tristan
@@ -382,6 +429,7 @@ typedef struct {
     TSFSRootBlock* rootblock;
     // table that handles the magical BS required to do reordering on-the-fly
     Magic* magic;
+    FSLocks* locks;
 } FileSystem;
 
 /*
@@ -428,14 +476,11 @@ int tsfs_cmp_ce(TSFSSBChildEntry* ce1, TSFSSBChildEntry* ce2) {
     return bufcmp(ce1->name, ce2->name, 9);
 }
 
-#include "./tsfsrw.h"
-
 u64 tsfs_tell(FileSystem* fs) {
     loff_t x = 0;
     fs->fdrive->_llseek(fs->kfd, 0, 0, &x, SEEK_CUR);
     return (u64)x;
 }
-#include "./gensizes.h"
 
 
 // int longseek(FileSystem* fs, loff_t offset, int whence) {
@@ -474,6 +519,9 @@ int _real_seek(FileSystem* fs, off_t offset, int whence, long line, const char* 
 }
 
 #define seek(fs, offset, whence) _real_seek(fs, offset, whence, __LINE__, __func__, __FILE__)
+
+#include "./tsfsrw.h"
+#include "./gensizes.h"
 
 u32 tsfs_loc_to_block(u64 loc) {
     return (u32)(loc/BLOCK_SIZE);
@@ -569,6 +617,7 @@ void __DBG_here(long, const char*, const char*);
 #include "./funcdefs.h"
 #include "./diskmanip.h"
 #include "./tsfs_magic.h"
+#include "./tsfs_locks.h"
 #include "./tsfshelpers.h"
 #include "./itable.h"
 

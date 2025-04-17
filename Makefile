@@ -1,5 +1,6 @@
 CCPRGM ?= ./cc.sh
 ASPRGM ?= i686-linux-gnu-as
+ARPRGM ?= i686-linux-gnu-ar
 LDPRGM ?= i686-linux-gnu-ld
 STRIPPRGM ?= i686-linux-gnu-strip
 OBJCOPYPRGM ?= i686-linux-gnu-objcopy
@@ -29,14 +30,20 @@ run : Stallos/stallos.bin
 build/init.elf : build/init-asm.elf build/init-ul.elf
 	${LDPRGM} ${LDFLAGS} -o build/init.elf build/init-ul.elf build/init-asm.elf -lgcc
 
-build/init-asm.elf : os/init.s
-	${ASPRGM} ${ASFLAGS} -o build/init-asm.elf os/init.s
+build/init-asm.elf : os/userspace/init/init.s
+	${ASPRGM} ${ASFLAGS} -o build/init-asm.elf os/userspace/init/init.s
 
-build/init-ul.elf : os/init.c
-	${CCPRGM} -o build/init-ul.elf os/init.c
+build/leek.a: build/leek.o build/init-asm.elf
+	${ARPRGM} rcs build/leek.a build/leek.o build/init-asm.elf
 
-build/kernel.elf : build/kernelbase-ul.elf build/kernel-asm.elf build/tsfs-ul.elf
-	${LDPRGM} ${LDFLAGS} -Ttext=0x1000 -o build/kernel.elf build/kernelbase-ul.elf build/kernel-asm.elf build/tsfs-ul.elf -lgcc
+build/leek.o: os/userspace/leek/leek.h  os/userspace/leek/leek.c
+	${CCPRGM} -o build/leek.o os/userspace/leek/leek.c
+
+build/init-ul.elf : os/userspace/init/init.c
+	${CCPRGM} -o build/init-ul.elf os/userspace/init/init.c
+
+build/kernel.elf : build/kernelbase-ul.elf build/kernel-asm.elf 
+	${LDPRGM} ${LDFLAGS} -Ttext=0x1000 -o build/kernel.elf build/kernelbase-ul.elf build/kernel-asm.elf -lgcc 
 
 build/kernel-asm.elf : build/system-comp.s
 	${ASPRGM} ${ASFLAGS} -o build/kernel-asm.elf build/system-comp.s

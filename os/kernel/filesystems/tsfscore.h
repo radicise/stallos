@@ -1,6 +1,13 @@
 #ifndef __TSFSCORE_H__
 #define __TSFSCORE_H__ 1
+#include "./errdata.h"
+#if _EDATA_START != 7
+#error "improperly updated magic number"
+#endif
+#undef _EDATA_START
 #include "./fsdefs.h"
+#define TSFS_CORE_LPROTECT (9+TSFS_EDATA_SIZE)
+char BLOC_TRACING = 0;
 int tsfs_root_corruption_check(TSFSRootBlock*, u32*);
 // extern int printf(const char*, ...);
 // #include "./tsfsmanage.h"
@@ -19,8 +26,6 @@ char* strcpy(char* dst, const char* src) {
 // #include <string.h>
 // #endif
 
-#define TSFS_CORE_LPROTECT 7
-
 u32 partition_blocks(FileSystem* fs) {
     // return (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
     return fs->rootblock->partition_size;
@@ -35,6 +40,8 @@ DO NOT CALL OUTSIDE THE CASE THAT A NEW PARTITION IS BEING MADE
 RETURNS FS WITH NULL ROOTBLOCK ON ERROR
 */
 FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
+    unsigned char buffer[6] = {0, 2, 0, 0, 0, 7};
+    printf("%lx\n", hashsized(&buffer, 6));
     s64 curr_time = (s64)(fetch_time(NULL));
     FSRet rv = {.err=EINVAL,.retptr=0};
     if (p_size % BLOCK_SIZE != 0) {
@@ -52,33 +59,35 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     fs -> kfd = kfd;
     fdr->lseek(kfd, 0, SEEK_SET);
     tsmagic_make(fs);
+    tslocks_make(fs);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
     rblock->breakver = VERNOBN;
     strcpy(rblock->version, TSFSVERSION);
     rblock->partition_size = (u32)p_size;
     rblock->creation_time = *((u64*)(&curr_time));
-    rblock->usedleft = 7;
+    rblock->usedleft = TSFS_CORE_LPROTECT;
     // u32 tblocks = (u32)((((u64)1)<<(rblock->partition_size)) / BLOCK_SIZE);
     u32 tblocks = (u32)p_size;
     rblock->usedright = tblocks - 1;
     u32 center = tblocks/2;
-    rblock->usedhalfleft = center-1;
-    rblock->usedhalfright = center+1;
-    rblock->top_dir = 5;
+    printf("CENTER: %lx\n", center);
+    rblock->usedhalfleft = center;
+    rblock->usedhalfright = center;
+    rblock->top_dir = TSFS_CORE_LPROTECT-2;
     u64 checksum = hash_rootblock(rblock);
     rblock->checksum = checksum;
     write_rootblock(fs, rblock);
-    dmanip_null(fs, 1, 4);
+    dmanip_null(fs, 1, 6);
+    dmanip_fill(fs, 6, 1, 1);
     block_seek(fs, 1, BSEEK_SET);
-    write_u32be(fs, center);
+    write_u32be(fs, 5);
     TSFSStructNode snode = {
         .storage_flags = TSFS_KIND_DIR,
         .parent_loc = rblock->top_dir + 1,
         .disk_loc = rblock->top_dir,
         .pnode = 0,
-        .data_loc = 0,
-        .inum = 0
+        .ikey = 0
     };
     snode.name[0] = '/';
     block_seek(fs, rblock->top_dir, BSEEK_SET);
@@ -89,13 +98,14 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
     sblock.entrycount = 0;
     block_seek(fs, snode.parent_loc, BSEEK_SET);
     write_structblock(fs, &sblock);
-    block_seek(fs, center, BSEEK_SET);
-    write_u32be(fs, 0xff010000UL);
+    block_seek(fs, 5, BSEEK_SET);
+    write_u32be(fs, 0xff000100UL);
     write_u32be(fs, 1);
-    block_seek(fs, center+1, BSEEK_SET);
-    write_u32be(fs, 0xff010100UL);
-    write_u32be(fs, center);
-    write_u32be(fs, rblock->top_dir);
+    write_u32be(fs, 6);
+    block_seek(fs, 6, BSEEK_SET);
+    write_u32be(fs, 0xff010000UL);
+    write_u32be(fs, 5);
+    // write_u32be(fs, rblock->top_dir);
     rv.retptr = fs;
     return rv;
 }
@@ -103,6 +113,7 @@ FSRet createFS(struct FileDriver* fdr, int kfd, loff_t p_size) {
 void releaseFS(FileSystem* fs) {
     deallocate(fs->rootblock, sizeof(TSFSRootBlock));
     tsfs_magic_release(fs);
+    tslocks_release(fs);
     deallocate(fs, sizeof(FileSystem));
 }
 
@@ -136,6 +147,7 @@ FSRet loadFS(struct FileDriver* fdr, int kfd, loff_t gsize) {
     fs -> kfd = kfd;
     fs -> err = 0;
     tsmagic_make(fs);
+    tslocks_make(fs);
     fdr->lseek(kfd, 0, SEEK_SET);
     TSFSRootBlock* rblock = (TSFSRootBlock*) allocate(sizeof(TSFSRootBlock));
     fs -> rootblock = rblock;
@@ -181,7 +193,11 @@ area is ternary and designates which way to search for available blocks, zero is
 and 2 is balanced centered
 NOTE: when area is 2, count is irrelevant, and exactly one block is allocated
 */
-u32 allocate_blocks(FileSystem* fs, u8 area, u16 count) {
+u32 _allocate_blocks(FileSystem* fs, u8 area, u16 count, unsigned long line, const char* file, const char* func) {
+    if (BLOC_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sBLOC TRACE <ALLOC> {AREA:%u, CNT: %hu}%s\n", TSFS_ANSI_GRN, area, count, TSFS_ANSI_NUN);
+    }
     u32 ul = fs->rootblock->usedleft;
     u32 ur = fs->rootblock->usedright;
     u32 uhl = fs->rootblock->usedhalfleft;
@@ -305,7 +321,11 @@ frees a structure block
 the block being freed MUST be inaccessible by other blocks
 all cleanup MUST be done prior to freeing it
 */
-int tsfs_free_structure(FileSystem* fs, u32 block_no) {
+int _tsfs_free_structure(FileSystem* fs, u32 block_no, unsigned long line, const char* file, const char* func) {
+    if (BLOC_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sBLOC TRACE <STRUCT> {BLOCKNO:%lu}\n%s", TSFS_ANSI_GRN, block_no, TSFS_ANSI_NUN);
+    }
     u32 ul = fs->rootblock->usedleft;
     if (block_no >= ul || block_no < TSFS_CORE_LPROTECT) { // protect bounds
         printf("BLKNO: %u\n", block_no);
@@ -333,6 +353,20 @@ int tsfs_free_structure(FileSystem* fs, u32 block_no) {
     TSFSStructNode* nodeptr = 0;
     block_seek(fs, (s32)ul, BSEEK_SET);
     read_structblock(fs, &sblock);
+    if (sblock.entrycount == 0xff) { // itable block
+        unsigned char data[8] = {0};
+        block_seek(fs, ul, BSEEK_SET);
+        read_buf(fs, data, 8);
+        u32 meta = areadu32be(data);
+        u32 ploc = areadu32be(data+4);
+        block_seek(fs, ploc, BSEEK_SET);
+        seek(fs, ((meta&0xff0000)?8:0) // offset by 8 bytes if the parent is an L1 table to account for metadata
+            +(4*(meta&0xff)), // go to the entry that needs to be updated
+            SEEK_CUR);
+        write_u32be(fs, block_no);
+        dmanip_null_shift_left(fs, ul, 1, ul-block_no);
+        return 0;
+    }
     // blockptr = tsfs_load_block(fs, 0);
     // printf("AFTER BLOCK LOAD, PTR = %p\n", (void*)blockptr);
     // _DBG_print_block(blockptr);
@@ -534,12 +568,18 @@ static void bitfield_print(FileSystem* fs, DynBField* ptr) {
     }
 }
 
+static inline u32 minu32(u32 n1, u32 n2) {return n1 ? n1 < n2 : n2;}
+
 /*
-frees all data blocks starting from the given dataheader
+frees all data blocks starting from the given dataheader or datablock
 !!WARNING!!
 cleanup MUST be complete BEFORE freeing data blocks
 */
-int tsfs_free_data(FileSystem* fs, u32 block_no) {
+int _tsfs_free_data(FileSystem* fs, u32 block_no, unsigned long line, const char* file, const char* func) {
+    if (BLOC_TRACING) {
+        __DBG_here(line, func, file);
+        printf("%sBLOC TRACE <DATA> {BLOCKNO:%lu}\n%s", TSFS_ANSI_GRN, block_no, TSFS_ANSI_NUN);
+    }
     u32 ur = fs->rootblock->usedright;
     u32 tblocks = partition_blocks(fs);
     if (block_no < ur || block_no >= tblocks) { // protect bounds
@@ -552,10 +592,10 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
     read_dataheader(fs, &dhtest);
     u64 comphash = hash_dataheader(&dhtest);
     u32 oblk = block_no;
-    // u32 tblocks = (u32)((((u64)1)<<(fs->rootblock->partition_size)) / BLOCK_SIZE);
+    // init the bitfield
     DynBField* bf = mk_bfield();
+    u32 used = tblocks-ur-1;
     {
-        u32 used = tblocks-fs->rootblock->usedright-1;
         u32 bfsize = (used)/8;
         printf("USED: %u\nBFSIZE: %u\n", used, bfsize);
         bfield_setsize(bf, bfsize + ((used%8>0)?1:0));
@@ -563,23 +603,182 @@ int tsfs_free_data(FileSystem* fs, u32 block_no) {
     }
     set_bfield_block(bf, oblk-ur, 1);
     int rcode = 0;
+    // # of blocks removed (for updating the used right count)
     u32 removed = 1;
+    u32 last_hole = 0;
+    u32 first_live = used;
     TSFSDataBlock crdb;
+    // check for data header deletion
     if (dhtest.checksum == comphash) {
-        block_seek(fs, dhtest.head, BSEEK_SET);
+        // printf("REMDH\n");
         set_bfield_block(bf, dhtest.head-ur, 1);
+        block_seek(fs, dhtest.head, BSEEK_SET);
+        read_datablock(fs, &crdb);
+        removed ++;
     } else {
         block_seek(fs, block_no, BSEEK_SET);
+        read_datablock(fs, &crdb);
     }
-    read_datablock(fs, &crdb);
+    // populate the bitfield
     while (crdb.next_block) {
+        removed ++;
         set_bfield_block(bf, crdb.next_block-ur, 1);
         block_seek(fs, crdb.next_block, BSEEK_SET);
         read_datablock(fs, &crdb);
     }
+    for (u32 i = 0; i < used; i ++) {
+        if (get_bfield_block(bf, i)) {
+            if (i > last_hole) {
+                last_hole = i;
+            }
+        } else {
+            if (i < first_live) {
+                first_live = i;
+            }
+        }
+    }
+    printf("FL-LH DATA: %lu, %lu\n", first_live, last_hole);
+    // DEBUG INFO
     bitfield_print(fs, bf);
+    if (first_live > last_hole) { // simple deletion, no movement required
+        dmanip_null(fs, ur, first_live);
+    } else { // movement is required
+        printf("NEEDS MOVE\n");
+        unsigned char* bigbuf = (unsigned char*)alloc(1024);
+        TSFSDataHeader* workdh;
+        TSFSDataBlock* workdb;
+        TSFSDataBlock* dbadj;
+        // int itercount = 0;
+        while (!(first_live > last_hole)) {
+            // itercount ++;
+            // if (itercount > 25) {
+            //     printf("ITERC EXCEEDED\n");
+            //     break;
+            // }
+            // printf("ITER: %i\nFL: %lu\nLH: %lu\n", itercount, first_live, last_hole);
+            bitfield_print(fs, bf);
+            // number of holes in the run
+            u32 hamt = 0;
+            for (u32 i = last_hole; i > 0; i --) {
+                if (get_bfield_block(bf, i)) {
+                    hamt ++;
+                } else {
+                    break;
+                }
+            }
+            // printf("HAMT,LH: %lu, %lu\n", hamt, last_hole);
+            // number of live blocks in the run
+            u32 lamt = 0;
+            for (u32 i = first_live; i < first_live+hamt; i ++) {
+                if (!get_bfield_block(bf, i)) {
+                    set_bfield_block(bf, i, 1);
+                    lamt ++;
+                } else {
+                    break;
+                }
+            }
+            // printf("LAMT,FL: %lu, %lu\n", lamt, first_live);
+            for (u32 i = first_live+lamt-1; i >= first_live; i --) {
+                // printf("I: %lu\n", i);
+                u32 sblk = i+ur;
+                u32 dblk = last_hole - ((first_live+lamt-1)-i);
+                set_bfield_block(bf, dblk, 0);
+                dblk += ur;
+                dmanip_null(fs, dblk, 1);
+                if (test_dataheader(fs, sblk)) { // move data header
+                    // block_seek(fs, sblk, BSEEK_SET);
+                    // read_dataheader(fs, &workdh);
+                    workdh = tsfs_load_head(fs, sblk);
+                    dmanip_null(fs, sblk, 1);
+                    update_itable_entry(fs, workdh->ikey, dblk);
+                    workdh->disk_loc = dblk;
+                    block_seek(fs, dblk, BSEEK_SET);
+                    write_dataheader(fs, workdh);
+                    workdb = tsfs_load_data(fs, workdh->head);
+                    // block_seek(fs, workdh.head, BSEEK_SET);
+                    // read_datablock(fs, &workdb);
+                    tsfs_unload(fs, workdh);
+                    seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+                    workdb->prev_block = dblk;
+                    write_datablock(fs, workdb);
+                    tsfs_unload(fs, workdb);
+                } else { // move data block
+                    // block_seek(fs, sblk, BSEEK_SET);
+                    // read_datablock(fs, &workdb);
+                    workdb = tsfs_load_data(fs, sblk);
+                    read_buf(fs, bigbuf, workdb->data_length);
+                    workdb->disk_loc = dblk;
+                    dmanip_null(fs, sblk, 1);
+                    block_seek(fs, dblk, BSEEK_SET);
+                    write_datablock(fs, workdb);
+                    write_buf(fs, bigbuf, workdb->data_length);
+                    if (test_dataheader(fs, workdb->prev_block)) {
+                        // block_seek(fs, workdb.prev_block, BSEEK_SET);
+                        // read_dataheader(fs, &workdh);
+                        workdh = tsfs_load_head(fs, workdb->prev_block);
+                        workdh->head = dblk;
+                        seek(fs, -TSFSDATAHEADER_DSIZE, SEEK_CUR);
+                        write_dataheader(fs, workdh);
+                        tsfs_unload(fs, workdh);
+                    } else {
+                        // block_seek(fs, workdb.prev_block, BSEEK_SET);
+                        // read_datablock(fs, &dbadj);
+                        dbadj = tsfs_load_data(fs, workdb->prev_block);
+                        dbadj->next_block = dblk;
+                        seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+                        write_datablock(fs, dbadj);
+                        tsfs_unload(fs, dbadj);
+                    }
+                    if (workdb->next_block) {
+                        // block_seek(fs, workdb.next_block, BSEEK_SET);
+                        // read_datablock(fs, &dbadj);
+                        dbadj = tsfs_load_data(fs, workdb->next_block);
+                        seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+                        dbadj->prev_block = dblk;
+                        write_datablock(fs, dbadj);
+                        tsfs_unload(fs, dbadj);
+                    }
+                    tsfs_unload(fs, workdb);
+                }
+            }
+            last_hole = 0;
+            first_live = used;
+            for (u32 i = 0; i < used; i ++) {
+                if (get_bfield_block(bf, i)) {
+                    if (i > last_hole) {
+                        last_hole = i;
+                    }
+                } else {
+                    if (i < first_live) {
+                        first_live = i;
+                    }
+                }
+            }
+            if (first_live > last_hole) {
+                printf("NORMAL ESCAPE\n");
+            }
+        }
+        dealloc(bigbuf, 1024);
+        last_hole = 0;
+        first_live = used;
+        for (u32 i = 0; i < used; i ++) {
+            if (get_bfield_block(bf, i)) {
+                if (i > last_hole) {
+                    last_hole = i;
+                }
+            } else {
+                if (i < first_live) {
+                    first_live = i;
+                }
+            }
+        }
+        dmanip_null(fs, ur, first_live);
+    }
     cleanup:
     rel_bfield(bf);
+    fs->rootblock->usedright += removed;
+    block_seek(fs, 0, BSEEK_SET);
+    write_rootblock(fs, fs->rootblock);
     return rcode;
 }
 
@@ -605,7 +804,8 @@ void getcreat_databloc(FileSystem* fs, u32 loc, u32 pos, TSFSDataBlock* db, int*
         db->storage_flags = TSFS_SF_FINAL_BLOCK|TSFS_SF_LIVE;
         odb->storage_flags &= ~TSFS_SF_FINAL_BLOCK;
         odb->next_block = blk;
-        seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+        // seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
+        block_seek(fs, odb->disk_loc, BSEEK_SET);
         write_datablock(fs, odb);
         tsfs_unload(fs, odb);
         block_seek(fs, blk, BSEEK_SET);
@@ -616,82 +816,96 @@ void getcreat_databloc(FileSystem* fs, u32 loc, u32 pos, TSFSDataBlock* db, int*
     }
 }
 
+/*
+writes data to a file
+if [position] is greater than the size of the file, the operation fails
+
+FS INVARIANT CONSIDERATION:
+it must never be the case that all of a file's data blocks are completely filled
+
+*/
 size_t data_write(FileSystem* fs, TSFSStructNode* sn, u64 position, const void* data, size_t size) {
+    // constants
     size_t osize = size;
-    struct PosDat data_loc = tsfs_traverse(fs, sn, position, 1);
-    if (data_loc.bloc.storage_flags == 0) {
+    u32 dbfullsize = BLOCK_SIZE - TSFSDATABLOCK_DSIZE;
+    // validations
+    u32 data_loc = resolve_itable_entry(fs, sn->ikey);
+    if (data_loc == 0) {
         return 0;
     }
-    u32 realoffset = (u32)(position-data_loc.poff);
-    seek(fs, realoffset + TSFSDATABLOCK_DSIZE, SEEK_CUR);
-    size_t cpos = 0;
-    u32 bsize = (u32)BLOCK_SIZE;
-    u32 fsize = bsize - TSFSDATABLOCK_DSIZE;
-    u32 left = fsize - realoffset;
-    u64 sinc = 0;
-    int binc = 0;
-    if (left >= size) {
-        printf("DW>=\n");
+    TSFSDataHeader* header = tsfs_load_head(fs, data_loc);
+    if (position > header->size) {
+        goto err;
+    }
+    // traversal
+    u64 cpos = 0;
+    TSFSDataBlock dblock = {0};
+    block_seek(fs, header->head, BSEEK_SET);
+    read_datablock(fs, &dblock);
+    while (1) {
+        if ((cpos + dblock.data_length) >= position) {
+            break;
+        }
+        if (dblock.next_block == 0) {
+            goto err;
+        }
+        cpos += dblock.data_length;
+        block_seek(fs, dblock.next_block, BSEEK_SET);
+        read_datablock(fs, &dblock);
+    }
+    u32 first_offset = position - cpos;
+    seek(fs, first_offset, SEEK_CUR);
+    // at this point:
+    // the position in the partition is at the first byte data should be written to
+    u64 schange = 0;
+    int blocks_added = 0;
+    if (dbfullsize - first_offset >= size) { // only need to modify one block
         write_buf(fs, data, size);
-        block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
-        size_t ns = size + realoffset;
-        u16 dl = data_loc.bloc.data_length;
-        sinc += (ns >= dl) ? (ns - dl) : 0;
-        data_loc.bloc.data_length = ns > dl ? ns : dl;
-        write_datablock(fs, &data_loc.bloc);
-        size = 0;
-    } else {
-        printf("DW<\n");
-        write_buf(fs, data, left);
-        block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
-        data_loc.bloc.data_length = fsize;
-        write_datablock(fs, &data_loc.bloc);
-        sinc += left;
-        size -= left;
-        cpos += left;
+        schange = (first_offset + size) - dblock.data_length;
+        dblock.data_length = first_offset + size;
+        block_seek(fs, dblock.disk_loc, BSEEK_SET);
+        write_datablock(fs, &dblock);
+        header->size += schange;
+        block_seek(fs, header->disk_loc, BSEEK_SET);
+        write_dataheader(fs, header);
+        tsfs_unload(fs, header);
+        return size;
     }
-    if (size > 0) {
-        printf("NCOMPLETE\nCSIZE: %zu\n", size);
-        TSFSDataBlock db = {0};
-        // loc_seek(fs, data_loc.bloc.next_block);
-        // read_datablock(fs, &db);
-        block_seek(fs, data_loc.bloc.disk_loc, BSEEK_SET);
-        read_datablock(fs, &db);
-        while (1) {
-            if (fsize > size) {
-                printf("FS>S\n");
-                break;
-            }
-            getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
-            seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
-            sinc += fsize - db.data_length;
-            db.data_length = fsize;
-            write_datablock(fs, &db);
-            write_buf(fs, (const void*)(((const char*)data)+cpos), fsize);
-            cpos += fsize;
-            size -= fsize;
+    size_t amount_left = size - (dbfullsize - first_offset);
+    write_buf(fs, data, (dbfullsize - first_offset));
+    schange = dbfullsize - dblock.data_length;
+    dblock.data_length = dbfullsize;
+    block_seek(fs, dblock.disk_loc, BSEEK_SET);
+    write_datablock(fs, &dblock);
+    while (amount_left) {
+        getcreat_databloc(fs, dblock.disk_loc, dblock.next_block, &dblock, &blocks_added);
+        // block_seek(fs, dblock.next_block, BSEEK_SET);
+        // read_datablock(fs, &dblock);
+        if (amount_left > dbfullsize) {
+            schange += (dbfullsize - dblock.data_length);
+            write_buf(fs, (const void*)(((char*)data) + (size - amount_left)), dbfullsize);
+            dblock.data_length = dbfullsize;
+            block_seek(fs, dblock.disk_loc, BSEEK_SET);
+            write_datablock(fs, &dblock);
+            amount_left -= dbfullsize;
+            continue;
         }
-        if (size > 0) {
-            printf("BEFORE: %d\n", binc);
-            getcreat_databloc(fs, db.disk_loc, db.next_block, &db, &binc);
-            printf("AFTER: %d\n", binc);
-            _DBG_print_data(&db);
-            seek(fs, -TSFSDATABLOCK_DSIZE, SEEK_CUR);
-            sinc += fsize - db.data_length;
-            db.data_length = size > db.data_length ? size : db.data_length;
-            write_datablock(fs, &db);
-            write_buf(fs, (const void*)(((const char*)data)+cpos), size);
-            size = 0;
-        }
+        schange += amount_left >= dblock.data_length ? (amount_left - dblock.data_length) : 0;
+        write_buf(fs, (const void*)(((char*)data)+(size-amount_left)), amount_left);
+        dblock.data_length = amount_left >= dblock.data_length ? amount_left : dblock.data_length;
+        block_seek(fs, dblock.disk_loc, BSEEK_SET);
+        write_datablock(fs, &dblock);
+        amount_left = 0;
     }
-    TSFSDataHeader dh;
-    block_seek(fs, sn->data_loc, BSEEK_SET);
-    read_dataheader(fs, &dh);
-    dh.size += sinc;
-    dh.blocks += binc;
-    seek(fs, -TSFSDATAHEADER_DSIZE, SEEK_CUR);
-    write_dataheader(fs, &dh);
-    return osize - size;
+    header->size += schange;
+    header->blocks += blocks_added;
+    block_seek(fs, header->disk_loc, BSEEK_SET);
+    write_dataheader(fs, header);
+    tsfs_unload(fs, header);
+    return size;
+    err:
+    tsfs_unload(fs, header);
+    return 0;
 }
 
 // TODO: make work with more than one data block
@@ -778,14 +992,14 @@ int tsfs_root_corruption_check(TSFSRootBlock* rb, u32* psize_actual) {
         corrupt = 1;
         kernelWarnMsg("usedleft crossed usedright");
     }
-    if (rb->usedhalfleft >= rb->usedhalfright || rb->usedhalfleft <= rb->usedleft) { // invalid usedhalfleft
-        corrupt = 1;
-        kernelWarnMsg("invalid usedhalfleft");
-    }
-    if (rb->usedhalfright >= rb->usedright) { // invalid usedhalfright
-        corrupt = 1;
-        kernelWarnMsg("invalid usedhalfright");
-    }
+    // if (rb->usedhalfleft >= rb->usedhalfright || rb->usedhalfleft <= rb->usedleft) { // invalid usedhalfleft
+    //     corrupt = 1;
+    //     kernelWarnMsg("invalid usedhalfleft");
+    // }
+    // if (rb->usedhalfright >= rb->usedright) { // invalid usedhalfright
+    //     corrupt = 1;
+    //     kernelWarnMsg("invalid usedhalfright");
+    // }
     return corrupt;
 }
 

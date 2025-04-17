@@ -65,4 +65,8 @@ defines constants such as O_RDWR
     //Symbolic links are not followed when resolving paths; see mount(2).
     #define ST_NOSYMFOLLOW 0b1000000000U
 #endif
+#ifndef CAP_DAC_OVERRIDE
+    #define CAP_DAC_OVERRIDE 1
+    #define CAP_DAC_READ_SEARCH 2
+#endif
 #endif

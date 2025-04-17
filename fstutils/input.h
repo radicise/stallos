@@ -46,7 +46,7 @@ typedef struct {
     void* data;
 } CLIData;
 
-char* HELPTXT = "exit\ngoto {path}\nmake [d|f] {name}\nlist\nhelp\n";
+char* HELPTXT = "exit - quits this program\ngoto {path} - equivalent to absolute cd\nmake [d|f] {name} - creates a directory (d) or file (f) of with specified name in CWD\nlist - lists files and directories in CWD\nhelp - show this text\nsktrace - toggles seek tracing\naudit {name} - gives info on the node with specified name in CWD\nauditb {name} - lists the blocks of the node with specified name in CWD\nauditd [t|b] {name} - prints the text (t) or hex (b) of the specified file\nreskey {ikey} - resolves the given ikey\ndmtrace - toggles disk manipulation operation tracing\nrem {name} - removes the node with specified name\nauditc {name} - gives info about child entries\n";
 
 CLIData clihelper(void) {
     CLIData ret = {0};
@@ -143,6 +143,91 @@ CLIData clihelper(void) {
         } else if (startswith(ptr, "auditb ")) { // 7
             r = 7;
             size_t plen = stringlen("auditb ");
+            size_t flen = stringlen(ptr);
+            if (flen <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* dst = ptr + plen;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
+        } else if (startswith(ptr, "auditc ")) { // 13
+            r = 13;
+            size_t plen = stringlen("auditb ");
+            size_t flen = stringlen(ptr);
+            if (flen <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* dst = ptr + plen;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
+        // string is "auditd [t|b] {name}"
+        } else if (startswith(ptr, "auditd ")) { // 8 & 9
+            size_t plen = stringlen("auditd ");
+            // printf("PLEN: %zu\n", plen);
+            size_t flen = stringlen(ptr);
+            // printf("FLEN: %zu\n", flen);
+            if (flen-2 <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* typ = ptr + plen;
+            char* dst = typ + 2;
+            // printf("TYP: %s\nDST: %s\n", typ, dst);
+            int t = 0;
+            if (startswith(typ, "t ")) { // directory
+                // printf("directory\n");
+            } else if (startswith(typ, "b ")) { // file
+                // printf("file\n");
+                t = 1;
+            } else {
+                printf("invalid: %c\n", typ[0]);
+                r = -3;
+                goto end;
+            }
+            r = t + 8;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
+        // string is "reskey {ikey}"
+        } else if (startswith(ptr, "reskey ")) { // 10
+            r = 10;
+            size_t plen = stringlen("reskey ");
+            size_t flen = stringlen(ptr);
+            if (flen <= plen) {
+                r = -2;
+                goto end;
+            }
+            char* dst = ptr + plen;
+            size_t dlen = stringlen(dst);
+            ret.data = malloc(dlen+1);
+            if (ret.data == NULL) {
+                free(ptr);
+                return ret;
+            }
+            strcopy(dst, ret.data);
+        // string is "dmtrace"
+        } else if (startswith(ptr, "dmtrace")) { // 11
+            r = 11;
+        // string is "rem {name}"
+        } else if (startswith(ptr, "rem ")) { // 12
+            r = 12;
+            size_t plen = stringlen("rem ");
             size_t flen = stringlen(ptr);
             if (flen <= plen) {
                 r = -2;

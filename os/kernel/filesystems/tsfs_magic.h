@@ -214,15 +214,15 @@ void _tsm_dbp_void(void* ptr) {
 check for interned object
 */
 void* _tsm_cintern(Magic* m, u32 pos) {
-    printf("CHECK FOR INTERN\n");
+    // printf("CHECK FOR INTERN\n");
     size_t i = 0;
     while (i < m->umax) {
         void* ptr = m->ptr[i++];
-        printf("INTERN PTR: %p\n", ptr);
+        // printf("INTERN PTR: %p\n", ptr);
         if (ptr == 0) continue;
         // _tsm_dbp_void(ptr);
         u32 tp = *((u32*)(((char*)ptr)+sizeof(size_t)));
-        printf("INTERNCHECK: t:{%x} == %x?\n", tp, pos);
+        // printf("INTERNCHECK: t:{%x} == %x?\n", tp, pos);
         if (tp == pos) {
             return ptr;
         }

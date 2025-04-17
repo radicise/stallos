@@ -12,6 +12,8 @@
 #include "machine/x86_32/errno.h"
 #elif TARGETNUM == 2
 #include "machine/x86_64/errno.h"
+#elif TARGETNUM == 3
+#include "machine/x86_64/errno.h"
 #else
 #error "Target is not supported"
 #endif

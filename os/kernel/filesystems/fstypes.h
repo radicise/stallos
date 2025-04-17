@@ -10,6 +10,8 @@ typedefs for use externally
 #include "../ktypes.h"
 #include "../FileDriver.h"
 
+typedef _kernel_u32 fsikey_t;
+
 struct FSReturn {// `errno' == 0: Success; `errno' != 0: Failure
 	void* retptr;// Pointer to object, if `errno' == 0 and return type is a pointer
 	_kernel_ssize_t retval;// Value, if `errno' == 0 and the return type is not a pointer
@@ -41,6 +43,7 @@ typedef struct {
     c - create
     m - modify
     a - access
+    u - update
     s - secs
     n - nsec
     */
@@ -50,6 +53,8 @@ typedef struct {
     _kernel_s64 mn;
     _kernel_s64 as;
     _kernel_s64 an;
+    _kernel_s64 us;
+    _kernel_s64 un;
 } TIMES;
 
 typedef struct {
@@ -60,10 +65,13 @@ typedef struct {
     _kernel_u16   refcount;
     _kernel_u32   head;
     _kernel_u32   blocks;
+    _kernel_u32   ikey;
     _kernel_u64   size;
-    _kernel_u16   perms;
+    _kernel_u32   perms;
+    _kernel_u32   oid;
+    _kernel_u32   gid;
     // WARNING: DO NOT ACCESS THIS FIELD, USE THE [get_dhtimes] AND [set_dhtimes] HELPER FUNCTIONS
-    _kernel_u64   times[6];
+    _kernel_u64   times[8];
     _kernel_u64   checksum;
 } TSFSDataHeader;
 
@@ -86,10 +94,11 @@ typedef struct {
     _kernel_u16   rc;
     _kernel_u8    id;
     _kernel_u8    storage_flags;
-    _kernel_u32   data_loc;
     _kernel_u32   parent_loc;
     _kernel_u32   pnode;
-    _kernel_u32   inum;
+    _kernel_u32   ikey;
+    _kernel_u32   oid;
+    _kernel_u32   gid;
     char  name[255];
     _kernel_u64   checksum;
 } TSFSStructNode;
@@ -113,12 +122,23 @@ typedef struct {
     void** ptr;
 } Magic;
 
+// Mutexes for various kinds of operations
+typedef struct {
+    // WARNING: it is an error to attempt ANY kind of disk access with acquiring the drive lock
+    // NOTE: the drive lock should be released between disk operations that are independent
+    // WARNING: the operation type locks must be acquired for the ENTIRE duration of a syscall
+    _kernel_Mutex* drive_lock; // lock on all disk operations
+    _kernel_Mutex* ddata_lock; // lock on disk operations that affect data
+    _kernel_Mutex* dstct_lock; // lock on disk operations that affect structure
+} FSLocks;
+
 typedef struct {
     struct FileDriver* fdrive;
     int kfd;
     int err;
     TSFSRootBlock* rootblock;
     Magic* magic;
+    FSLocks* locks;
 } FileSystem;
 
 typedef struct {

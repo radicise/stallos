@@ -13,6 +13,36 @@
 #include "os/kernel/filesystems/external.h"
 #include "./fstutils/input.h"
 
+// #define MDISK_SIZE 21
+#define MDISK_SIZE 1024*1024*4
+// #define MDISK_SIZE 4096
+
+void Mutex_acquire(_kernel_Mutex* mutex){}
+void Mutex_release(_kernel_Mutex* mutex){}
+
+struct FSInfo {
+	_kernel_Mutex dataLock;// Must be acquired when any of the references `cwd' and `root' are held; must be acquired when any of the following fields are being accessed
+	const char* volatile cwd;// Can be deallocated with dealloc(cwd, strlen(cwd) + 1)
+	const char* volatile root;// Can be deallocated with dealloc(root, strlen(root) + 1)
+	volatile _kernel_mode_t umask;
+};
+struct PerThread {// TODO Make a system for threads to change the properties of other threads
+	int errno;// This MUST be the first member (in order of member declaration) of `struct PerThread'; this may not be accessed in the kernel by any thread other than the one handling a system call of the thread specified by this structure
+	_kernel_pid_t tid;// Does not change
+	_kernel_Mutex dataLock;// TODO Must be acquired when any of the following fields are being accessed; this must be acquired when the reference `fsinfo' is had
+	volatile _kernel_kuid_t ruid;
+	volatile _kernel_kuid_t euid;
+	volatile _kernel_kuid_t suid;
+	volatile _kernel_kuid_t fsuid;
+	volatile _kernel_u64 cap_effective;
+	volatile _kernel_u64 cap_permitted;
+	volatile _kernel_u64 cap_inheritable;
+	struct FSInfo* fsinfo;// Can be deallocated with dealloc(fsinfo, sizeof(struct FSInfo))
+    volatile int __curr_userFD;
+};
+
+struct PerThread volatile* PerThread_context;
+
 void kernelWarnMsg(const char* msg) {
     puts(msg);
 }
@@ -24,7 +54,8 @@ void kernelMsgULong_hex(unsigned long l) {
 }
 
 void bugCheckNum(long n) {
-    printf("BUGCHK: %li\n", n);
+    printf("BUGCHK: 0x%lx\n", n);
+    exit(1);
 }
 
 void* alloc(_kernel_size_t size) {
@@ -35,9 +66,17 @@ void dealloc(void* ptr, _kernel_size_t size) {
 }
 
 FILE* fp;
-char* bigdata[1024];
+char bigdata[1024];
 
+_kernel_off_t fdrive_tell(int _) {
+    return ftell(fp);
+}
 _kernel_ssize_t fdrive_write(int _, const void* data, _kernel_size_t len) {
+    if (fdrive_tell(0) + len > MDISK_SIZE) {
+        printf("BOUNDRY EXCEEDED\n");
+        exit(2);
+        return 0;
+    }
     if (len % 16 == 0) {
         return fwrite(data, 16, len / 16, fp);
     } else if (len % 8 == 0) {
@@ -59,9 +98,6 @@ _kernel_off_t fdrive_lseek(int _, _kernel_off_t offset, int whence) {
     fseek(fp, offset, whence);
     return ftell(fp);
 }
-_kernel_off_t fdrive_tell(int _) {
-    return ftell(fp);
-}
 int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff_t* posptr, int whence) {
     fseek(fp, (((long)offhi) << 32) | (long)(offlo), whence);
     (*posptr) = ftell(fp);
@@ -71,10 +107,6 @@ int fdrive__llseek(int _, _kernel_off_t offhi, _kernel_off_t offlo, _kernel_loff
 #undef fsflush
 #define fsflush(fs) fflush(fp)
 
-// #define MDISK_SIZE 21
-#define MDISK_SIZE 1024*1024*4
-// #define MDISK_SIZE 4096
-
 int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
     if (ce->flags != TSFS_CF_EXTT) {
         _kernel_u64 l = tsfs_tell(s);
@@ -82,11 +114,18 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         // printf("inip: %llu\nseekp: %llu\n", l, ce->dloc);
         TSFSStructNode sn = {0};
         read_structnode(s, &sn);
+        char* permtxt = strmove("rwx-rwx-rwx");
         char tc = 'i';
+        _kernel_mode_t objmod = 0;
         if (sn.storage_flags == TSFS_KIND_DIR) {
             tc = 'd';
+            objmod = sn.ikey;
         } else if (sn.storage_flags == TSFS_KIND_FILE) {
             tc = 'f';
+            TSFSDataHeader dh = {0};
+            block_seek(s, resolve_itable_entry(s, sn.ikey), BSEEK_SET);
+            read_dataheader(s, &dh);
+            objmod = dh.perms;
         } else if (sn.storage_flags == TSFS_KIND_HARD) {
             tc = 'h';
         } else if (sn.storage_flags == TSFS_KIND_LINK) {
@@ -94,7 +133,8 @@ int _fstest_sbcs_fe_do(FileSystem* s, TSFSSBChildEntry* ce, void* data) {
         } else {
             tc = 'i';
         }
-        printf("@ %u : -%c- %s\n", ce->dloc, tc, sn.name);
+        printf("@ %u : -%c- -%s- [%d|%d] %s\n", ce->dloc, tc, permtxt, sn.oid, sn.gid, sn.name);
+        free(permtxt);
         loc_seek(s, l);
     }
     return 0;
@@ -347,13 +387,25 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     TSFSStructNode topdir = {0};
     read_structnode(s, &topdir);
     tsfs_mk_file(s, &topdir, "test");
-    TSFSStructNode* fil = tsfs_load_node(s, tsfs_resolve_path(s, "/test"));
-    for (int i = 0; i < 1; i ++) {
-        data_write(s, fil, 1024*i, bigdata, 1005);
+    tsfs_mk_file(s, &topdir, "ctrl");
+    _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
+    printf("FILE BLOCK NO: %u\n", tblkno);
+    TSFSStructNode* fil = tsfs_load_node(s, tblkno);
+    _DBG_print_node(fil);
+    for (int i = 0; i < 8; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 1024);
     }
-    _kernel_u32 p = fil->data_loc;
-    tsfs_unload(s, fil);
-    tsfs_free_data(s, p);
+    _kernel_u32 p = resolve_itable_entry(s, fil->ikey);
+    printf("DLOC: %x\n", p);
+    block_seek(s, p, BSEEK_SET);
+    TSFSDataHeader dh = {0};
+    read_dataheader(s, &dh);
+    _DBG_print_head(&dh);
+    // tsfs_unload(s, fil);
+    // goto rel;
+    // tsfs_unload(s, fil);
+    // tsfs_free_data(s, p);
+    tsfs_unlink(s, fil);
     // _DBG_print_root(s->rootblock);
     // block_seek(s, 0, BSEEK_SET);
     // TSFSRootBlock rbt = {0};
@@ -363,7 +415,7 @@ int delete_test(struct FileDriver* fdrive, int fd, char f) {
     releaseFS(s);
     return 0;
 }
-
+#define TSFSDBLOCKDSIZE 19
 int full_test(struct FileDriver* fdrive, int fd, char flags) {
     FileSystem* s = 0;
     SEEK_TRACING = 0;
@@ -408,6 +460,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             char* name = strmove(clidata.data);
             free(clidata.data);
             TSFSStructNode* par = tsfs_load_node(s, tsfs_resolve_path(s, cwd));
+            _DBG_print_node(par);
             if (clicode == 2) {
                 TSFSStructBlock blk = {0};
                 tsfs_mk_dir(s, par, name, &blk);
@@ -439,7 +492,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             _DBG_print_node(&dir);
             if (dir.storage_flags == TSFS_KIND_FILE) {
                 TSFSDataHeader head = {0};
-                block_seek(s, dir.data_loc, BSEEK_SET);
+                block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
                 read_dataheader(s, &head);
                 _DBG_print_head(&head);
             }
@@ -458,7 +511,7 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
             _DBG_print_node(&dir);
             if (dir.storage_flags == TSFS_KIND_FILE) {
                 TSFSDataHeader head = {0};
-                block_seek(s, dir.data_loc, BSEEK_SET);
+                block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
                 read_dataheader(s, &head);
                 _DBG_print_head(&head);
                 TSFSDataBlock cdb = {0};
@@ -471,11 +524,153 @@ int full_test(struct FileDriver* fdrive, int fd, char flags) {
                     _DBG_print_data(&cdb);
                 }
             }
+        } else if (clicode < 10) {
+            TSFSStructNode dir = {0};
+            char* name = strmove(clidata.data);
+            char* fullpath = strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 tarblock = tsfs_resolve_path(s, fullpath);
+            free(fullpath);
+            if (tarblock == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            block_seek(s, tarblock, BSEEK_SET);
+            read_structnode(s, &dir);
+            _DBG_print_node(&dir);
+            if (dir.storage_flags != TSFS_KIND_FILE) {
+                printf("BAD NODE TYPE\n");
+                continue;
+            }
+            TSFSDataHeader head = {0};
+            block_seek(s, resolve_itable_entry(s, dir.ikey), BSEEK_SET);
+            read_dataheader(s, &head);
+            TSFSDataBlock cdb = {0};
+            block_seek(s, head.head, BSEEK_SET);
+            read_datablock(s, &cdb);
+            char* dumpdata = (char*)malloc(1006);
+            if (dumpdata == NULL) {
+                printf("MALLOC FAILED");
+                break;
+            }
+            for (int i = 0; i < head.blocks; i ++) {
+                block_seek(s, cdb.disk_loc, BSEEK_SET);
+                seek(s, TSFSDBLOCKDSIZE, SEEK_CUR);
+                read_buf(s, dumpdata, cdb.data_length);
+                dumpdata[cdb.data_length] = 0;
+                if (clicode == 8) {
+                    // text dump
+                    printf("TXT DATA @ {%x}\n%s\nLEN: %zu\n", cdb.disk_loc, dumpdata, stringlen(dumpdata));
+                } else {
+                    // binary dump
+                    printf("BIN DATA @ {%x}\n", cdb.disk_loc);
+                    for (int j = 1; j < cdb.data_length+1; j ++) {
+                        printf("%x ", dumpdata[j-1]);
+                        if (j % 8 == 0) {
+                            printf("\n");
+                        }
+                    }
+                    if (cdb.data_length % 8) {
+                        printf("\n");
+                    }
+                }
+                if (cdb.next_block != 0) {
+                    block_seek(s, cdb.next_block, BSEEK_SET);
+                    read_datablock(s, &cdb);
+                }
+            }
+            free(dumpdata);
+        } else if (clicode == 10) {
+            char* ikeytxt = strmove(clidata.data);
+            free(clidata.data);
+            unsigned long ikey = parse_ulonghex(ikeytxt);
+            free(ikeytxt);
+            printf("IKEY: %lx\nIKEYRES: %x\n", ikey, resolve_itable_entry(s, ikey));
+        } else if (clicode == 11) {
+            DMAN_TRACING ^= 1; // toggle disk manip tracing
+        } else if (clicode == 12) {
+            char* path = strjoin(cwd, clidata.data);
+            free(clidata.data);
+            _kernel_u32 blockno = tsfs_resolve_path(s, path);
+            free(path);
+            if (blockno == 0) {
+                printf("BAD NAME\n");
+                continue;
+            }
+            TSFSStructNode* dnode = tsfs_load_node(s, blockno);
+            if (dnode->storage_flags == TSFS_KIND_FILE) {
+                tsfs_unlink(s, dnode);
+            } else {
+                if (tsfs_rmdir(s, dnode)) {
+                    tsfs_unload(s, dnode);
+                };
+            }
         }
     }
     dealloc:
     free(s->rootblock);
     free(s);
+    return 0;
+}
+
+int truncate_test(struct FileDriver* fdrive, int fd, char flags) {
+    regen_mock(fd);
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    int dfd = open("bigdata.txt", O_RDONLY);
+    if (dfd == -1) {
+        goto rel;
+    }
+    read(dfd, bigdata, 1024);
+    close(dfd);
+    // TSFSStructBlock sb = {0};
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    TSFSStructNode topdir = {0};
+    read_structnode(s, &topdir);
+    tsfs_mk_file(s, &topdir, "test");
+    _kernel_u32 tblkno = tsfs_resolve_path(s, "/test");
+    printf("FILE BLOCK NO: %u\n", tblkno);
+    TSFSStructNode* fil = tsfs_load_node(s, tblkno);
+    _DBG_print_node(fil);
+    for (int i = 0; i < 1; i ++) {
+        data_write(s, fil, 1024*i, bigdata, 1024);
+    }
+    // _kernel_u32 p = resolve_itable_entry(s, fil->ikey);
+    // printf("DLOC: %lx\n", p);
+    // block_seek(s, p, BSEEK_SET);
+    // TSFSDataHeader dh = {0};
+    // read_dataheader(s, &dh);
+    // _DBG_print_head(&dh);
+    // tsfs_unload(s, fil);
+    // goto rel;
+    // tsfs_free_data(s, p);
+    // tsfs_unlink(s, fil);
+    // tsfs_truncate(s, fil, 1028);
+    tsfs_truncate(s, fil, 0);
+    tsfs_truncate(s, fil, 0);
+    tsfs_unload(s, fil);
+    // _DBG_print_root(s->rootblock);
+    // block_seek(s, 0, BSEEK_SET);
+    // TSFSRootBlock rbt = {0};
+    // read_rootblock(s, &rbt);
+    // _DBG_print_root(&rbt);
+    rel:
+    releaseFS(s);
+    return 0;
+}
+
+int pathres_test(struct FileDriver* fdrive, int fd, char flags) {
+    regen_mock(fd);
+    FileSystem* s = (createFS(fdrive, fd, MDISK_SIZE)).retptr;
+    TSFSStructNode pn;
+    block_seek(s, s->rootblock->top_dir, BSEEK_SET);
+    read_structnode(s, &pn);
+    TSFSStructBlock nb;
+    tsfs_mk_dir(s, &pn, "test", &nb);
+    _kernel_u32 r1 = tsfs_resolve_path(s, "/test");
+    _kernel_u32 r2 = tsfs_resolve_path(s, "test");
+    printf("r1(/test)=%u\nr2(test)=%u\n", r1, r2);
+    rel:
+    releaseFS(s);
     return 0;
 }
 
@@ -501,6 +696,8 @@ int harness(const char* fpath, char flag, int(*tst)(struct FileDriver*, int, cha
     return retc;
 }
 
+static char* argpass;
+
 int generic_test(char f1, char f2) {
     switch (f1) {
         case -1:
@@ -516,6 +713,17 @@ int generic_test(char f1, char f2) {
             printf("ECHO: %s\n", str);
             free(str);
             break;
+        case -3:
+            if (f2) {
+                printf("NO PATH TO NORMALIZE\n");
+                break;
+            }
+            char* _root = "/";
+            char* _cwd = "/s1/s2";
+            char* n = _tsfs_normalize(_root, _cwd, argpass);
+            printf("ROOT: %s\nCWD: %s\nPATH: %s\nNORM: %s\n", _root, _cwd, argpass, n);
+            free(n);
+            break;
         default:
             printf("BAD FLAG\n");
             break;
@@ -524,6 +732,7 @@ int generic_test(char f1, char f2) {
 }
 
 int main(int argc, char** argv) {
+    // printf("%zu\n", sizeof(TSFSStructNode));
     char flags[] = {0, 0};
     char* fpath = argv[1];
     for (int i = 2; i < argc; i ++) {
@@ -557,6 +766,17 @@ int main(int argc, char** argv) {
             flags[0] = 8;
         } else if (stringcmp(argv[i], "-sktrace")) {
             SEEK_TRACING = 1;
+        } else if (stringcmp(argv[i], "truncate")) {
+            flags[0] = 9;
+        } else if (stringcmp(argv[i], "normalize")) {
+            flags[0] = -3;
+            if (argc == i+1) {
+                flags[1] = 1;
+            } else {
+                argpass = argv[i+1];
+            }
+        } else if (stringcmp(argv[i], "pathres")) {
+            flags[0] = 10;
         }
     }
     printf("{%d, %d}\n", flags[0], flags[1]);
@@ -589,6 +809,12 @@ int main(int argc, char** argv) {
             break;
         case 8:
             harness(fpath, flags[1], delete_test);
+            break;
+        case 9:
+            harness(fpath, flags[1], truncate_test);
+            break;
+        case 10:
+            harness(fpath, flags[1], pathres_test);
             break;
         default:
             printf("bad args\n");

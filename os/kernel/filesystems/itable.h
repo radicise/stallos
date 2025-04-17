@@ -12,7 +12,7 @@ first four bytes - flags and index
 next four bytes - parent location
 all other bytes - children
 <8>bytes
-<a,1><b,1><c,1><d,1><3,4>
+<a,1><b,1><c,1><d,1><e,4>
 <a> - constant - 0xff, identifies this block as an ITABLE
 <b> - bool - singly or doubly indirected block (0=L1,1=L2)
 <c> - uint8 - number of entries in this table, when zero, the table will be deallocated, excepting if the table is singly indirected to the first table and has index zero, or is doubly indirected through that table and has index zero
@@ -90,20 +90,24 @@ u32 _search_l2_table(FileSystem* fs, u32 dl, char flags, u32 val) {
 }
 
 u32 _create_l2_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
-    u32 r = allocate_blocks(fs, 2, 1);
+    u64 opos = tsfs_tell(fs);
+    u32 r = allocate_blocks(fs, 0, 1);
     block_seek(fs, r, BSEEK_SET);
     write_u32be(fs, 0xff010100 + (u32)pindex);
     write_u32be(fs, ploc);
     write_u32be(fs, initval);
+    longseek(fs, opos, SEEK_SET);
     return r;
 }
 
 u32 _create_l1_table(FileSystem* fs, u32 ploc, u8 pindex, u32 initval) {
-    u32 r = allocate_blocks(fs, 2, 1);
+    u64 opos = tsfs_tell(fs);
+    u32 r = allocate_blocks(fs, 0, 1);
     block_seek(fs, r, BSEEK_SET);
     write_u32be(fs, 0xff000100 + (u32)pindex);
     write_u32be(fs, ploc);
     write_u32be(fs, _create_l2_table(fs, r, 0, initval));
+    longseek(fs, opos, SEEK_SET);
     return r;
 }
 
@@ -143,6 +147,8 @@ u32 _search_l1_table(FileSystem* fs, u32 dl, char flags, u32 val) {
 see ITABLE key specs for details on the return value
 */
 u32 aquire_itable_slot(FileSystem* fs, u32 value) {
+    _DBG_here();
+    printf("ITABLE AQU: VALUE=%lx\n", value);
     block_seek(fs, 1, BSEEK_SET);
     for (u32 j = 1; j < 5; j ++) {
         for (int i = 0; i < 256; i ++) {
@@ -175,11 +181,11 @@ int release_itable_slot(FileSystem* fs, u32 imapkey) {
     l1p = read_u32be(fs);
     block_seek(fs, l1p, BSEEK_SET);
     u32 l1d = read_u32be(fs);
-    seek(fs, 4+(4*cl1), SEEK_CUR);
+    seek(fs, 8+(4*cl1), SEEK_CUR);
     l2p = read_u32be(fs);
     block_seek(fs, l2p, BSEEK_SET);
     u32 l2d = read_u32be(fs);
-    seek(fs, 4+(4*cl1), SEEK_CUR);
+    seek(fs, 8+(4*cl1), SEEK_CUR);
     write_u32be(fs, 0);
     l2d -= 256;
     block_seek(fs, l2p, BSEEK_SET);
@@ -189,17 +195,34 @@ int release_itable_slot(FileSystem* fs, u32 imapkey) {
     l1d -= 256;
     block_seek(fs, l1p, BSEEK_SET);
     write_u32be(fs, l1d);
-    seek(fs, 4 + (4*cl1&IDATA_INDX), SEEK_CUR);
+    seek(fs, 8 + (4*cl1&IDATA_INDX), SEEK_CUR);
     write_u32be(fs, 0);
-    tsfs_free_centered(fs, l2p);
+    // tsfs_free_centered(fs, l2p);
+    tsfs_free_structure(fs, l2p);
     if (croot == 0 || (l1d&IDATA_ENTS)) return 0;
     block_seek(fs, 1, BSEEK_SET);
     seek(fs, 4 * croot, SEEK_CUR);
     l1p = read_u32be(fs);
     seek(fs, -4, SEEK_CUR);
     write_u32be(fs, 0);
-    tsfs_free_centered(fs, l1p);
+    // tsfs_free_centered(fs, l1p);
+    tsfs_free_structure(fs, l1p);
     return 0;
+}
+
+int update_itable_entry(FileSystem* fs, u32 ikey, u32 value) {
+    ikey = ikey & ITABLE_INDEX;
+    u32 iroot = ikey >> 16;
+    u32 il1 = (ikey >> 8) & 0xff;
+    u32 il2 = ikey & 0xff;
+    block_seek(fs, 1, BSEEK_SET);
+    seek(fs, 4 * iroot, SEEK_CUR);
+    block_seek(fs, read_u32be(fs), BSEEK_SET);
+    seek(fs, 8 + (4 * il1), SEEK_CUR);
+    block_seek(fs, read_u32be(fs), BSEEK_SET);
+    seek(fs, 8 + (4 * il2), SEEK_CUR);
+    write_u32be(fs, value);
+    return fs->err;
 }
 
 u32 resolve_itable_entry(FileSystem* fs, u32 ikey) {
