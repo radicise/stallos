@@ -32,6 +32,7 @@ time_t fetch_time(void) {
 int reserve_kfd(void) {
 	return makeKfd();
 }
+/*
 void associate_kfd(int kfd, struct FileDriver* driver, int statusflags, int userspacefd) {
 	struct KFDInfo* fi = alloc(sizeof(struct KFDInfo));
 	fi->status = statusflags;
@@ -51,4 +52,5 @@ void associate_kfd(int kfd, struct FileDriver* driver, int statusflags, int user
 	}
 	return;
 }
+*/
 #endif

@@ -127,14 +127,14 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	return;
 }
 pid_t Threads_executionFork(struct Thread* newThread, void* stack) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE; the argument `stack' is the first byte not in the stack if 'MACHINE_KSTACK_GROWSDOWN' is nonzero and otherwise is the first byte in the stack
-	flushThreadState(&(newThread->state));
-	prepare_fork_child(&(newThread->state), stack, newThread->group->mem);
 	pid_t n = Threads_insertThread(newThread, 1);
 	if (n == ((pid_t) 0)) {
 		return (pid_t) (-1);
 	}
 	newThread->state.invocData.data[0] = 0;
-	return n;// TODO URGENT Ensure that locks are correct upon returning of the new kernel thread to user space
+	flushThreadState(&(newThread->state));
+	prepare_fork_child(&(newThread->state), stack, newThread->group->mem);
+	return n;
 }
 unsigned long Threads_forkExec_kfunc(unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE
 	return (unsigned long) (Threads_executionFork((struct Thread*) ((uintptr) arg0), (void*) ((uintptr) arg1)));

@@ -124,7 +124,7 @@ int Set_add(uintptr dat, struct Set* ll) {// Success: 0; Already exists: -1
 		lb = (volatile struct Set_block*) lb->next;
 	}
 }
-uintptr Set_containsByCompare(uintptr dat, int (*comparator)(uintptr, uintptr), struct Set* ll) {// Contains a match: The match; Does not contain a match: (uintptr) -1
+uintptr Set_containsByCompare(uintptr dat, int (*comparator)(uintptr, uintptr), struct Set* ll) {// Contains a match: The match; Does not contain a match: (uintptr) -1; NO CONCURRENT ACCESS
 	Mutex_acquire(&(ll->lock));
 	volatile struct Set_block* lb = ll->start;
 	while (1) {

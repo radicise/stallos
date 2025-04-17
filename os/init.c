@@ -83,6 +83,11 @@ void print(const char* d) {
 void _start() {
 	/*
 	while (1) {
+		print("Yippee!\n");
+	}
+	*/
+	/*
+	while (1) {
 		char b;
 		read(0, &b, 1);
 		write(1, &b, 1);
@@ -132,7 +137,8 @@ void _start() {
 		i++;
 	}
 	*/
-	time_t timeOld = time(NULL);
+	time_t timeOrig = time(NULL);
+	time_t timeOld = timeOrig;
 	printLong(gettid());
 	write(1, ": ", 2);
 	printLong(timeOld);
@@ -148,7 +154,7 @@ void _start() {
 		write(1, ": ", 2);
 		printLong(timeNow);
 		printLine();
-		if (timeNow == ((time_t) 3)) {
+		if (timeNow == (timeOrig + 3)) {
 			pid_t l = fork();
 			/*
 			if (l == (pid_t) 0) {

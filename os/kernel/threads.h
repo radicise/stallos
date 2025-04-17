@@ -72,13 +72,14 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	struct PerThreadgroup* ngrp = alloc(sizeof(struct PerThreadgroup));
 	Mutex_acquire(&(orig->group->breakLock));
 	memcpy(ngrp, orig->group, sizeof(struct PerThreadgroup));
+	ngrp->mem = (MemSpace_fork(ngrp->mem));// TODO Maybe allow reading but not writing of `userBreak' while the memory is being forked
 	Mutex_release(&(orig->group->breakLock));
 	Mutex_initUnlocked(&(ngrp->breakLock));
-	ngrp->mem = (MemSpace_fork(ngrp->mem));
+	ngrp->desctors = Map_copy(orig->group->desctors);
 	nth->group = ngrp;
 	return nth;
 }
-pid_t kernel_fork(void* kstack) {// When there is no "tgid"-"tid" combination available for the new thread, the operation fails, no new thread is created, and the value of `(pid_t) (-1)' is returned to the caller; when there is at least one "tgid"-"tid" combination available for the new thread, the operation succeeds, the new thread's "tid" is returned to the calling thread, and the new thread returns to its saved state as if resulting from being a successfully-created child from fork(2)
+pid_t kernel_fork(void* kstack) {// When there is no "tgid"-"tid" combination available for the new thread, the operation fails, no new thread is created, and the value of `(pid_t) (-1)' is returned to the caller; when there is at least one "tgid"-"tid" combination available for the new thread, the operation succeeds, the new thread's "tid" is returned to the calling thread, and the new thread returns to its saved state as if resulting from being a successfully-created child from fork(2); locks are NOT given to the new thread
 	struct Thread* nth = Threads_forkData(Thread_context);
 	pid_t result = Threads_forkExec(nth, kstack);
 	if (result == ((pid_t) (-1))) {// TODO Maybe prevent the possibility of needing to deallocate in the case of the operation failing

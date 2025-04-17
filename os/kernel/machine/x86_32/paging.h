@@ -24,7 +24,7 @@ typedef u32 PGDEnt;
 #define PG_PINNED ((PGDEnt) (u32) 0x00000e00)
 void PGDPinAdj(volatile PGDEnt* ent, int dec) {
 	u32 val = AtomicULong_get((AtomicULong*) ent);
-	unsigned int pins = (val >> 9) & 0x00000007;// TODO Support more than 7 concurrent page pins
+	unsigned int pins = (val >> 9) & 0x00000007;// TODO URGENT Support more than 7 concurrent page pins
 	if (!dec) {
 		pins++;
 		pins &= 0x00000007;

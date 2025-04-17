@@ -236,7 +236,7 @@ int loadELF(const Elf32_Ehdr* prgm, size_t len, uintptr* s, struct MemSpace* mem
 	}
 	return 0;
 }
-int runELF(const void* elf, size_t len, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem'
+int runELF(const void* elf, size_t len, struct Thread* thread) {// The object at `thread' should be filled out, excepting the contents at `thread->state' and the value of `thread->group->mem' and the value of `thread->group->userBreak'
 	thread->group->mem = MemSpace_create();
 	uintptr s = 0;
 	int i = loadELF((const Elf32_Ehdr*) elf, len, &s, thread->group->mem);// TODO URGENT Handling of `argv', `argc', and maybe also `envp'

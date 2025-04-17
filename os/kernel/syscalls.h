@@ -389,44 +389,27 @@ int makeKfd(void) {// TODO Allocate and deallocate `kfd' values properly
 void removeKfd(int kfd) {// TODO Allocate and deallocate `kfd' values properly
 	return;
 }
-struct FileKey {
-	pid_t tgpid;
-	int fd;
-};
-int FileKeyComparator(uintptr a, uintptr b) {
-	struct FileKey* aF = (struct FileKey*) (((struct Map_pair*) a)->key);
-	struct FileKey* bF = (struct FileKey*) b;
-	return (aF->tgpid != bF->tgpid) || (aF->fd != bF->fd);
-}
 int FileValueComparator(uintptr a, uintptr b) {
 	return !((((struct Map_pair*) a)->value) == b);
 }
-struct Map* FileKeyKfdMap;
-struct KFDInfo {
+struct KFDInfo {// One per file description
 	Mutex dataLock;
 	int status;
-	AtomicLongF refs;
+	AtomicLongF refs;// One less than the sum of open file descriptors and operations pending completion
 };
 struct Map* KFDStatus;
-int getDesc(pid_t pIdent, int fd) {
-	struct FileKey match;
-	match.tgpid = pIdent;
-	match.fd = fd;
-	Mutex_acquire(&(FileKeyKfdMap->set->lock));
-	uintptr i = Map_findByCompare((uintptr) &match, FileKeyComparator, FileKeyKfdMap);
+int getDesc(int fd) {
+	Mutex_acquire(&(PerThreadgroup_context->desctors->set->lock));
+	uintptr i = Map_fetch(fd, PerThreadgroup_context->desctors);
 	if (i == (uintptr) (-1)) {
 		return (-1);
-	}
-	i = Map_fetch(i, FileKeyKfdMap);
-	if (i == (uintptr) (-1)) {
-		bugCheckNum(0x0002 | FAILMASK_SYSCALLS);
 	}
 	uintptr st = Map_fetch(i, KFDStatus);
 	if (st == (uintptr) (-1)) {
 		bugCheckNum(0x0003 | FAILMASK_SYSCALLS);
 	}
 	AtomicLongF_adjust(&(((struct KFDInfo*) st)->refs), 1);
-	Mutex_release(&(FileKeyKfdMap->set->lock));
+	Mutex_release(&(PerThreadgroup_context->desctors->set->lock));
 	return i;
 }
 #include "FileDriver.h"
@@ -451,18 +434,8 @@ void retDesc(int kfd) {
 	if (st == (uintptr) (-1)) {
 		bugCheckNum(0x0004 | FAILMASK_SYSCALLS);
 	}
-	Mutex_acquire(&(FileKeyKfdMap->set->lock));
 	long r = AtomicLongF_adjust(&(((struct KFDInfo*) st)->refs), (-1));
 	if (!r) {
-		uintptr i = Map_findByCompare(kfd, FileValueComparator, FileKeyKfdMap);
-		if (i == (uintptr) (-1)) {
-			bugCheckNum(0x0008 | FAILMASK_SYSCALLS);
-		}
-		if (Map_remove(i, FileKeyKfdMap)) {
-			bugCheckNum(0x0009 | FAILMASK_SYSCALLS);
-		}
-		dealloc((void*) i, sizeof(struct FileKey));
-		Mutex_release(&(FileKeyKfdMap->set->lock));
 		struct FileDriver* fdrvr = resolveFileDriver(kfd);
 		if (fdrvr == NULL) {
 			bugCheckNum(0x0005 | FAILMASK_SYSCALLS);
@@ -471,14 +444,11 @@ void retDesc(int kfd) {
 		if (Map_remove(kfd, kfdDriverMap)) {
 			bugCheckNum(0x0006 | FAILMASK_SYSCALLS);
 		}
-		dealloc((void*) (struct KFDInfo*) st, sizeof(struct KFDInfo));
 		if (Map_remove(kfd, KFDStatus)) {
 			bugCheckNum(0x0007 | FAILMASK_SYSCALLS);
 		}
+		dealloc((void*) (struct KFDInfo*) st, sizeof(struct KFDInfo));
 		removeKfd(kfd);
-	}
-	else {
-		Mutex_release(&(FileKeyKfdMap->set->lock));
 	}
 	return;
 }
@@ -594,7 +564,7 @@ void retUserMem(void* mem, unsigned long upm, uintptr olen, uintptr rlen) {
 	undedic_argblock((void*) (((char*) mem) - poff), plen);
 	return;
 }
-void initSystemCallInterface(void) {
+void initSystemCallInterface(int kfdReservedAmnt) {// TODO Reserve `kfd' values in a better fashion
 	kmem_init();
 	kfdDriverMap = Map_create();// Map, int "kfd" -> struct FileDriver* "driver"
 	FSDriverMap = Map_create();// Map, const char* "Filesystem name" -> struct FSDesc* "Filesystem driver"; "Filesystem" only ends with '/' if it is "/"
@@ -604,68 +574,40 @@ void initSystemCallInterface(void) {
 	Map_add(3, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdb"
 	Map_add(4, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdc"
 	Map_add(5, (uintptr) &FileDriver_ATA, kfdDriverMap);// "/dev/hdd"
-	FileKeyKfdMap = Map_create();// Map, struct FileKey* "file key" -> int "kfd"
 	struct KFDInfo* l = alloc(sizeof(struct KFDInfo));
 	l->status = O_RDWR;
 	Mutex_initUnlocked(&(l->dataLock));
-	AtomicLongF_init(&(l->refs), 0);
+	AtomicLongF_init(&(l->refs), 2);// TODO Set the reference count for each of the five file descriptions in `system.c'
 	Map_add(1, (uintptr) l, KFDStatus);
-	struct FileKey* k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 0;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdin" for `init'
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 1;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stdout" for `init'
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 2;
-	Map_add((uintptr) k, 1, FileKeyKfdMap);// "stderr" for `init'
 	l = alloc(sizeof(struct KFDInfo));
 	l->status = O_RDWR;
 	Mutex_initUnlocked(&(l->dataLock));
 	AtomicLongF_init(&(l->refs), 0);
 	Map_add(2, (uintptr) l, KFDStatus);
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 3;
-	Map_add((uintptr) k, 2, FileKeyKfdMap);// "ATA Drive 1" for `init'
 	l = alloc(sizeof(struct KFDInfo));
 	l->status = O_RDWR;
 	Mutex_initUnlocked(&(l->dataLock));
 	AtomicLongF_init(&(l->refs), 0);
 	Map_add(3, (uintptr) l, KFDStatus);
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 4;
-	Map_add((uintptr) k, 3, FileKeyKfdMap);// "ATA Drive 2" for `init'
 	l = alloc(sizeof(struct KFDInfo));
 	l->status = O_RDWR;
 	Mutex_initUnlocked(&(l->dataLock));
 	AtomicLongF_init(&(l->refs), 0);
 	Map_add(4, (uintptr) l, KFDStatus);
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 5;
-	Map_add((uintptr) k, 4, FileKeyKfdMap);// "ATA Drive 3" for `init'
 	l = alloc(sizeof(struct KFDInfo));
 	l->status = O_RDWR;
 	Mutex_initUnlocked(&(l->dataLock));
 	AtomicLongF_init(&(l->refs), 0);
 	Map_add(5, (uintptr) l, KFDStatus);
-	k = alloc(sizeof(struct FileKey));
-	k->tgpid = 1;
-	k->fd = 6;
-	Map_add((uintptr) k, 5, FileKeyKfdMap);// "ATA Drive 4" for `init'
-	kfdNext = 6;
+	kfdNext = kfdReservedAmnt + 1;
 	Mutex_initUnlocked(&kfdgenLock);
 	initPaging();
 	initSegmentation();
 	return;
 }
 void endingCleanup(void) {
-	Map_destroy(FileKeyKfdMap);
+	Map_destroy(FSDriverMap);
+	Map_destroy(KFDStatus);
 	Map_destroy(kfdDriverMap);
 	// TODO Check whether the heap has been cleared
 	return;
@@ -729,12 +671,12 @@ ssize_t write(int fd, const void* buf, size_t count) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(fetch_tgid(), fd);
-	if (kfd == (-1)) {
-		errno = EBADF;// File descriptor <fd> is not opened for the process
+	fd = getDesc(fd);
+	if (fd == (-1)) {
+		errno = EBADF;// File descriptor is not opened for the process
 		return (-1);
 	}
-	struct FileDriver* driver = resolveFileDriver(kfd);
+	struct FileDriver* driver = resolveFileDriver(fd);
 	//if (tid == 300) {while (1) {}}// NRW
 	if (driver == NULL) {
 		bugCheck();
@@ -742,8 +684,9 @@ ssize_t write(int fd, const void* buf, size_t count) {
 	//if (tid == 300) {bugCheckNum(0x12);}// NRW
 	errno = 0;
 	//if (tid == 300) {bugCheckNum(0x12);}// NRW
-	ssize_t res = driver->write(kfd, buf, count);
-	retDesc(kfd);
+	//kernelMsgCode("thread: ", tid);// NRW
+	ssize_t res = driver->write(fd, buf, count);
+	retDesc(fd);
 	return res;
 }
 ssize_t read(int fd, void* buf, size_t count) {
@@ -751,18 +694,18 @@ ssize_t read(int fd, void* buf, size_t count) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(fetch_tgid(), fd);
-	if (kfd == (-1)) {
-		errno = EBADF;// File descriptor <fd> is not opened for the process
+	fd = getDesc(fd);
+	if (fd == (-1)) {
+		errno = EBADF;// File descriptor is not opened for the process
 		return (-1);
 	}
-	struct FileDriver* driver = resolveFileDriver(kfd);
+	struct FileDriver* driver = resolveFileDriver(fd);
 	if (driver == NULL) {
 		bugCheck();
 	}
 	errno = 0;
-	ssize_t res = driver->read(kfd, buf, count);
-	retDesc(kfd);
+	ssize_t res = driver->read(fd, buf, count);
+	retDesc(fd);
 	return res;
 }
 off_t lseek(int fd, off_t off, int how) {
@@ -770,18 +713,18 @@ off_t lseek(int fd, off_t off, int how) {
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(fetch_tgid(), fd);
-	if (kfd == (-1)) {
-		errno = EBADF;// File descriptor <fd> is not opened for the process
+	fd = getDesc(fd);
+	if (fd == (-1)) {
+		errno = EBADF;// File descriptor is not opened for the process
 		return (-1);
 	}
-	struct FileDriver* driver = resolveFileDriver(kfd);
+	struct FileDriver* driver = resolveFileDriver(fd);
 	if (driver == NULL) {
 		bugCheck();
 	}
 	errno = 0;
-	off_t res = driver->lseek(kfd, off, how);
-	retDesc(kfd);
+	off_t res = driver->lseek(fd, off, how);
+	retDesc(fd);
 	return res;
 }
 int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {// Introduced in Linux 1.1.46
@@ -789,18 +732,18 @@ int _llseek(int fd, off_t offHi, off_t offLo, loff_t* res, int how) {// Introduc
 		errno = EBADF;
 		return (-1);
 	}
-	int kfd = getDesc(fetch_tgid(), fd);
-	if (kfd == (-1)) {
-		errno = EBADF;// File descriptor <fd> is not opened for the process
+	fd = getDesc(fd);
+	if (fd == (-1)) {
+		errno = EBADF;// File descriptor is not opened for the process
 		return (-1);
 	}
-	struct FileDriver* driver = resolveFileDriver(kfd);
+	struct FileDriver* driver = resolveFileDriver(fd);
 	if (driver == NULL) {
 		bugCheck();
 	}
 	errno = 0;
-	int result = driver->_llseek(kfd, offHi, offLo, res, how);
-	retDesc(kfd);
+	int result = driver->_llseek(fd, offHi, offLo, res, how);
+	retDesc(fd);
 	return result;
 }
 time_t time(time_t* resAddr) {

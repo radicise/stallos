@@ -450,9 +450,7 @@ void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 119
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
 		timeIncrement();
 	}
-	if ((PIT0Ticks % 3LL) == 0) {// NRW
-		Scheduler_update();
-	}
+	Scheduler_update();
 	return;
 }
 void irupt_handler_71h(void) {// IRQ 1
@@ -633,7 +631,7 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	for (int i = 0; i < 1024; i++) {
 		lpd[i] = readLongLinear(i << 2);
 	}
-	initSystemCallInterface();
+	initSystemCallInterface(5);
 	kernelMsg("done\n");
 	// while (1) {}
 	// while (1) {}
@@ -656,6 +654,14 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	}
 	Mutex_acquire(&Threads_threadManage);
 	Mutex_initUnlocked(&(PerThreadgroup_context->breakLock));
+	PerThreadgroup_context->desctors = Map_create();
+	Map_add(0, 1, PerThreadgroup_context->desctors);// "stdin" for `init'
+	Map_add(1, 1, PerThreadgroup_context->desctors);// "stdout" for `init'
+	Map_add(2, 1, PerThreadgroup_context->desctors);// "stderr" for `init'
+	Map_add(3, 2, PerThreadgroup_context->desctors);// "ATA Drive 1" for `init'
+	Map_add(4, 3, PerThreadgroup_context->desctors);// "ATA Drive 2" for `init'
+	Map_add(5, 4, PerThreadgroup_context->desctors);// "ATA Drive 3" for `init'
+	Map_add(6, 5, PerThreadgroup_context->desctors);// "ATA Drive 4" for `init'
 	PerThread_context->ruid = 0;
 	PerThread_context->euid = 0;
 	PerThread_context->suid = 0;
