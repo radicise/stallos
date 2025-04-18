@@ -9,6 +9,8 @@ struct PerThreadgroup {
 	Mutex breakLock;
 	volatile uintptr userBreak;
 	struct Map* desctors;// DOES NOT CHANGE; Map, int "descriptor" -> int "description"
+	Mutex reapedLock;
+	volatile struct rusage reaped;
 };
 #include "threads.h"
 #endif

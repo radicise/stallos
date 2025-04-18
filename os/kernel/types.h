@@ -35,6 +35,7 @@ typedef _kernel_mode_t mode_t;
 typedef _kernel_kdev_t kdev_t;
 typedef _kernel_udev_old_t udev_old_t;
 typedef _kernel_udev_new_t udev_new_t;
+typedef _kernel_suseconds_t suseconds_t;
 /*
  *
  * Other
@@ -68,5 +69,27 @@ struct new_utsname {
 	char version[65];
 	char machine[65];
 	char domainname[65];
+};
+struct timeval {
+	time_t tv_sec;
+	suseconds_t tv_usec;
+};
+struct rusage {
+	struct timeval ru_utime;
+	struct timeval ru_stime;
+	long ru_maxrss;
+	long ru_ixrss;
+	long ru_idrss;
+	long ru_isrss;
+	long ru_minflt;
+	long ru_majflt;
+	long ru_nswap;
+	long ru_inblock;
+	long ru_oublock;
+	long ru_msgsnd;
+	long ru_msgrcv;
+	long ru_nsignals;
+	long ru_nvcsw;
+	long ru_nivcsw;
 };
 #endif

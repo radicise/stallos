@@ -193,6 +193,13 @@ volatile void* moveExv(volatile void* dst, volatile const void* buf, size_t coun
 	}
 	return m;
 }
+volatile void* setExv(volatile void* ptr, int val, size_t count) {
+	volatile char* n = ptr;
+	while (count--) {
+		*(n++) = val;
+	}
+	return ptr;
+}
 void yield(void) {
 	if (handlingIRQ) {
 		return;
@@ -444,7 +451,8 @@ unsigned long kfct(unsigned long arg0, unsigned long arg1, unsigned long arg2, u
 	}
 	return Thread_context->state.invocData.data[0];
 }
-#define SCHED_INCR_PICOS 0x2540E3C33ULL
+#define SCHED_INCR_PICOS 10000153651ULL
+#define SCHED_INCR_MICROS 10000
 void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
@@ -518,7 +526,7 @@ void irupt_handler_kfunc(void) {
 	if (Thread_context->state.invocData.kfunc == NULL) {
 		switch (data[0]) {
 			case (1):
-				Scheduler_yield();
+				Scheduler_yield(1);
 				break;
 			default:
 				bugCheckNum(0x0008 | FAILMASK_SYSTEM);
@@ -662,6 +670,9 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	Map_add(4, 3, PerThreadgroup_context->desctors);// "ATA Drive 2" for `init'
 	Map_add(5, 4, PerThreadgroup_context->desctors);// "ATA Drive 3" for `init'
 	Map_add(6, 5, PerThreadgroup_context->desctors);// "ATA Drive 4" for `init'
+	Scheduler_clearRusage(&(PerThreadgroup_context->reaped));
+	Mutex_initUnlocked(&(PerThreadgroup_context->reapedLock));
+	Scheduler_clearRusage(&(PerThread_context->usage));
 	PerThread_context->ruid = 0;
 	PerThread_context->euid = 0;
 	PerThread_context->suid = 0;

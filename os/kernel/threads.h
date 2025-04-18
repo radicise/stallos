@@ -28,6 +28,7 @@ struct Thread* volatile Thread_context;
 #else
 #error "Target is not supported"
 #endif
+#include "sched.h"
 void lockThreadInfo(void) {
 	Mutex_acquire(&(PerThread_context->dataLock));
 	return;
@@ -68,6 +69,7 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	Mutex_release(&(orig->thread.fsinfo->dataLock));
 	Mutex_release(&(orig->thread.dataLock));
 	Mutex_initUnlocked(&(nth->thread.fsinfo->dataLock));
+	Scheduler_clearRusage(&(nth->thread.usage));
 	Mutex_initUnlocked(&(nth->thread.dataLock));
 	struct PerThreadgroup* ngrp = alloc(sizeof(struct PerThreadgroup));
 	Mutex_acquire(&(orig->group->breakLock));
@@ -76,6 +78,8 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	Mutex_release(&(orig->group->breakLock));
 	Mutex_initUnlocked(&(ngrp->breakLock));
 	ngrp->desctors = Map_copy(orig->group->desctors);
+	Scheduler_clearRusage(&(ngrp->reaped));
+	Mutex_initUnlocked(&(ngrp->reapedLock));
 	nth->group = ngrp;
 	return nth;
 }
@@ -104,15 +108,4 @@ pid_t kernel_fork(void* kstack) {// When there is no "tgid"-"tid" combination av
 #define tid (PerThread_context->tid)
 #define tgid (PerThreadgroup_context->tgid)
 #define usermem (PerThreadgroup_context->mem)
-void Scheduler_yield(void) {// To only be called from interrupts, when IRQ are disabled
-	if (!handlingIRQ) {
-		bugCheckNum(0x0101 | FAILMASK_THREADS);
-	}
-	Threads_nextThread();
-	return;
-}
-void Scheduler_update(void) {
-	Scheduler_yield();// TODO Make thread yielding timing better
-	return;
-}
 #endif
