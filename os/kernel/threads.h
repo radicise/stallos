@@ -12,10 +12,17 @@
 #include "perThreadgroup.h"
 #include "perThread.h"
 struct Thread {
+	int dispo;// 0: Scheduled; 1: tid == tgid, and the threadgroup lives on through another thread; 2: tid == tgid, and the threadgroup is a zomboid
 	struct PerThread thread;
 	struct Thread_state state;
 	struct PerThreadgroup* group;// Does not change; can be deallocated with dealloc(group, sizeof(struct PerThreadgroup))
 };
+int Threads_isScheduled(int dispo) {
+	if (dispo == 0) {
+		return 1;
+	}
+	return 0;
+}
 Mutex Threads_threadManage;
 struct PerThreadgroup* volatile PerThreadgroup_context;
 struct PerThread* volatile PerThread_context;
@@ -50,6 +57,9 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	Mutex_acquire(&(orig->thread.fsinfo->dataLock));
 	struct Thread* nth = alloc(sizeof(struct Thread));
 	moveExv(nth, orig, sizeof(struct Thread));
+	if (nth->dispo != 0) {
+		bugCheckNum(0x0004 | FAILMASK_PERTHREAD);
+	}
 	struct FSInfo* nfsi = alloc(sizeof(struct FSInfo));
 	moveExv(nfsi, orig->thread.fsinfo, sizeof(struct FSInfo));
 	const char* ocwd = orig->thread.fsinfo->cwd;
@@ -80,6 +90,8 @@ struct Thread* Threads_forkData(struct Thread* orig) {
 	ngrp->desctors = Map_copy(orig->group->desctors);
 	Scheduler_clearRusage(&(ngrp->reaped));
 	Mutex_initUnlocked(&(ngrp->reapedLock));
+	Scheduler_clearRusage(&(ngrp->tusage));
+	Mutex_initUnlocked(&(ngrp->tusageLock));
 	nth->group = ngrp;
 	return nth;
 }

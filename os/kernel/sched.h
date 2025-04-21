@@ -28,6 +28,24 @@ void Scheduler_yield(int voluntary) {// To only be called from interrupts, when 
 	if (!handlingIRQ) {
 		bugCheckNum(0x0101 | FAILMASK_THREADS);
 	}
+	if (voluntary) {
+		PerThread_context->usage.ru_nvcsw++;
+	}
+	else {
+		PerThread_context->usage.ru_nivcsw++;
+		if (Threads_kernelExecution()) {
+			unsigned long us = PerThread_context->usage.ru_stime.tv_usec;
+			us += SCHED_INCR_MICROS;
+			PerThread_context->usage.ru_stime.tv_usec = (us % 1000000);
+			PerThread_context->usage.ru_stime.tv_sec += (us / 1000000);
+		}
+		else {
+			unsigned long us = PerThread_context->usage.ru_utime.tv_usec;
+			us += SCHED_INCR_MICROS;
+			PerThread_context->usage.ru_utime.tv_usec = (us % 1000000);
+			PerThread_context->usage.ru_utime.tv_sec += (us / 1000000);
+		}
+	}
 	Threads_nextThread();
 	return;
 }

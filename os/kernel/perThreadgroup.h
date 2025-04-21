@@ -11,6 +11,8 @@ struct PerThreadgroup {
 	struct Map* desctors;// DOES NOT CHANGE; Map, int "descriptor" -> int "description"
 	Mutex reapedLock;
 	volatile struct rusage reaped;
+	Mutex tusageLock;
+	volatile struct rusage tusage;
 };
 #include "threads.h"
 #endif

@@ -11,7 +11,7 @@ struct FSInfo {
 struct PerThread {// TODO Make a system for threads to change the properties of other threads
 	int errno;// This MUST be the first member (in order of member declaration) of `struct PerThread'; this may not be accessed in the kernel by any thread other than the one handling a system call of the thread specified by this structure
 	pid_t tid;// Does not change
-	struct rusage usage;// Must not be accessed by any thread
+	struct rusage usage;// Must not be accessed by any non-IRQ kernel thread
 	Mutex dataLock;// TODO Must be acquired when any of the following fields are being accessed; this must be acquired when the reference `fsinfo' is had
 	volatile kuid_t ruid;
 	volatile kuid_t euid;

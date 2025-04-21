@@ -656,7 +656,7 @@ void testing_mount_tsfs(void) {
  * NOTE: `oldstat' deals with `udev_old_t', while `newstat' deals with `udev_new_t' (and `udev_old_t' under certain conditions of Linux version and Linux 'BITS_PER_LONG')
  *
  */
-void exit(int code) {// TODO Actually implement
+void _exit(int code) {// TODO Actually implement
 	kMsg_lock();
 	kernelMsg("Thread ");
 	kernelMsgULong_hex(tid);
@@ -665,6 +665,54 @@ void exit(int code) {// TODO Actually implement
 	kernelMsg(" & 0xff\n");
 	kMsg_unlock();
 	while (1) {}
+	/*
+	 * TODO
+	 *
+	 * Upon _exit:
+	 * - Lock threadgroup terminatedusage lock
+	 * - Add thread usage to threadgroup terminatedusage
+	 * - Unlock threadgroup terminatedusage lock
+	 * - If the thread is the last thread in the threadgroup:
+	 * - - Reparent the threadgroup's children to init / PR_SET_CHILD_SUBREAPER
+	 * - - Store threadgroup termination information
+	 * - - Set the threadgroup's state to `zomboid'
+	 * - - Place termination signals
+	 * - It tid == tgid:
+	 * - - If the thread is not the last thread in the threadgroup:
+	 * - - - Set the threadgroup's state to `survived'
+	 * - - Free all resources associated with the `struct Thread' besides the `struct Thread' itself and the `struct Threadgroup'
+	 * - Else:
+	 * - - Remove from thread list
+	 * - - Free all resources associated with the `struct Thread' besides those of the `struct Threadgroup'
+	 *
+	 * Reap process:
+	 * - Lock parent's threadgroup reap
+	 * - Bug check if the child's threadgroup reap lock is held // TODO URGENT What if two threads wait on the same threadgroup? The aforementioned bug check assumes that this is prevented
+	 * - Bug check if the child's threadgroup terminatedusage lock is held // TODO URGENT What if two threads wait on the same threadgroup? The aforementioned bug check assumes that this is prevented
+	 * - Add child's threadgroup terminatedusage to parent's threadgroup reap
+	 * - Add child's threadgroup reap to parent's threadgroup reap
+	 * - Unlock parent's threadgroup reap
+	 * - Free all resources associated with the `struct Thread' of the tid == tgid thread, including the `struct Threadgroup' associated with such a `struct Thread', and remove the aforementioned thread from the thread list
+	 *
+	 * waitpid(val1, val2, 0) procedure:
+	 * If Linuxcompat >= 2.5 and either SA_NOCLDWAIT was set for SIGCHLD or SIG_IGN was set for SIGCHLD
+	 * - If 2.5 <= Linuxcompat < 2.6, determine what to do // TODO Determine what to do if 2.5 <= Linuxcompat < 2.6
+	 * - Lock threadgroup's child->tgid mapping
+	 * - If empty, fail the waitpid with errno == ECHILD
+	 * - Reap all terminated child processes
+	 * - If empty, fail the waitpid with errno == ECHILD
+	 * - Unlock threadgroup's child->tgid mapping
+	 * - Yield execution
+	 * - Repeat
+	 * Else
+	 * - Lock threadgroup's child->tgid mapping
+	 * - Find selected terminated child
+	 * - If no match is found, fail the wait/friend with errno == ECHILD
+	 * - Reap selected terminated child
+	 * - Unlock threadgroup's child->tid mapping
+	 * - Return from the waitpid with the selected terminated child's tgid
+	 *
+	 */
 }
 ssize_t write(int fd, const void* buf, size_t count) {
 	if (fd < 0) {
@@ -974,7 +1022,7 @@ unsigned long system_call(unsigned long arg1, unsigned long arg2, unsigned long 
 #endif
 	switch (nr) {
 		case (1):
-			exit(arg1);
+			_exit(arg1);
 			bugCheckNum(0x0011 | FAILMASK_SYSCALLS);
 		case (2):
 			retVal = (unsigned long) (fork());

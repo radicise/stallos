@@ -34,7 +34,7 @@ pid_t Threads_insertThread(struct Thread* thread, int newThreadgroup) {// `threa
 		}
 		if (n == ___nextTask___) {
 			Mutex_release(&Threads_threadManage);
-			return (pid_t) 0;// TODO URGENT Correctly implement behaviour for allocating tgid and tid when any threads with tid == tgid have ended
+			return (pid_t) 0;
 		}
 	}
 	___nextTask___ = ((n + ((pid_t) 1)) == pid_max) ? ((pid_t) PID_USERSTART) : (n + ((pid_t) 1));
@@ -57,10 +57,13 @@ pid_t Threads_addThread(struct Thread* thread, int newGroup) {
 }
 int Threads_findNext(uintptr suspect, uintptr u) {
 	struct Map_pair* pair = (struct Map_pair*) suspect;
+	if (!(Threads_isScheduled(((struct Thread*) (pair->value))->dispo))) {
+		return 1;
+	}
 	uintptr key = pair->key;
-	if (key > (((uintptr*) u)[1])) {
-		if (key < (((uintptr*) u)[0])) {
-			((uintptr*) u)[0] = key;
+	if (key > (((pid_t*) u)[1])) {
+		if (key < (((pid_t*) u)[0])) {
+			((pid_t*) u)[0] = key;
 		}
 	}
 	return 1;
@@ -78,13 +81,13 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	if (st == ((uintptr) (-1))) {
 		bugCheckNum(0x0002 | FAILMASK_THREADS);// The current thread seemingly does not exist
 	}
-	uintptr uu[2];
-	uu[0] = (uintptr) pid_max;// TODO Ensure that the `uintptr' type is at least as wide as the `pid_t' type and that the conversions both ways between the types are reversible by doing the inverse conversion
-	uu[1] = (uintptr) currentThread;
+	pid_t uu[2];
+	uu[0] = pid_max;
+	uu[1] = currentThread;
 	Map_findByCompare((uintptr) uu, Threads_findNext, ___taskMap___);
 	if (uu[0] == (pid_max)) {
 		if (Map_fetch((uintptr) ((pid_t) 0), ___taskMap___) == ((uintptr) (-1))) {
-			uu[1] = (uintptr) ((pid_t) 0);
+			uu[1] = (pid_t) 0;
 			Map_findByCompare((uintptr) uu, Threads_findNext, ___taskMap___);
 			if (uu[0] == pid_max) {
 				bugCheckNum(0x0004 | FAILMASK_THREADS);// TODO UGRENT There would be no threads running, seemingly. Is this allowed under Linux?
@@ -99,7 +102,7 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 		return;
 	}
 	flushThreadState(&(((struct Thread*) st)->state));
-	uintptr thn = Map_fetch(uu[0], ___taskMap___);
+	uintptr thn = Map_fetch((uintptr) (uu[0]), ___taskMap___);
 	if (thn == ((uintptr) (-1))) {
 		bugCheckNum(0x0003 | FAILMASK_THREADS);// The planned thread seemingly does not exist
 	}
@@ -119,12 +122,15 @@ void Threads_nextThread(void) {// MAY ONLY BE CALLED WHEN THE INTERRUPT FLAG IS 
 	Mutex_release(&Threads_threadManage);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7);
 	Seg_enable(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 13);
-	currentThread = (pid_t) uu[0];
+	currentThread = uu[0];
 	PerThreadgroup_context = thns->group;
 	PerThread_context = &(thns->thread);
 	Thread_context = thns;
 	mem_barrier();
 	return;
+}
+int Threads_kernelExecution(void) {
+	return (TS_isBusy(((SegDesc*) (((volatile char*) physicalZero) + 0x800)) + 7)) ? 1 : 0;
 }
 pid_t Threads_executionFork(struct Thread* newThread, void* stack) {// THIS FUNCTION MAY BE CALLED ONLY THROUGH THE `kfunc' INTERFACE; the argument `stack' is the first byte not in the stack if 'MACHINE_KSTACK_GROWSDOWN' is nonzero and otherwise is the first byte in the stack
 	pid_t n = Threads_insertThread(newThread, 1);

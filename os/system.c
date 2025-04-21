@@ -3,6 +3,8 @@
 #endif
 #define RELOC 0x00040000
 #define MACHINE_KSTACK_GROWSDOWN 1
+#define SCHED_INCR_PICOS 10000153651ULL
+#define SCHED_INCR_MICROS 10000
 // The value of `RELOC' MUST be a positive integer multiple of the value of `PAGE_SIZE'
 #define physicalZero ((volatile void*) (((uintptr) 0) - ((uintptr) RELOC)))
 // TODO URGENT Ensure that pointer underflow acts as expected
@@ -451,8 +453,6 @@ unsigned long kfct(unsigned long arg0, unsigned long arg1, unsigned long arg2, u
 	}
 	return Thread_context->state.invocData.data[0];
 }
-#define SCHED_INCR_PICOS 10000153651ULL
-#define SCHED_INCR_MICROS 10000
 void irupt_handler_70h(void) {// IRQ 0, frequency (Hz) = (1193181 + (2/3)) / 11932 = 3579545 / 35796
 	PIT0Ticks++;
 	if (((PIT0Ticks * ((unsigned long long) 35796)) % ((unsigned long long) 3579545)) < ((unsigned long long) 35796)) {
@@ -672,6 +672,8 @@ void systemEntry(void) {// TODO URGENT Ensure that the system has enough contigu
 	Map_add(6, 5, PerThreadgroup_context->desctors);// "ATA Drive 4" for `init'
 	Scheduler_clearRusage(&(PerThreadgroup_context->reaped));
 	Mutex_initUnlocked(&(PerThreadgroup_context->reapedLock));
+	Scheduler_clearRusage(&(PerThreadgroup_context->tusage));
+	Mutex_initUnlocked(&(PerThreadgroup_context->tusageLock));
 	Scheduler_clearRusage(&(PerThread_context->usage));
 	PerThread_context->ruid = 0;
 	PerThread_context->euid = 0;
